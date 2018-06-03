@@ -33,9 +33,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/AidosKuneen/aknode/imesh"
+	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/rpc"
 	"github.com/AidosKuneen/aknode/setting"
+
 	"github.com/natefinch/lumberjack"
 )
 
@@ -44,7 +47,6 @@ func onSigs(se *setting.Setting) {
 	signal.Notify(sig,
 		syscall.SIGHUP,
 		syscall.SIGINT,
-		syscall.SIGUSR1,
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 
@@ -104,7 +106,15 @@ func main() {
 
 	setting := setting.Init("aknode.json")
 	onSigs(setting)
+	node.Init(setting)
+	imesh.Init(setting)
+	leaves.Init(setting)
+	if err := node.Bootstrap(setting); err != nil {
+		fmt.Println(err)
+		log.Fatal(err)
+	}
 	runNode(setting)
+	node.GoCron(setting)
 
 	if setting.Debug {
 		//for pprof
@@ -166,7 +176,11 @@ func runNode(setting *setting.Setting) {
 				}
 				log.Fatal(err)
 			}
-			go node.Handle(setting, conn)
+			if err := node.Handle(setting, conn); err != nil {
+				if err := conn.Close(); err != nil {
+					log.Println(err)
+				}
+			}
 		}
 	}()
 }

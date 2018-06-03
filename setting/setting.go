@@ -39,10 +39,10 @@ const (
 
 //Setting is  a aknode setting.
 type Setting struct {
-	Debug        bool     `json:"debug"`
-	Testnet      byte     `json:"testnet"`
-	BlacklistIPs []string `json:"blacklist_ips"`
-	NetworkType  byte     `json:"network_type"`
+	Debug       bool     `json:"debug"`
+	Testnet     byte     `json:"testnet"`
+	Blacklists  []string `json:"blacklist_ips"`
+	NetworkType byte     `json:"network_type"`
 
 	MyHostName     string   `json:"my_ip"`
 	DefaultNodes   []string `json:"default_nodes"`
@@ -114,4 +114,14 @@ func Init(fname string) *Setting {
 		panic(err)
 	}
 	return &se
+}
+
+//InBlacklist returns true if remote is in blacklist.
+func (s *Setting) InBlacklist(remote string) bool {
+	for _, b := range s.Blacklists {
+		if remote == b {
+			return true
+		}
+	}
+	return false
 }

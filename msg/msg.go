@@ -23,9 +23,9 @@ package msg
 import (
 	"errors"
 	"net"
-	"time"
 
 	"github.com/AidosKuneen/aklib/arypack"
+	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/setting"
 
@@ -34,19 +34,18 @@ import (
 
 //Commands in Header.
 const (
-	CmdVersion    byte = iota //Header + Version  p2p
-	CmdVerack                 // Header  p2p
-	CmdPing                   // Header + Nonce ,p2p
-	CmdPong                   // Header+ Nonce,p2p
-	CmdGetAddr                // Header,p2p
-	CmdAddr                   // Header * Addrs,p2p
-	CmdInv                    // Header + Inventories,broadcast
-	CmdGetData                // Header+ Inventories,p2p
-	CmdNotfound               // Header+ Inventories,p2p
-	CmdTxs                    // Header+ Txs,p2p
-	CmdStatements             // Header + Statements,p2p
-	CmdGetLeaves              // Header,p2p
-	CmdLeaves                 // Header + Inventories,p2p
+	CmdVersion   byte = iota + 1 //Header + Version  p2p
+	CmdVerack                    // Header  p2p
+	CmdPing                      // Header + Nonce ,p2p
+	CmdPong                      // Header+ Nonce,p2p
+	CmdGetAddr                   // Header,p2p
+	CmdAddr                      // Header * Addrs,p2p
+	CmdInv                       // Header + Inventories,broadcast
+	CmdGetData                   // Header+ Inventories,p2p
+	CmdTxs                       // Header+ Hashes,p2p
+	CmdGetLeaves                 // Header,p2p
+	CmdLeaves                    // Header + Inventories,p2p
+	CmdClose                     //Header,p2p
 )
 
 //Services in Version mesasge.
@@ -57,23 +56,31 @@ const (
 
 //Invenory types
 const (
-	InvError byte = iota
-	InvTx
-	InvMinFeeTx
-	InvMinTicketTx
-	InvStatement
-	InvQuorumSet
+	InvTx byte = iota
+	InvMinableTx
 )
 
+//InvType return inventory type from tx type.
+func InvType(typ byte) (byte, error) {
+	switch typ {
+	case tx.RewardTicket:
+		return db.HeaderTicketTx, nil
+	case tx.RewardFee:
+		return db.HeaderFeeTx, nil
+	default:
+		return 255, errors.New("invalid type")
+	}
+}
+
+//Maxs for messages.
 const (
-	maxLength    = 2000000
-	maxAddrs     = 1000
-	maxInv       = 1000
-	maxTx        = 500
-	maxStatement = 1000
+	MaxLength = 2000000
+	MaxAddrs  = 1000
+	MaxInv    = 50000
+	MaxTx     = 500
 )
 
-const userAgent = "AKnode Versin 1.0"
+const userAgent = "AKnode Versin 0.0"
 
 //MessageVersion is a version of the message.
 const MessageVersion = 1
@@ -95,13 +102,13 @@ type Version struct {
 }
 
 //Addr is an IP address and port.
-type Addr []byte
+type Addr struct {
+	Address string
+	Port    uint16
+}
 
 //Addrs provides information on known nodes of the network.
-type Addrs struct {
-	Timestamp time.Time
-	Addrs     []Addr
-}
+type Addrs []Addr
 
 //Inventory vectors are used for notifying other nodes about objects they have or data which is being requested.
 type Inventory struct {
@@ -118,6 +125,9 @@ type Txs []*tx.Transaction
 //Nonce  is a  nonce for ping and pong.
 type Nonce [32]byte
 
+//Hashes  is a  slice of tx hash.
+type Hashes [][32]byte
+
 //GetLeaves is for getting leaves from From to To.
 type GetLeaves struct {
 	From [32]byte
@@ -126,34 +136,45 @@ type GetLeaves struct {
 
 //Write write a message to con.
 func Write(s *setting.Setting, m interface{}, cmd byte, conn *net.TCPConn) error {
-	dat := arypack.Marshal(m)
-	if len(dat) > maxLength {
-		return errors.New("packet is too big")
+	var dat []byte
+	if m != nil {
+		dat = arypack.Marshal(m)
+		if len(dat) > MaxLength {
+			return errors.New("packet is too big")
+		}
 	}
 	h := &Header{
 		Magic:   s.Config.MessageMagic,
 		Length:  uint32(len(dat)),
 		Command: cmd,
 	}
-	dat2 := arypack.Marshal(h)
-
-	if _, err := conn.Write(dat); err != nil {
+	if _, err := conn.Write(arypack.Marshal(h)); err != nil {
 		return err
 	}
-	_, err := conn.Write(dat2)
+	if m == nil {
+		return nil
+	}
+	_, err := conn.Write(dat)
 	return err
 }
 
-//ReadHeader read a message from con and returns msg type and its contents in byte.
+//ReadHeader read a message from con and returns msg type.
 func ReadHeader(s *setting.Setting, conn *net.TCPConn) (byte, []byte, error) {
 	var h Header
 	var err error
 
-	enc := msgpack.NewEncoder(conn).StructAsArray(true)
-	if err := enc.Encode(&h); err != nil {
-		return 0, nil, err
+	for {
+		dec := msgpack.NewDecoder(conn)
+		if err := dec.Decode(&h); err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+				continue
+			} else {
+				return 0, nil, err
+			}
+		}
+		break
 	}
-	if h.Length > maxLength {
+	if h.Length > MaxLength {
 		return 0, nil, errors.New("message is too big")
 	}
 	if s.Config.MessageMagic != h.Magic {
@@ -175,24 +196,25 @@ func ReadHeader(s *setting.Setting, conn *net.TCPConn) (byte, []byte, error) {
 //ReadVersion read and make a Version struct.
 func ReadVersion(buf []byte) (*Version, error) {
 	var v Version
-	err := arypack.Unmarshal(buf, &v)
+	if err := arypack.Unmarshal(buf, &v); err != nil {
+		return nil, err
+	}
 	if v.Version != MessageVersion {
 		return nil, errors.New("invalid version")
 	}
 	if v.Service != ServiceFull {
 		return nil, errors.New("unknown service")
 	}
-	return &v, err
+	return &v, nil
 }
 
 //ReadAddrs read and make a Addrs struct.
 func ReadAddrs(buf []byte) (*Addrs, error) {
 	var v Addrs
-	err := arypack.Unmarshal(buf, &v)
-	if err != nil {
+	if err := arypack.Unmarshal(buf, &v); err != nil {
 		return nil, err
 	}
-	if len(v.Addrs) > maxAddrs {
+	if len(v) > MaxAddrs {
 		return nil, errors.New("addrs is too long")
 	}
 	return &v, nil
@@ -201,35 +223,43 @@ func ReadAddrs(buf []byte) (*Addrs, error) {
 //ReadInventories read and make a Addrs struct.
 func ReadInventories(buf []byte) (Inventories, error) {
 	var v Inventories
-	err := arypack.Unmarshal(buf, &v)
-	if len(v) > maxInv {
+	if err := arypack.Unmarshal(buf, &v); err != nil {
+		return nil, err
+	}
+	if len(v) > MaxInv {
 		return nil, errors.New("Inventories is too long")
 	}
-	return v, err
+	return v, nil
 }
 
 //ReadTxs read and make a Addrs struct.
 func ReadTxs(buf []byte) (Txs, error) {
 	var v Txs
-	err := arypack.Unmarshal(buf, &v)
-	if len(v) > maxTx {
+	if err := arypack.Unmarshal(buf, &v); err != nil {
+		return nil, err
+	}
+	if len(v) > MaxTx {
 		return nil, errors.New("Txs is too long")
 	}
-	return v, err
+	return v, nil
 }
 
 //ReadNonce read and make a Addrs struct.
-func ReadNonce(buf []byte) (Nonce, error) {
+func ReadNonce(buf []byte) (*Nonce, error) {
 	var v Nonce
-	err := arypack.Unmarshal(buf, &v)
-	return v, err
+	if err := arypack.Unmarshal(buf, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
 }
 
 //ReadGetLeaves read and make a GetLeaves struct.
 func ReadGetLeaves(buf []byte) (*GetLeaves, error) {
 	var v GetLeaves
-	err := arypack.Unmarshal(buf, &v)
-	return &v, err
+	if err := arypack.Unmarshal(buf, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
 }
 
 //NewVersion returns Verstion struct.
@@ -239,7 +269,10 @@ func NewVersion(s *setting.Setting, to Addr) *Version {
 		Service:   ServiceFull,
 		UserAgent: userAgent,
 		AddrTo:    to,
-		AddrFrom:  Addr(s.MyHostName),
+		AddrFrom: Addr{
+			Address: s.MyHostName,
+			Port:    s.Port,
+		},
 	}
 	return v
 }
