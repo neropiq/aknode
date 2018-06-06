@@ -24,14 +24,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path"
 	"runtime"
 	"syscall"
-	"time"
 
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
@@ -113,7 +111,7 @@ func main() {
 		fmt.Println(err)
 		log.Fatal(err)
 	}
-	runNode(setting)
+	node.Run(setting)
 	node.GoCron(setting)
 
 	if setting.Debug {
@@ -125,62 +123,6 @@ func main() {
 	}
 
 	if setting.RunRPCServer {
-		runRPC(setting)
+		rpc.Run(setting)
 	}
-}
-
-func runRPC(setting *setting.Setting) {
-	ipport := fmt.Sprintf("%s:%d", setting.RPCBind, setting.RPCPort)
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		rpc.Handle(setting, w, r)
-	})
-
-	s := &http.Server{
-		Addr:              ipport,
-		Handler:           mux,
-		ReadTimeout:       time.Minute,
-		WriteTimeout:      time.Minute,
-		ReadHeaderTimeout: time.Minute,
-		MaxHeaderBytes:    1 << 20,
-	}
-	fmt.Printf("Starting RPC Server on " + ipport + "\n")
-	go func() {
-		log.Println(s.ListenAndServe())
-	}()
-}
-
-func runNode(setting *setting.Setting) {
-	ipport := fmt.Sprintf("%s:%d", setting.Bind, setting.Port)
-	tcpAddr, err := net.ResolveTCPAddr("tcp", ipport)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	l, err := net.ListenTCP("tcp", tcpAddr)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	fmt.Printf("Starting node Server on " + ipport + "\n")
-	go func() {
-		defer l.Close()
-		for {
-			conn, err := l.AcceptTCP()
-			if err != nil {
-				if ne, ok := err.(net.Error); ok {
-					if ne.Temporary() {
-						log.Println("AcceptTCP", err)
-						continue
-					}
-				}
-				log.Fatal(err)
-			}
-			if err := node.Handle(setting, conn); err != nil {
-				if err := conn.Close(); err != nil {
-					log.Println(err)
-				}
-			}
-		}
-	}()
 }

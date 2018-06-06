@@ -18,39 +18,58 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package rpc
+package msg
 
 import (
-	"fmt"
-	"log"
-	"net/http"
-	"time"
+	"bytes"
+	"testing"
 
+	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-//Run runs RPC server.
-func Run(setting *setting.Setting) {
-	ipport := fmt.Sprintf("%s:%d", setting.RPCBind, setting.RPCPort)
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		handle(setting, w, r)
-	})
-
-	s := &http.Server{
-		Addr:              ipport,
-		Handler:           mux,
-		ReadTimeout:       time.Minute,
-		WriteTimeout:      time.Minute,
-		ReadHeaderTimeout: time.Minute,
-		MaxHeaderBytes:    1 << 20,
+func TestMsg(t *testing.T) {
+	s := &setting.Setting{
+		Config: aklib.TestConfig,
 	}
-	fmt.Printf("Starting RPC Server on " + ipport + "\n")
-	go func() {
-		log.Println(s.ListenAndServe())
-	}()
+	var buf bytes.Buffer
+	var nonce Nonce
+	for i := range nonce {
+		nonce[i] = byte(i)
+	}
+	if err := Write(s, &nonce, CmdPing, &buf); err != nil {
+		t.Error(err)
+	}
+	cmd, body, err := ReadHeader(s, &buf)
+	if err != nil {
+		t.Error(err)
+	}
+	if cmd != CmdPing {
+		t.Error("invalid write/read")
+	}
+	n, err := ReadNonce(body)
+	if err != nil {
+		t.Error(err)
+	}
+	if *n != nonce {
+		t.Error("invalid readnonce")
+	}
 }
 
-//Handle handles api calls.
-func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+func TestMsgErr(t *testing.T) {
+	s := &setting.Setting{
+		Config: aklib.TestConfig,
+	}
+	var buf bytes.Buffer
+	var nonce Nonce
+	for i := range nonce {
+		nonce[i] = byte(i)
+	}
+	if err := Write(s, &nonce, CmdPing, &buf); err != nil {
+		t.Error(err)
+	}
+	buf.Truncate(1)
+	if _, _, err := ReadHeader(s, &buf); err == nil {
+		t.Error("should be error")
+	}
 }

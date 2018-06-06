@@ -44,7 +44,7 @@ func Init(s *setting.Setting) {
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &nodesDB.Addrs, db.HeaderNodeIP)
 	})
-	if err != nil {
+	if err != nil && err != badger.ErrKeyNotFound {
 		fmt.Println(err)
 		log.Fatal(err)
 	}

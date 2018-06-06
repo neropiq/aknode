@@ -22,6 +22,7 @@ package msg
 
 import (
 	"errors"
+	"io"
 	"net"
 
 	"github.com/AidosKuneen/aklib/arypack"
@@ -80,7 +81,7 @@ const (
 	MaxTx     = 500
 )
 
-const userAgent = "AKnode Versin 0.0"
+const userAgent = "AKnode Versin 0.01"
 
 //MessageVersion is a version of the message.
 const MessageVersion = 1
@@ -135,7 +136,7 @@ type GetLeaves struct {
 }
 
 //Write write a message to con.
-func Write(s *setting.Setting, m interface{}, cmd byte, conn *net.TCPConn) error {
+func Write(s *setting.Setting, m interface{}, cmd byte, conn io.ReadWriter) error {
 	var dat []byte
 	if m != nil {
 		dat = arypack.Marshal(m)
@@ -159,7 +160,7 @@ func Write(s *setting.Setting, m interface{}, cmd byte, conn *net.TCPConn) error
 }
 
 //ReadHeader read a message from con and returns msg type.
-func ReadHeader(s *setting.Setting, conn *net.TCPConn) (byte, []byte, error) {
+func ReadHeader(s *setting.Setting, conn io.ReadWriter) (byte, []byte, error) {
 	var h Header
 	var err error
 

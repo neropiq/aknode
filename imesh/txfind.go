@@ -60,7 +60,7 @@ func Init(s *setting.Setting) error {
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &unresolved, db.HeaderUnresolvedInfo)
 	})
-	if err != nil {
+	if err != nil && err != badger.ErrKeyNotFound {
 		return err
 	}
 	for h, tr := range unresolved.Txs {

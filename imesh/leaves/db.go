@@ -21,17 +21,15 @@
 package leaves
 
 import (
-	"bytes"
 	"fmt"
 	"log"
-	"sort"
 	"sync"
-
-	"github.com/AidosKuneen/aklib/tx"
 
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/rand"
+	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/setting"
+
 	"github.com/dgraph-io/badger"
 )
 
@@ -46,7 +44,7 @@ func Init(s *setting.Setting) {
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &leaves.hash, db.HeaderLeaves)
 	})
-	if err != nil {
+	if err != nil && err != badger.ErrKeyNotFound {
 		fmt.Println(err)
 		log.Fatal(err)
 	}
@@ -55,15 +53,15 @@ func Init(s *setting.Setting) {
 //Get gets n random leaves. if <=0, it returns all leaves.
 func Get(n int) ([]tx.Hash, error) {
 	leaves.RLock()
-	defer leaves.Unlock()
-	r := make([]tx.Hash, 0, len(leaves.hash))
+	defer leaves.RUnlock()
+	r := make([]tx.Hash, len(leaves.hash))
 	copy(r, leaves.hash)
 
-	for i := n - 1; i >= 0; i-- {
+	for i := len(r) - 1; i >= 0; i-- {
 		j := rand.R.Intn(i + 1)
 		r[i], r[j] = r[j], r[i]
 	}
-	if n < len(leaves.hash) || n <= 0 {
+	if n >= len(leaves.hash) || n <= 0 {
 		return r, nil
 	}
 	return r[:n], nil
@@ -71,7 +69,6 @@ func Get(n int) ([]tx.Hash, error) {
 
 type txsearch struct {
 	*tx.Transaction
-	hash    []byte
 	visited bool
 }
 
@@ -79,11 +76,14 @@ type txsearch struct {
 func CheckAdd(s *setting.Setting, trs ...*tx.Transaction) error {
 	leaves.Lock()
 	defer leaves.Unlock()
-	txs := isVisited(trs, leaves.hash)
+	txs := isVisited(trs)
 	leaves.hash = leaves.hash[:0]
-	for _, tr := range txs {
+	//h is reused (i.e. always same object) in for loop, so need to clone it.
+	for h, tr := range txs {
 		if !tr.visited {
-			leaves.hash = append(leaves.hash, tr.hash)
+			hh := make(tx.Hash, 32)
+			copy(hh, h[:])
+			leaves.hash = append(leaves.hash, hh)
 		}
 	}
 	return put(s)
@@ -95,25 +95,20 @@ func put(s *setting.Setting) error {
 	})
 }
 
-func isVisited(trs []*tx.Transaction, leaves []tx.Hash) []*txsearch {
-	txs := make([]*txsearch, len(trs)+len(leaves))
-	for i, tr := range trs {
-		txs[i].Transaction = tr
-		txs[i].hash = tr.Hash()
+func isVisited(trs []*tx.Transaction) map[[32]byte]*txsearch {
+	txs := make(map[[32]byte]*txsearch)
+	for _, tr := range trs {
+		txs[tr.Hash().Array()] = &txsearch{
+			Transaction: tr,
+		}
 	}
-	for i, l := range leaves {
-		txs[len(trs)+i].hash = l
+	for _, l := range leaves.hash {
+		txs[l.Array()] = &txsearch{}
 	}
-	sort.Slice(txs, func(i, j int) bool {
-		return bytes.Compare(txs[i].hash, txs[j].hash) < 0
-	})
 	for _, tr := range trs {
 		for _, prev := range tr.Previous {
-			i := sort.Search(len(txs), func(i int) bool {
-				return bytes.Compare(txs[i].hash, prev) >= 0
-			})
-			if i < len(txs) && bytes.Equal(txs[i].hash, prev) {
-				txs[i].visited = true
+			if t, ok := txs[prev.Array()]; ok {
+				t.visited = true
 			}
 		}
 	}

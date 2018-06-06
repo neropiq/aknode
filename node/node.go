@@ -22,6 +22,7 @@ package node
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"strconv"
@@ -72,30 +73,6 @@ func writeVersion(s *setting.Setting, to msg.Addr, conn *net.TCPConn) error {
 	if cmd != msg.CmdVerack {
 		return errors.New("message must be verack after Version")
 	}
-	return nil
-}
-
-//Handle handles messages in tcp.
-func Handle(s *setting.Setting, conn *net.TCPConn) error {
-	var err error
-	if err := conn.SetDeadline(time.Now().Add(rwTimeout)); err != nil {
-		log.Println(err)
-		return err
-	}
-	p, err := readVersion(s, conn)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	if err := writeVersion(s, p.from, conn); err != nil {
-		log.Println(err)
-		return err
-	}
-	if err := p.Add(); err != nil {
-		log.Println(err)
-		return err
-	}
-	go p.Run(s)
 	return nil
 }
 
@@ -161,5 +138,65 @@ func Bootstrap(s *setting.Setting) error {
 			}
 		}()
 	}
+	return nil
+}
+
+//Run runs a node server.
+func Run(setting *setting.Setting) {
+	ipport := fmt.Sprintf("%s:%d", setting.Bind, setting.Port)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", ipport)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	l, err := net.ListenTCP("tcp", tcpAddr)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	fmt.Printf("Starting node Server on " + ipport + "\n")
+	go func() {
+		defer l.Close()
+		for {
+			conn, err := l.AcceptTCP()
+			if err != nil {
+				if ne, ok := err.(net.Error); ok {
+					if ne.Temporary() {
+						log.Println("AcceptTCP", err)
+						continue
+					}
+				}
+				log.Fatal(err)
+			}
+			if err := handle(setting, conn); err != nil {
+				if err := conn.Close(); err != nil {
+					log.Println(err)
+				}
+			}
+		}
+	}()
+}
+
+//Handle handles messages in tcp.
+func handle(s *setting.Setting, conn *net.TCPConn) error {
+	var err error
+	if err := conn.SetDeadline(time.Now().Add(rwTimeout)); err != nil {
+		log.Println(err)
+		return err
+	}
+	p, err := readVersion(s, conn)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	if err := writeVersion(s, p.from, conn); err != nil {
+		log.Println(err)
+		return err
+	}
+	if err := p.Add(); err != nil {
+		log.Println(err)
+		return err
+	}
+	go p.Run(s)
 	return nil
 }

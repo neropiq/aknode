@@ -18,39 +18,37 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package rpc
+package imesh
 
 import (
-	"fmt"
 	"log"
-	"net/http"
-	"time"
+	"os"
+	"testing"
 
+	"github.com/AidosKuneen/aklib"
+
+	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-//Run runs RPC server.
-func Run(setting *setting.Setting) {
-	ipport := fmt.Sprintf("%s:%d", setting.RPCBind, setting.RPCPort)
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		handle(setting, w, r)
-	})
+var s setting.Setting
 
-	s := &http.Server{
-		Addr:              ipport,
-		Handler:           mux,
-		ReadTimeout:       time.Minute,
-		WriteTimeout:      time.Minute,
-		ReadHeaderTimeout: time.Minute,
-		MaxHeaderBytes:    1 << 20,
+func TestMain(m *testing.M) {
+	var err error
+	if err := os.RemoveAll("./test_db"); err != nil {
+		log.Println(err)
 	}
-	fmt.Printf("Starting RPC Server on " + ipport + "\n")
-	go func() {
-		log.Println(s.ListenAndServe())
-	}()
+	s.DB, err = db.Open("./test_db")
+	if err != nil {
+		panic(err)
+	}
+	s.Config = aklib.TestConfig
+	c := m.Run()
+	if err := os.RemoveAll("./test_db"); err != nil {
+		log.Println(err)
+	}
+	os.Exit(c)
 }
 
-//Handle handles api calls.
-func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+func TestImesh(t *testing.T) {
 }
