@@ -22,9 +22,11 @@ package setting
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
+	"os/user"
+	"path/filepath"
 
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/db"
@@ -43,6 +45,7 @@ type Setting struct {
 	Testnet     byte     `json:"testnet"`
 	Blacklists  []string `json:"blacklist_ips"`
 	NetworkType byte     `json:"network_type"`
+	RootDir     string   `json:"root_dir"`
 
 	MyHostName     string   `json:"my_ip"`
 	DefaultNodes   []string `json:"default_nodes"`
@@ -51,45 +54,61 @@ type Setting struct {
 	MaxConnections uint16   `json:"max_connections"`
 	Proxy          string   `json:"proxy"`
 
-	RunRPCServer      bool     `json:"run_rpc_server"`
-	RPCBind           string   `json:"rpc_bind"`
-	RPCPort           uint16   `json:"rpc_port"`
-	RPCUser           string   `json:"rpc_user"`
-	RPCPassword       string   `json:"rpc_password"`
-	RPCAllowIPs       []string `json:"rpc_allow_ips"`
-	RPCMaxConnections uint16   `json:"rpc_max_connections"`
-	RPCProxy          string   `json:"rpc_proxy"`
+	RunRPCServer      bool   `json:"run_rpc"`
+	RPCType           byte   `json:"rpc_type"`
+	RPCBind           string `json:"rpc_bind"`
+	RPCPort           uint16 `json:"rpc_port"`
+	RPCUser           string `json:"rpc_user"`
+	RPCPassword       string `json:"rpc_password"`
+	RPCMaxConnections uint16 `json:"rpc_max_connections"`
+	RPCProxy          string `json:"rpc_proxy"`
 
-	RunValidator bool     `json:"run_validator"`
-	Validators   []string `json:"validtors"`
+	RunValidator bool `json:"run_validator"`
+	//Validators   []string `json:"validtors"`
+
+	RunExplorer            bool   `json:"run_explore"`
+	ExplorerBind           string `json:"explorer_bind"`
+	ExplorerPort           uint16 `json:"explorer_port"`
+	ExplorerMaxConnections uint16 `json:"explorer_max_connections"`
+	ExplorerProxy          string `json:"explorer_proxy"`
 
 	DB     *badger.DB    `json:"-"`
 	Config *aklib.Config `json:"-"`
 }
 
-//Init parse a json file fname , open DB and returns Settings struct .
-func Init(fname string) *Setting {
-	s, err := ioutil.ReadFile(fname)
-	if err != nil {
-		log.Println(err)
-		os.Exit(1)
-	}
+//Load parse a json file fname , open DB and returns Settings struct .
+func Load(fname string) *Setting {
 	var se Setting
-	if err := json.Unmarshal(s, &se); err != nil {
-		log.Println(err)
+	var err error
+	if fname != "" {
+		s, err := ioutil.ReadFile(fname)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		if err := json.Unmarshal(s, &se); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+	}
+	if int(se.Testnet) > len(aklib.Configs) {
+		fmt.Println("testnet must be 0(mainnet) or 1")
 		os.Exit(1)
 	}
+	net := aklib.Configs[se.Testnet]
 	if se.NetworkType != NetworkIP {
-		log.Println("invalid network type")
+		fmt.Println("invalid network type")
 		os.Exit(1)
+	}
+	usr, err := user.Current()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	if se.RootDir == "" {
+		se.RootDir = filepath.Join(usr.HomeDir, ".aknode")
 	}
 
-	if int(se.Testnet) > len(aklib.Configs) {
-		log.Println("testnet must be 0(mainnet) or 1")
-		os.Exit(1)
-	}
-	se.Config = aklib.Configs[se.Testnet]
-	net := aklib.Configs[se.Testnet]
 	if se.Bind == "" {
 		se.Bind = "0.0.0.0"
 	}
@@ -99,21 +118,55 @@ func Init(fname string) *Setting {
 	if se.MaxConnections == 0 {
 		se.MaxConnections = 10
 	}
-
+	if se.RPCType != NetworkIP && se.RPCType != NetworkTor {
+		fmt.Println("invalid RPC type")
+		os.Exit(1)
+	}
 	if se.RPCBind == "" {
 		se.RPCBind = "localhost"
 	}
 	if se.RPCPort == 0 {
 		se.RPCPort = net.DefaultRPCPort
 	}
-
-	//need extra checks for quorum
-
-	se.DB, err = db.Open("db")
-	if err != nil {
-		panic(err)
+	if se.RunRPCServer && (se.RPCUser == "" || se.RPCPassword == "") {
+		fmt.Println("You must specify rpc_user and rpc_password")
+		os.Exit(1)
 	}
+	if se.RPCMaxConnections == 0 {
+		se.MaxConnections = 1
+	}
+
+	if se.ExplorerBind == "" {
+		se.RPCBind = "localhost"
+	}
+	if se.ExplorerPort == 0 {
+		se.RPCPort = net.DefaultExplorerPort
+	}
+	if se.ExplorerMaxConnections == 0 {
+		se.ExplorerMaxConnections = 1
+	}
+
+	dbDir := filepath.Join(se.BaseDir(), "db")
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	se.DB, err = db.Open(dbDir)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	if err := os.MkdirAll(se.BaseDir(), 0755); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	se.Config = aklib.Configs[se.Testnet]
 	return &se
+}
+
+//BaseDir returns a dir which contains a setting file and db dir.
+func (s *Setting) BaseDir() string {
+	return filepath.Join(s.RootDir, s.Config.Name)
 }
 
 //InBlacklist returns true if remote is in blacklist.

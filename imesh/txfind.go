@@ -21,10 +21,14 @@
 package imesh
 
 import (
+	"errors"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/AidosKuneen/aklib"
+
+	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
@@ -33,48 +37,100 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
+//HashWithType is hash with tx type.
+type HashWithType struct {
+	Hash tx.Hash
+	Type tx.Type
+}
+
 type unresolvedTx struct {
-	body       *tx.Body
+	prevs      []tx.Hash
+	Type       tx.Type
 	unresolved bool
 	visited    bool
 	broken     bool
-	minable    bool
 }
 
 //Noexist represents a non-existence transaction.
 type Noexist struct {
-	Hash     tx.Hash
+	*HashWithType
 	Sleep    time.Duration
 	Searched time.Time
-	Minable  bool
 }
 
 var unresolved = struct {
 	Txs      map[[32]byte]*unresolvedTx
 	Noexists map[[32]byte]*Noexist
 	sync.RWMutex
-}{}
+}{
+	Txs:      make(map[[32]byte]*unresolvedTx),
+	Noexists: make(map[[32]byte]*Noexist),
+}
 
-//Init initialize unresolved txs.
+//Init initialize imesh db and unresolved txs.
 func Init(s *setting.Setting) error {
-	err := s.DB.View(func(txn *badger.Txn) error {
+	unresolved.Txs = make(map[[32]byte]*unresolvedTx)
+	unresolved.Noexists = make(map[[32]byte]*Noexist)
+
+	var total uint64
+	tr := tx.Transaction{
+		Body: &tx.Body{
+			Outputs: make([]*tx.Output, 0, len(s.Config.Genesis)),
+		},
+	}
+	for adr, val := range s.Config.Genesis {
+		b, err := address.FromAddress58(adr)
+		if err != nil {
+			return err
+		}
+		total += val
+		tr.Outputs = append(tr.Outputs, &tx.Output{
+			Address: b,
+			Value:   val,
+		})
+	}
+	if total != aklib.ADKSupply {
+		return errors.New("invalid total supply")
+	}
+	has, err := Has(s, tr.Hash())
+	if err != nil {
+		return err
+	}
+	if !has {
+		if err := putTx(s, &tr); err != nil {
+			return err
+		}
+		t, err := GetTxInfo(s, tr.Hash())
+		if err != nil {
+			return err
+		}
+		t.Status = StatusConfirmed
+		if err := t.Put(s, tr.Hash()); err != nil {
+			return err
+		}
+		if err := leaves.CheckAdd(s, &tr); err != nil {
+			return err
+		}
+	}
+	err = s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &unresolved, db.HeaderUnresolvedInfo)
 	})
 	if err != nil && err != badger.ErrKeyNotFound {
 		return err
 	}
-	for h, tr := range unresolved.Txs {
-		t, err := GetTx(s, h[:])
+	for h, ut := range unresolved.Txs {
+		t, err := getUnresolvedTx(s, h[:])
 		if err != nil {
 			return nil
 		}
-		tr.body = t.Body
-		if err := t.Check(s.Config); err != nil {
-			if _, err2 := t.CheckMinable(s.Config); err2 != nil {
-				return err2
-			}
-			tr.minable = true
+		tr := &unresolvedTx{
+			prevs: prevs(t),
+			Type:  ut.Type,
 		}
+		if err := t.Check(s.Config, tr.Type); err != nil {
+			return err
+		}
+		unresolved.Txs[h] = tr
 	}
 	return nil
 }
@@ -85,8 +141,8 @@ func put(s *setting.Setting) error {
 	})
 }
 
-//AddTxHash adds a h as unresolved tx hash.
-func AddTxHash(s *setting.Setting, h tx.Hash, isMinable bool) error {
+//AddNoexistTxHash adds a h as unresolved tx hash.
+func AddNoexistTxHash(s *setting.Setting, h tx.Hash, typ tx.Type) error {
 	unresolved.Lock()
 	defer unresolved.Unlock()
 	has, err := Has(s, h)
@@ -96,55 +152,53 @@ func AddTxHash(s *setting.Setting, h tx.Hash, isMinable bool) error {
 	if has {
 		return nil
 	}
+	if _, exist := unresolved.Noexists[h.Array()]; exist {
+		return nil
+	}
 	unresolved.Noexists[h.Array()] = &Noexist{
-		Hash:    h,
-		Sleep:   time.Minute,
-		Minable: isMinable,
+		HashWithType: &HashWithType{
+			Hash: h,
+			Type: typ,
+		},
+		Sleep: time.Minute,
 	}
 	return nil
 }
 
 //CheckAddTx adds trs into imeash if they are already resolved.
 //If not adds to search cron.
-func CheckAddTx(s *setting.Setting, trs []*tx.Transaction) error {
+func CheckAddTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 	unresolved.Lock()
 	defer unresolved.Unlock()
-	for _, tr := range trs {
-		ng, err := isBrokenTx(s, tr.Hash())
-		if err != nil {
-			return err
-		}
-		if ng {
-			continue
-		}
-		minable := false
-		if err := tr.Check(s.Config); err != nil {
-			if _, err2 := tr.CheckMinable(s.Config); err2 == nil {
-				minable = true
-			} else {
-				if err1 := putBrokenTx(s, tr.Hash()); err1 != nil {
-					return err1
-				}
-				log.Println(err)
-				continue
-			}
-		}
-		has, err := Has(s, tr.Hash())
-		if err != nil {
-			return err
-		}
-		if has {
-			continue
-		}
-		if err := putUnresolvedTx(s, tr); err != nil {
-			return err
-		}
-		u := &unresolvedTx{
-			body:    tr.Body,
-			minable: minable,
-		}
-		unresolved.Txs[tr.Hash().Array()] = u
+	has, err := Has(s, tr.Hash())
+	if err != nil {
+		return err
 	}
+	if has {
+		return nil
+	}
+	ng, err := isBrokenTx(s, tr.Hash())
+	if err != nil {
+		return err
+	}
+	if ng {
+		return errors.New("tx is broken")
+	}
+	if err := tr.Check(s.Config, typ); err != nil {
+		log.Println(err)
+		if err1 := putBrokenTx(s, tr.Hash()); err1 != nil {
+			return err1
+		}
+		return err
+	}
+	if err := putUnresolvedTx(s, tr); err != nil {
+		return err
+	}
+	u := &unresolvedTx{
+		prevs: prevs(tr),
+		Type:  typ,
+	}
+	unresolved.Txs[tr.Hash().Array()] = u
 	return put(s)
 }
 
@@ -154,7 +208,7 @@ func GetSearchingTx(s *setting.Setting) ([]Noexist, error) {
 	defer unresolved.Unlock()
 	r := make([]Noexist, 0, len(unresolved.Noexists))
 	for _, n := range unresolved.Noexists {
-		if !n.Searched.IsZero() && n.Searched.Add(n.Sleep).Before(time.Now()) {
+		if !n.Searched.IsZero() && !n.Searched.Add(n.Sleep).Before(time.Now()) {
 			continue
 		}
 		r = append(r, *n)
@@ -166,121 +220,130 @@ func GetSearchingTx(s *setting.Setting) ([]Noexist, error) {
 
 //Resolve checks all reference of unresolvev txs
 //and add to imesh if all are resolved.
-func Resolve(s *setting.Setting) ([]tx.Hash, []tx.Hash, error) {
+func Resolve(s *setting.Setting) ([]*HashWithType, error) {
 	unresolved.Lock()
 	defer unresolved.Unlock()
-	ns, err := isResolved(s)
-	if err != nil {
-		return nil, nil, err
+	if err := isResolved(s); err != nil {
+		return nil, err
 	}
-	for _, n := range ns {
-		if _, ok := unresolved.Noexists[n.Hash.Array()]; !ok {
-			unresolved.Noexists[n.Hash.Array()] = n
-		}
-	}
-	var txH, minableH []tx.Hash
-	for h, tr := range unresolved.Txs {
-		tr.visited = false
+	var trs []*HashWithType
+	for hs, tr := range unresolved.Txs {
 		if !tr.broken && tr.unresolved {
+			tr.visited = false
 			tr.unresolved = false
 			continue
 		}
-		tra, err := getUnresolvedTx(s, h[:])
-		if err != nil {
-			return nil, nil, err
-		}
-		if err := deleteUnresolvedTx(s, h[:]); err != nil {
-			return nil, nil, err
-		}
-		delete(unresolved.Txs, h)
+		delete(unresolved.Txs, hs)
 		if tr.broken {
-			if err := putBrokenTx(s, h[:]); err != nil {
-				return nil, nil, err
-			}
 			continue
 		}
-		switch tr.minable {
-		case true:
-			minableH = append(minableH, h[:])
-			if _, err := tra.CheckAllMinable(getTxFunc(s), s.Config); err != nil {
-				log.Println(err)
-				continue
-			}
-			if err := PutMinableTx(s, tra); err != nil {
-				return nil, nil, err
-			}
-			continue
-		case false:
-			txH = append(txH, h[:])
-			if err := tra.CheckAll(getTxFunc(s), s.Config); err != nil {
-				log.Println(err)
-				continue
-			}
-			if err := putTx(s, tra); err != nil {
-				return nil, nil, err
-			}
-			if err := leaves.CheckAdd(s, tra); err != nil {
-				return nil, nil, err
-			}
-		}
+		h := make(tx.Hash, 32)
+		copy(h, hs[:])
+		trs = append(trs, &HashWithType{
+			Hash: h,
+			Type: tr.Type,
+		})
 	}
-	return txH, minableH, put(s)
+	return trs, put(s)
 }
 
-func isResolved(s *setting.Setting) ([]*Noexist, error) {
-	var ns []*Noexist
-	var err error
-	for _, tr := range unresolved.Txs {
-		ns, err = tr.dfs(s, nil)
-		if err != nil {
-			return nil, err
+func isResolved(s *setting.Setting) error {
+	for h, tr := range unresolved.Txs {
+		if err := tr.dfs(s, h); err != nil {
+			return err
 		}
 	}
-	return ns, nil
+	return nil
 }
-func (tr *unresolvedTx) dfs(s *setting.Setting, ns []*Noexist) ([]*Noexist, error) {
+func (tr *unresolvedTx) dfs(s *setting.Setting, h [32]byte) error {
 	if tr.visited {
-		return ns, nil
+		return nil
 	}
 	tr.visited = true
-	prevs := make([]tx.Hash, 0, len(tr.body.Previous)+1+
-		len(tr.body.Inputs)+len(tr.body.MultiSigIns))
-	for _, prev := range tr.body.Previous {
-		prevs = append(prevs, prev)
-	}
-	prevs = append(prevs, tr.body.TicketInput)
-	for _, prev := range tr.body.Inputs {
-		prevs = append(prevs, prev.PreviousTX)
-	}
-	for _, prev := range tr.body.MultiSigIns {
-		prevs = append(prevs, prev.PreviousTX)
-	}
-
-	for _, prev := range prevs {
+	for _, prev := range tr.prevs {
 		has, err := Has(s, prev)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if has {
 			continue
 		}
 		ng, err := isBrokenTx(s, prev)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if ng {
 			tr.broken = true
-			return ns, nil
+			return nil
 		}
-		if ptr, ok := unresolved.Txs[prev.Array()]; !ok || ptr.minable {
+		if ptr, ok := unresolved.Txs[prev.Array()]; !ok || ptr.Type != tx.TxNormal {
 			tr.unresolved = true
 			if _, ok1 := unresolved.Noexists[prev.Array()]; !ok1 {
-				ns = append(ns, &Noexist{
-					Hash:  prev,
+				unresolved.Noexists[prev.Array()] = &Noexist{
+					HashWithType: &HashWithType{
+						Hash: prev,
+						Type: tx.TxNormal,
+					},
 					Sleep: time.Minute,
-				})
+				}
+			}
+		} else {
+			if err := ptr.dfs(s, prev.Array()); err != nil {
+				return err
+			}
+			if ptr.broken {
+				tr.broken = true
+			}
+			if ptr.unresolved {
+				tr.unresolved = true
 			}
 		}
 	}
-	return ns, nil
+	if tr.broken || !tr.unresolved {
+		if err := resolved(s, tr, h[:]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func resolved(s *setting.Setting, tr *unresolvedTx, hs tx.Hash) error {
+	tra, err := getUnresolvedTx(s, hs)
+	if err != nil {
+		return err
+	}
+	if err := deleteUnresolvedTx(s, hs); err != nil {
+		return err
+	}
+	if tr.broken {
+		return putBrokenTx(s, hs)
+	}
+	if err := tra.CheckAll(getTxFunc(s), s.Config, tr.Type); err != nil {
+		tr.broken = true
+		log.Println(err)
+		return putBrokenTx(s, hs)
+	}
+	if tr.Type == tx.TxNormal {
+		if err := putTx(s, tra); err != nil {
+			return err
+		}
+		return leaves.CheckAdd(s, tra)
+	}
+	return PutMinableTx(s, tra, tr.Type)
+}
+
+func prevs(tr *tx.Transaction) []tx.Hash {
+	prevs := make([]tx.Hash, 0, len(tr.Previous)+1+
+		len(tr.Inputs)+len(tr.MultiSigIns))
+	prevs = append(prevs, tr.Previous...)
+	if tr.TicketInput != nil {
+		prevs = append(prevs, tr.TicketInput)
+	}
+	for _, prev := range tr.Inputs {
+		prevs = append(prevs, prev.PreviousTX)
+	}
+	for _, prev := range tr.MultiSigIns {
+		prevs = append(prevs, prev.PreviousTX)
+	}
+	return prevs
 }

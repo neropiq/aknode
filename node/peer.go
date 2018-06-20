@@ -27,9 +27,12 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sort"
 	"sync"
 	"time"
 
+	akrand "github.com/AidosKuneen/aklib/rand"
+	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 
 	"github.com/AidosKuneen/aknode/imesh"
@@ -44,9 +47,18 @@ const (
 
 //peers is a slice of connecting peers.
 var peers = struct {
-	Peers []*Peer
+	Peers map[*Peer]struct{}
 	sync.RWMutex
-}{}
+}{
+	Peers: make(map[*Peer]struct{}),
+}
+
+var banned = struct {
+	addr map[string]time.Time
+	sync.RWMutex
+}{
+	addr: make(map[string]time.Time),
+}
 
 type wdata struct {
 	cmd  byte
@@ -66,8 +78,24 @@ type Peer struct {
 
 //NewPeer returns Peer struct.
 func NewPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*Peer, error) {
-	if s.InBlacklist(conn.RemoteAddr().String()) {
+	remote := conn.RemoteAddr().String()
+	if s.InBlacklist(remote) {
 		return nil, errors.New("remote is in blacklist")
+	}
+	err := func() error {
+		banned.Lock()
+		defer banned.Unlock()
+		if t, exist := banned.addr[remote]; exist {
+			if t.Add(time.Hour).After(time.Now()) {
+				delete(banned.addr, remote)
+			} else {
+				return errors.New("the remote node is banned now")
+			}
+		}
+		return nil
+	}()
+	if err != nil {
+		return nil, err
 	}
 	if v.AddrFrom.Address != "" && s.InBlacklist(v.AddrFrom.Address) {
 		return nil, errors.New("remote is in blacklist")
@@ -99,8 +127,15 @@ func (p *Peer) Add() error {
 	if len(peers.Peers) >= int(p.setting.MaxConnections)*2 {
 		return errors.New("peers is too big")
 	}
-	peers.Peers = append(peers.Peers, p)
+	peers.Peers[p] = struct{}{}
 	return nil
+}
+
+//PeerNum returns number of peers
+func PeerNum() int {
+	peers.RLock()
+	defer peers.RUnlock()
+	return len(peers.Peers)
 }
 
 //Close closes a connection to a peer.
@@ -110,24 +145,40 @@ func (p *Peer) Close() {
 	}
 	peers.Lock()
 	defer peers.Unlock()
-	for i, ps := range peers.Peers {
-		if ps == p {
-			copy(peers.Peers[i:], peers.Peers[i+1:])
-			peers.Peers[len(peers.Peers)-1] = nil
-			peers.Peers = peers.Peers[:len(peers.Peers)-1]
-			break
-		}
-	}
+	delete(peers.Peers, p)
 }
 
 //WriteAll writes a command to all connected peers.
 func WriteAll(m interface{}, cmd byte) {
 	peers.RLock()
 	defer peers.RUnlock()
-	for _, p := range peers.Peers {
+	for p := range peers.Peers {
 		if err := p.Write(m, cmd); err != nil {
 			log.Println(err)
 		}
+	}
+}
+
+//WriteGetData writes a get_data command to all connected peers.
+func WriteGetData(invs msg.Inventories) {
+	peers.RLock()
+	defer peers.RUnlock()
+	for i := len(invs) - 1; i >= 0; i-- {
+		j := akrand.R.Intn(i + 1)
+		invs[i], invs[j] = invs[j], invs[i]
+	}
+	n := 2 * len(invs) / len(peers.Peers)
+	if n == 0 {
+		n = 1
+	}
+	i := 0
+	for p := range peers.Peers {
+		from := ((i / 2) * n) % len(invs)
+		to := (((i / 2) + 1) * n) % (len(invs) + 1)
+		if err := p.Write(invs[from:to], msg.CmdGetData); err != nil {
+			log.Println(err)
+		}
+		i++
 	}
 }
 
@@ -195,6 +246,9 @@ func nonce() msg.Nonce {
 func (p *Peer) Run(s *setting.Setting) {
 	if err := p.run(s); err != nil {
 		log.Println(err)
+		banned.Lock()
+		banned.addr[p.AddrFrom.Address] = time.Now()
+		banned.Unlock()
 		if err := Remove(s, p.AddrFrom); err != nil {
 			log.Println(err)
 		}
@@ -228,6 +282,7 @@ func (p *Peer) run(s *setting.Setting) error {
 			}
 			return err
 		}
+
 		switch cmd {
 		case msg.CmdPing:
 			v, err := msg.ReadNonce(buf)
@@ -238,6 +293,7 @@ func (p *Peer) run(s *setting.Setting) error {
 				log.Println(err)
 				continue
 			}
+
 		case msg.CmdPong:
 			v, err := msg.ReadNonce(buf)
 			if err != nil {
@@ -246,12 +302,14 @@ func (p *Peer) run(s *setting.Setting) error {
 			if err := p.received(msg.CmdPing, v[:]); err != nil {
 				return err
 			}
+
 		case msg.CmdGetAddr:
 			adrs := Get(msg.MaxAddrs)
 			if err := p.Write(adrs, msg.CmdAddr); err != nil {
 				log.Println(err)
 				return nil
 			}
+
 		case msg.CmdAddr:
 			if err := p.received(msg.CmdGetAddr, nil); err != nil {
 				return err
@@ -264,27 +322,25 @@ func (p *Peer) run(s *setting.Setting) error {
 				log.Println(err)
 				continue
 			}
+
 		case msg.CmdInv:
 			invs, err := msg.ReadInventories(buf)
 			if err != nil {
 				return err
 			}
 			for _, inv := range invs {
-				switch inv.Type {
-				case msg.InvTx:
-					if err := imesh.AddTxHash(s, inv.Hash[:], false); err != nil {
-						log.Println(err)
-						continue
-					}
-				case msg.InvMinableTx:
-					if err := imesh.AddTxHash(s, inv.Hash[:], true); err != nil {
-						log.Println(err)
-						continue
-					}
-				default:
-					return fmt.Errorf("unknown inv type %v", inv.Type)
+				typ, err := inv.Type.ToTxType()
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				if err := imesh.AddNoexistTxHash(s, inv.Hash[:], typ); err != nil {
+					log.Println(err)
+					continue
 				}
 			}
+			resolve()
+
 		case msg.CmdGetData:
 			invs, err := msg.ReadInventories(buf)
 			if err != nil {
@@ -293,20 +349,36 @@ func (p *Peer) run(s *setting.Setting) error {
 			trs := make(msg.Txs, 0, len(invs))
 			for _, inv := range invs {
 				switch inv.Type {
-				case msg.InvTx:
-					tx, err := imesh.GetTx(s, inv.Hash[:])
+				case msg.InvTxNormal:
+					tr, err := imesh.GetTx(s, inv.Hash[:])
 					if err != nil {
 						log.Println(err)
 						continue
 					}
-					trs = append(trs, tx)
-				case msg.InvMinableTx:
-					tx, err := imesh.GetMinableTx(s, inv.Hash[:])
+					trs = append(trs, &msg.Tx{
+						Type: inv.Type,
+						Tx:   tr,
+					})
+				case msg.InvTxRewardFee:
+					tr, err := imesh.GetMinableTx(s, inv.Hash[:], tx.TxRewardFee)
 					if err != nil {
 						log.Println(err)
 						continue
 					}
-					trs = append(trs, tx)
+					trs = append(trs, &msg.Tx{
+						Type: inv.Type,
+						Tx:   tr,
+					})
+				case msg.InvTxRewardTicket:
+					tr, err := imesh.GetMinableTx(s, inv.Hash[:], tx.TxRewardTicket)
+					if err != nil {
+						log.Println(err)
+						continue
+					}
+					trs = append(trs, &msg.Tx{
+						Type: inv.Type,
+						Tx:   tr,
+					})
 				default:
 					return fmt.Errorf("unknown inv type %v", inv.Type)
 				}
@@ -318,28 +390,45 @@ func (p *Peer) run(s *setting.Setting) error {
 				log.Println(err)
 				return nil
 			}
+			resolve()
+
 		case msg.CmdTxs:
-			v, err := msg.ReadTxs(buf)
+			vs, err := msg.ReadTxs(buf)
 			if err != nil {
 				return err
 			}
-			if err := imesh.CheckAddTx(s, v); err != nil {
-				log.Println(err)
+			for _, v := range vs {
+				typ, err := v.Type.ToTxType()
+				if err != nil {
+					return err
+				}
+				if err := v.Tx.Check(s.Config, typ); err != nil {
+					return err
+				}
+				if err := imesh.CheckAddTx(s, v.Tx, typ); err != nil {
+					log.Println(err)
+				}
 			}
+			resolve()
+
 		case msg.CmdGetLeaves:
-			ls, err := leaves.Get(0)
+			v, err := msg.ReadGetLeaves(buf)
 			if err != nil {
-				log.Println(err)
-				return nil
+				return err
 			}
-			h := make(msg.Hashes, 0, len(ls))
-			for _, l := range ls {
-				h = append(h, l.Array())
+			ls := leaves.GetAll()
+			idx := sort.Search(len(ls), func(i int) bool {
+				return bytes.Compare(ls[i], v.From[:]) >= 0
+			})
+			h := make(msg.Hashes, 0, len(ls)-idx)
+			for i := idx; i < len(ls) && i < msg.MaxLeaves; i++ {
+				h = append(h, ls[i].Array())
 			}
 			if err := p.Write(h, msg.CmdLeaves); err != nil {
 				log.Println(err)
 				return nil
 			}
+
 		case msg.CmdLeaves:
 			v, err := msg.ReadInventories(buf)
 			if err != nil {
@@ -349,15 +438,24 @@ func (p *Peer) run(s *setting.Setting) error {
 				return err
 			}
 			for _, h := range v {
-				if h.Type != msg.InvTx {
+				if h.Type != msg.InvTxNormal {
 					return fmt.Errorf("invalid inventory type %v", h.Type)
 				}
-				if err := imesh.AddTxHash(s, h.Hash[:], false); err != nil {
+				if err := imesh.AddNoexistTxHash(s, h.Hash[:], tx.TxNormal); err != nil {
 					log.Println(err)
 				}
 			}
+			if len(v) == msg.MaxLeaves {
+				gl := &msg.GetLeaves{
+					From: v[len(v)-1].Hash,
+				}
+				WriteAll(&gl, msg.CmdGetLeaves)
+			}
+			resolve()
+
 		case msg.CmdClose:
 			return nil
+
 		default:
 			return fmt.Errorf("invalid cmd %d", cmd)
 		}

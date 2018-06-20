@@ -8,10 +8,11 @@
 
 This  library is the node server for Aidos Kuneen for step2, 
 including:
-* RPC APIs
-* Aidos Explorer
-* Validator
-* Wallet Service via RPC APIs
+
+* RPC APIs (NOT YET)
+* Aidos Explorer (NOT YET)
+* Validator (NOT YET)
+* Wallet Service via RPC APIs (NOT YET)
 
 
 UNDER CONSTRUCTION

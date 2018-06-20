@@ -21,8 +21,10 @@
 package leaves
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"sort"
 	"sync"
 
 	"github.com/AidosKuneen/aklib/db"
@@ -41,6 +43,7 @@ var leaves = struct {
 
 //Init loads leaves from DB.
 func Init(s *setting.Setting) {
+	leaves.hash = nil
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &leaves.hash, db.HeaderLeaves)
 	})
@@ -65,6 +68,18 @@ func Get(n int) ([]tx.Hash, error) {
 		return r, nil
 	}
 	return r[:n], nil
+}
+
+//GetAll gets all leaves after sorting.
+func GetAll() []tx.Hash {
+	leaves.RLock()
+	defer leaves.RUnlock()
+	r := make([]tx.Hash, len(leaves.hash))
+	copy(r, leaves.hash)
+	sort.Slice(r, func(i, j int) bool {
+		return bytes.Compare(r[i], r[j]) < 0
+	})
+	return r
 }
 
 type txsearch struct {

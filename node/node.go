@@ -33,10 +33,6 @@ import (
 	"github.com/vmihailenco/msgpack"
 )
 
-var (
-	dns = []string{"peer1.aidoskuneen.com"}
-)
-
 func readVersion(s *setting.Setting, conn *net.TCPConn) (*Peer, error) {
 	cmd, buf, err := msg.ReadHeader(s, conn)
 	if err != nil {
@@ -80,15 +76,15 @@ func writeVersion(s *setting.Setting, to msg.Addr, conn *net.TCPConn) error {
 func Bootstrap(s *setting.Setting) error {
 	if Size() < int(s.MaxConnections) {
 		var adrs msg.Addrs
-		for _, d := range dns {
-			ns, err := net.LookupHost(d)
+		for _, d := range s.Config.DNS {
+			_, addrs, err := net.LookupSRV(d.Service, "tcp", d.Name)
 			if err != nil {
 				return err
 			}
-			for _, n := range ns {
+			for _, n := range addrs {
 				adr := msg.Addr{
-					Address: n,
-					Port:    s.Config.DefaultPort,
+					Address: n.Target,
+					Port:    n.Port,
 				}
 				adrs = append(adrs, adr)
 			}

@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sort"
 	"sync"
 
 	"github.com/AidosKuneen/aklib/db"
@@ -35,12 +34,15 @@ import (
 )
 
 var nodesDB = struct {
-	Addrs []msg.Addr
+	Addrs map[msg.Addr]struct{}
 	sync.RWMutex
-}{}
+}{
+	Addrs: make(map[msg.Addr]struct{}),
+}
 
 //Init loads node IP addresses from DB.
 func Init(s *setting.Setting) {
+	nodesDB.Addrs = nil
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &nodesDB.Addrs, db.HeaderNodeIP)
 	})
@@ -61,8 +63,12 @@ func Size() int {
 func Get(n int) []msg.Addr {
 	nodesDB.Lock()
 	defer nodesDB.Unlock()
-	r := make([]msg.Addr, 0, len(nodesDB.Addrs))
-	copy(r, nodesDB.Addrs)
+	r := make([]msg.Addr, len(nodesDB.Addrs))
+	i := 0
+	for a := range nodesDB.Addrs {
+		r[i] = a
+		i++
+	}
 
 	for i := n - 1; i >= 0; i-- {
 		j := rand.R.Intn(i + 1)
@@ -77,27 +83,14 @@ func Get(n int) []msg.Addr {
 	return r[:n]
 }
 
-func find(addr msg.Addr) int {
-	loc := sort.Search(len(nodesDB.Addrs), func(i int) bool {
-		return nodesDB.Addrs[i].Address >= addr.Address
-	})
-	for ; loc < len(nodesDB.Addrs); loc++ {
-		if nodesDB.Addrs[loc] == addr {
-			return loc
-		}
-	}
-	return -1
-}
-
 //Remove removes address from list.
 func Remove(s *setting.Setting, addr msg.Addr) error {
 	nodesDB.Lock()
 	defer nodesDB.Unlock()
-	loc := find(addr)
-	if loc < 0 {
-		return errors.New("address not found")
+	if _, e := nodesDB.Addrs[addr]; !e {
+		return errors.New("not found")
 	}
-	nodesDB.Addrs = append(nodesDB.Addrs[:loc], nodesDB.Addrs[loc+1:]...)
+	delete(nodesDB.Addrs, addr)
 	return put(s)
 }
 
@@ -115,20 +108,14 @@ func Put(s *setting.Setting, addrs msg.Addrs) error {
 		if len(nodesDB.Addrs) > msg.MaxAddrs {
 			continue
 		}
-		if find(addr) >= 0 {
-			nodesDB.Addrs = append(nodesDB.Addrs, addr)
+		if _, e := nodesDB.Addrs[addr]; !e {
+			nodesDB.Addrs[addr] = struct{}{}
 		}
 	}
-	sort.Slice(nodesDB.Addrs, func(i, j int) bool {
-		return nodesDB.Addrs[i].Address < nodesDB.Addrs[j].Address
-	})
 	return put(s)
 }
 
 func put(s *setting.Setting) error {
-	sort.Slice(nodesDB.Addrs, func(i, j int) bool {
-		return nodesDB.Addrs[i].Address < nodesDB.Addrs[j].Address
-	})
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, nil, nodesDB.Addrs, db.HeaderNodeIP)
 	})

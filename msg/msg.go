@@ -43,8 +43,8 @@ const (
 	CmdAddr                      // Header * Addrs,p2p
 	CmdInv                       // Header + Inventories,broadcast
 	CmdGetData                   // Header+ Inventories,p2p
-	CmdTxs                       // Header+ Hashes,p2p
-	CmdGetLeaves                 // Header,p2p
+	CmdTxs                       // Header+ Txs,p2p
+	CmdGetLeaves                 // Header + GetLeaves,p2p
 	CmdLeaves                    // Header + Inventories,p2p
 	CmdClose                     //Header,p2p
 )
@@ -55,19 +55,53 @@ const (
 	ServiceSPV
 )
 
+//InvType is a tx type of Inv.
+type InvType byte
+
 //Invenory types
 const (
-	InvTx byte = iota
-	InvMinableTx
+	InvTxNormal InvType = iota
+	InvTxRewardTicket
+	InvTxRewardFee
 )
 
-//InvType return inventory type from tx type.
-func InvType(typ byte) (byte, error) {
+//TxType2DBHeader return db beader from tx type.
+func TxType2DBHeader(typ tx.Type) (db.Header, error) {
 	switch typ {
-	case tx.RewardTicket:
-		return db.HeaderTicketTx, nil
-	case tx.RewardFee:
-		return db.HeaderFeeTx, nil
+	case tx.TxNormal:
+		return db.HeaderTxBody, nil
+	case tx.TxRewardTicket:
+		return db.HeaderTxRewardTicket, nil
+	case tx.TxRewardFee:
+		return db.HeaderTxRewardFee, nil
+	default:
+		return 255, errors.New("invalid type")
+	}
+}
+
+//TxType2InvType return inventory type from tx type.
+func TxType2InvType(typ tx.Type) (InvType, error) {
+	switch typ {
+	case tx.TxNormal:
+		return InvTxNormal, nil
+	case tx.TxRewardTicket:
+		return InvTxRewardTicket, nil
+	case tx.TxRewardFee:
+		return InvTxRewardFee, nil
+	default:
+		return 255, errors.New("invalid type")
+	}
+}
+
+//ToTxType return a tx type from inventory type.
+func (it InvType) ToTxType() (tx.Type, error) {
+	switch it {
+	case InvTxNormal:
+		return tx.TxNormal, nil
+	case InvTxRewardTicket:
+		return tx.TxRewardTicket, nil
+	case InvTxRewardFee:
+		return tx.TxRewardFee, nil
 	default:
 		return 255, errors.New("invalid type")
 	}
@@ -76,9 +110,10 @@ func InvType(typ byte) (byte, error) {
 //Maxs for messages.
 const (
 	MaxLength = 2000000
-	MaxAddrs  = 1000
+	MaxAddrs  = 100
 	MaxInv    = 50000
 	MaxTx     = 500
+	MaxLeaves = 10000
 )
 
 const userAgent = "AKnode Versin 0.01"
@@ -113,15 +148,21 @@ type Addrs []Addr
 
 //Inventory vectors are used for notifying other nodes about objects they have or data which is being requested.
 type Inventory struct {
-	Type byte
+	Type InvType
 	Hash [32]byte
 }
 
 //Inventories is a slice of Inventory, for inv, getdata, notfound messages.
 type Inventories []*Inventory
 
-//Txs describes a bitcoin transaction, in reply to getdata
-type Txs []*tx.Transaction
+//Tx describes a  transaction with Invenroty type.
+type Tx struct {
+	Type InvType
+	Tx   *tx.Transaction
+}
+
+//Txs describes a transaction slice in reply to getTxs
+type Txs []*Tx
 
 //Nonce  is a  nonce for ping and pong.
 type Nonce [32]byte
@@ -132,7 +173,6 @@ type Hashes [][32]byte
 //GetLeaves is for getting leaves from From to To.
 type GetLeaves struct {
 	From [32]byte
-	To   [32]byte
 }
 
 //Write write a message to con.

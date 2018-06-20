@@ -30,50 +30,67 @@ import (
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-func searchTx(s *setting.Setting) error {
-	trs, err := imesh.GetSearchingTx(s)
-	if err != nil {
-		return err
+var ch = make(chan struct{}, 1)
+
+//Resolve run resolve routine.
+func resolve() {
+	if len(ch) == 0 {
+		ch <- struct{}{}
 	}
-	inv := make(msg.Inventories, 0, len(trs))
-	for _, tr := range trs {
-		typ := msg.InvTx
-		if tr.Minable {
-			typ = msg.InvMinableTx
-		}
-		inv = append(inv, &msg.Inventory{
-			Type: typ,
-			Hash: tr.Hash.Array(),
-		})
-	}
-	WriteAll(inv, msg.CmdGetData)
-	return nil
 }
 
-func resolve(s *setting.Setting) error {
-	txH, minableH, err := imesh.Resolve(s)
-	if err != nil {
-		return err
+func goResolve(s *setting.Setting) {
+	for range ch {
+		trs, err := imesh.Resolve(s)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		if len(trs) != 0 {
+			inv := make(msg.Inventories, 0, len(trs))
+			for _, h := range trs {
+				typ, err := msg.TxType2InvType(h.Type)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				inv = append(inv, &msg.Inventory{
+					Type: typ,
+					Hash: h.Hash.Array(),
+				})
+			}
+			WriteAll(inv, msg.CmdInv)
+		}
+
+		ts, err := imesh.GetSearchingTx(s)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		if len(ts) != 0 {
+			inv := make(msg.Inventories, 0, len(ts))
+			for _, tr := range ts {
+				typ, err := msg.TxType2InvType(tr.Type)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				inv = append(inv, &msg.Inventory{
+					Type: typ,
+					Hash: tr.Hash.Array(),
+				})
+			}
+			WriteGetData(inv)
+		}
+		//wait to collect noexsistence txs
+		time.Sleep(5 * time.Second)
 	}
-	inv := make(msg.Inventories, 0, len(txH)+len(minableH))
-	for _, h := range txH {
-		inv = append(inv, &msg.Inventory{
-			Type: msg.InvTx,
-			Hash: h.Array(),
-		})
-	}
-	for _, h := range minableH {
-		inv = append(inv, &msg.Inventory{
-			Type: msg.InvMinableTx,
-			Hash: h.Array(),
-		})
-	}
-	WriteAll(inv, msg.CmdInv)
-	return nil
 }
 
 //GoCron starts cron jobs.
 func GoCron(s *setting.Setting) {
+	go goResolve(s)
+
 	go func() {
 		for {
 			time.Sleep(10 * time.Minute)
@@ -83,13 +100,8 @@ func GoCron(s *setting.Setting) {
 	}()
 	go func() {
 		for {
-			time.Sleep(time.Minute)
-			if err := resolve(s); err != nil {
-				log.Println(err)
-			}
-			if err := searchTx(s); err != nil {
-				log.Println(err)
-			}
+			time.Sleep(5 * time.Minute)
+			resolve()
 		}
 	}()
 }

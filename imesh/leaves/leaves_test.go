@@ -23,7 +23,6 @@ package leaves
 import (
 	"bytes"
 	"encoding/hex"
-	"log"
 	"os"
 	"testing"
 
@@ -35,24 +34,26 @@ import (
 
 var s setting.Setting
 
-func TestMain(m *testing.M) {
+func setup(t *testing.T) {
 	var err error
 	if err := os.RemoveAll("./test_db"); err != nil {
-		log.Println(err)
+		t.Error(err)
 	}
 	s.DB, err = db.Open("./test_db")
 	if err != nil {
-		panic(err)
+		t.Error(err)
 	}
 	s.Config = aklib.TestConfig
-	c := m.Run()
+}
+func teardown(t *testing.T) {
 	if err := os.RemoveAll("./test_db"); err != nil {
-		log.Println(err)
+		t.Error(err)
 	}
-	os.Exit(c)
 }
 
 func TestLeaves(t *testing.T) {
+	setup(t)
+	defer teardown(t)
 	var trs [10]*tx.Transaction
 	for i := range trs {
 		trs[i] = &tx.Transaction{

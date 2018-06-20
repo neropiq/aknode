@@ -27,7 +27,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
+	"path/filepath"
 	"runtime"
 	"syscall"
 
@@ -90,19 +90,22 @@ func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
 	var verbose bool
+	var fname string
 	flag.BoolVar(&verbose, "verbose", false, "outputs logs to stdout.")
+	flag.StringVar(&fname, "fname", "~/.aknode/aknode.json", "setting file path")
 	flag.Parse()
+
+	setting := setting.Init(fname)
 	if !verbose {
 		l := &lumberjack.Logger{
-			Filename:   path.Join("aknode.log"),
+			Filename:   filepath.Join(setting.BaseDir(), "aknode.log"),
 			MaxSize:    10, // megabytes
 			MaxBackups: 10,
-			MaxAge:     28, //days
+			MaxAge:     30 * 3, //days
 		}
 		log.SetOutput(l)
 	}
 
-	setting := setting.Init("aknode.json")
 	onSigs(setting)
 	node.Init(setting)
 	imesh.Init(setting)
@@ -125,4 +128,9 @@ func main() {
 	if setting.RunRPCServer {
 		rpc.Run(setting)
 	}
+	if setting.RunExplorer {
+		explorer.Run(setting)
+	}
+	c := make(chan struct{})
+	<-c
 }
