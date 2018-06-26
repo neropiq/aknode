@@ -32,7 +32,7 @@ import (
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-var s setting.Setting
+var s, s1 setting.Setting
 var a *address.Address
 
 func setup(t *testing.T) {
@@ -46,6 +46,22 @@ func setup(t *testing.T) {
 		panic(err)
 	}
 	s.Config = aklib.DebugConfig
+	s.MaxConnections = 1
+	s.Bind = "localhost"
+	s.Port = 1234
+
+	if err := os.RemoveAll("./test_db2"); err != nil {
+		log.Println(err)
+	}
+	s1.DB, err = db.Open("./test_db2")
+	if err != nil {
+		panic(err)
+	}
+	s1.Config = aklib.DebugConfig
+	s1.MaxConnections = 1
+	s1.Bind = "localhost"
+	s1.Port = 1235
+
 	seed := address.GenerateSeed()
 	a, err = address.New(address.Height10, seed, s.Config)
 	if err != nil {
@@ -61,6 +77,29 @@ func teardown(t *testing.T) {
 	if err := os.RemoveAll("./test_db"); err != nil {
 		t.Error(err)
 	}
+	if err := os.RemoveAll("./test_db2"); err != nil {
+		t.Error(err)
+	}
 }
 func TestNode(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+	s.Config.DNS = []aklib.SRV{
+		aklib.SRV{
+			Service: "seeds",
+			Name:    "aidoskuneen.com",
+		}}
+	if err := lookup(&s); err != nil {
+		t.Error(err)
+	}
+	if len(nodesDB.Addrs) != 4 {
+		t.Error("len should be 4")
+	}
+	nodesDB.Addrs = nil
+	if err := initDB(&s); err != nil {
+		t.Error(err)
+	}
+	if len(nodesDB.Addrs) != 4 {
+		t.Error("len should be 4")
+	}
 }

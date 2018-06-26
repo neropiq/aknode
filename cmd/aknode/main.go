@@ -18,19 +18,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package aknode
+package main
 
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
 	"syscall"
 
+	"github.com/AidosKuneen/aknode/explorer"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/node"
@@ -95,7 +98,16 @@ func main() {
 	flag.StringVar(&fname, "fname", "~/.aknode/aknode.json", "setting file path")
 	flag.Parse()
 
-	setting := setting.Init(fname)
+	s, err := ioutil.ReadFile(fname)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	setting, err := setting.Load(s)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 	if !verbose {
 		l := &lumberjack.Logger{
 			Filename:   filepath.Join(setting.BaseDir(), "aknode.log"),
@@ -107,15 +119,19 @@ func main() {
 	}
 
 	onSigs(setting)
-	node.Init(setting)
-	imesh.Init(setting)
-	leaves.Init(setting)
-	if err := node.Bootstrap(setting); err != nil {
+
+	if err := imesh.Init(setting); err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
 	}
-	node.Run(setting)
-	node.GoCron(setting)
+	if err := leaves.Init(setting); err != nil {
+		fmt.Println(err)
+		log.Fatal(err)
+	}
+	if node.Start(setting); err != nil {
+		fmt.Println(err)
+		log.Fatal(err)
+	}
 
 	if setting.Debug {
 		//for pprof
@@ -131,6 +147,8 @@ func main() {
 	if setting.RunExplorer {
 		explorer.Run(setting)
 	}
-	c := make(chan struct{})
-	<-c
+	if setting.RunFeeMiner || setting.RunTicketMiner {
+		node.RunMiner(setting)
+	}
+	<-make(chan struct{})
 }

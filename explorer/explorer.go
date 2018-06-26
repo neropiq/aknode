@@ -45,7 +45,7 @@ func Run(setting *setting.Setting) {
 		ReadHeaderTimeout: time.Minute,
 		MaxHeaderBytes:    1 << 20,
 	}
-	fmt.Printf("Starting Explorer Server on " + ipport + "\n")
+	fmt.Println("Starting Explorer Server on", ipport)
 	go func() {
 		log.Println(s.ListenAndServe())
 	}()

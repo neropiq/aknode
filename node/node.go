@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"strconv"
 	"time"
 
 	"github.com/AidosKuneen/aknode/msg"
@@ -33,7 +32,7 @@ import (
 	"github.com/vmihailenco/msgpack"
 )
 
-func readVersion(s *setting.Setting, conn *net.TCPConn) (*Peer, error) {
+func readVersion(s *setting.Setting, conn *net.TCPConn) (*peer, error) {
 	cmd, buf, err := msg.ReadHeader(s, conn)
 	if err != nil {
 		return nil, err
@@ -45,7 +44,7 @@ func readVersion(s *setting.Setting, conn *net.TCPConn) (*Peer, error) {
 	if err != nil {
 		return nil, err
 	}
-	p, err := NewPeer(v, conn, s)
+	p, err := newPeer(v, conn, s)
 	if err != nil {
 		return nil, err
 	}
@@ -72,9 +71,8 @@ func writeVersion(s *setting.Setting, to msg.Addr, conn *net.TCPConn) error {
 	return nil
 }
 
-//Bootstrap  connects to peers.
-func Bootstrap(s *setting.Setting) error {
-	if Size() < int(s.MaxConnections) {
+func lookup(s *setting.Setting) error {
+	if len(nodesDB.Addrs) < int(s.MaxConnections) {
 		var adrs msg.Addrs
 		for _, d := range s.Config.DNS {
 			_, addrs, err := net.LookupSRV(d.Service, "tcp", d.Name)
@@ -82,35 +80,43 @@ func Bootstrap(s *setting.Setting) error {
 				return err
 			}
 			for _, n := range addrs {
-				adr := msg.Addr{
-					Address: n.Target,
-					Port:    n.Port,
+				lips, err := net.LookupIP(n.Target)
+				if err != nil {
+					return err
 				}
-				adrs = append(adrs, adr)
+				for _, ip := range lips {
+					adr := msg.Addr{
+						Address: ip,
+						Port:    n.Port,
+					}
+					adrs = append(adrs, adr)
+				}
 			}
-			if err := Put(s, adrs); err != nil {
+			if err := putAddrs(s, adrs); err != nil {
 				return err
 			}
 		}
 	}
+	return nil
+}
+
+func connect(s *setting.Setting) {
 	for i := 0; i < int(s.MaxConnections); i++ {
 		go func() {
 			for {
-				ps := Get(1)
+				ps := get(1)
 				if len(ps) == 0 {
 					time.Sleep(time.Minute)
 					continue
 				}
 				p := ps[0]
-				to := p.Address + ":" + strconv.Itoa(int(p.Port))
-				conn, err := net.Dial("tcp", to)
+				to := net.TCPAddr{
+					IP:   p.Address,
+					Port: int(p.Port),
+				}
+				tcpconn, err := net.DialTCP("tcp", nil, &to)
 				if err != nil {
 					log.Println(err)
-					continue
-				}
-				tcpconn, ok := conn.(*net.TCPConn)
-				if !ok {
-					log.Println("invalid connection")
 					continue
 				}
 				if err := tcpconn.SetDeadline(time.Now().Add(rwTimeout)); err != nil {
@@ -126,7 +132,7 @@ func Bootstrap(s *setting.Setting) error {
 					log.Println(err)
 					continue
 				}
-				if err := pr.Add(); err != nil {
+				if err := pr.add(); err != nil {
 					log.Println(err)
 					continue
 				}
@@ -134,21 +140,37 @@ func Bootstrap(s *setting.Setting) error {
 			}
 		}()
 	}
+}
+
+//Bootstrap  connects to peers.
+func bootstrap(s *setting.Setting) error {
+	if err := lookup(s); err != nil {
+		return err
+	}
+	connect(s)
 	return nil
 }
 
-//Run runs a node server.
-func Run(setting *setting.Setting) {
+//Start starts a node server.
+func Start(setting *setting.Setting) error {
+	if err := initDB(setting); err != nil {
+		return err
+	}
+	if err := bootstrap(setting); err != nil {
+		return err
+	}
+	return start(setting)
+}
+
+func start(setting *setting.Setting) error {
 	ipport := fmt.Sprintf("%s:%d", setting.Bind, setting.Port)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", ipport)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 	l, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 	fmt.Printf("Starting node Server on " + ipport + "\n")
 	go func() {
@@ -171,6 +193,8 @@ func Run(setting *setting.Setting) {
 			}
 		}
 	}()
+	goCron(setting)
+	return err
 }
 
 //Handle handles messages in tcp.
@@ -189,7 +213,7 @@ func handle(s *setting.Setting, conn *net.TCPConn) error {
 		log.Println(err)
 		return err
 	}
-	if err := p.Add(); err != nil {
+	if err := p.add(); err != nil {
 		log.Println(err)
 		return err
 	}

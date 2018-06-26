@@ -22,8 +22,7 @@ package node
 
 import (
 	"errors"
-	"fmt"
-	"log"
+	"net"
 	"sync"
 
 	"github.com/AidosKuneen/aklib/db"
@@ -33,40 +32,59 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
+const maxAddrs = 1000
+
+type adrmap map[string]uint16
+
 var nodesDB = struct {
-	Addrs map[msg.Addr]struct{}
+	Addrs adrmap
 	sync.RWMutex
 }{
-	Addrs: make(map[msg.Addr]struct{}),
+	Addrs: make(adrmap),
+}
+
+func (a adrmap) msgAddr(key string) msg.Addr {
+	return msg.Addr{
+		Address: []byte(key),
+		Port:    a[key],
+	}
+}
+
+func (a adrmap) add(ip net.IP, port uint16) {
+	a[string(ip.To16())] = port
+}
+func (a adrmap) delete(ip net.IP) {
+	delete(a, string(ip.To16()))
 }
 
 //Init loads node IP addresses from DB.
-func Init(s *setting.Setting) {
+func initDB(s *setting.Setting) error {
 	nodesDB.Addrs = nil
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &nodesDB.Addrs, db.HeaderNodeIP)
 	})
 	if err != nil && err != badger.ErrKeyNotFound {
-		fmt.Println(err)
-		log.Fatal(err)
+		return err
 	}
-}
-
-//Size returns size of node addresses.
-func Size() int {
-	nodesDB.RLock()
-	defer nodesDB.RUnlock()
-	return len(nodesDB.Addrs)
+	for _, n := range s.DefaultNodeIPs {
+		nodesDB.Addrs.add(n.IP, uint16(n.Port))
+	}
+	for adr := range nodesDB.Addrs {
+		if s.InBlacklist(net.IP(adr)) {
+			nodesDB.Addrs.delete(net.IP(adr))
+		}
+	}
+	return nil
 }
 
 //Get returns random n numbers of nodes.
-func Get(n int) []msg.Addr {
+func get(n int) []msg.Addr {
 	nodesDB.Lock()
 	defer nodesDB.Unlock()
 	r := make([]msg.Addr, len(nodesDB.Addrs))
 	i := 0
 	for a := range nodesDB.Addrs {
-		r[i] = a
+		r[i] = nodesDB.Addrs.msgAddr(a)
 		i++
 	}
 
@@ -84,18 +102,18 @@ func Get(n int) []msg.Addr {
 }
 
 //Remove removes address from list.
-func Remove(s *setting.Setting, addr msg.Addr) error {
+func remove(s *setting.Setting, addr msg.Addr) error {
 	nodesDB.Lock()
 	defer nodesDB.Unlock()
-	if _, e := nodesDB.Addrs[addr]; !e {
+	if _, e := nodesDB.Addrs[addr.Key()]; !e {
 		return errors.New("not found")
 	}
-	delete(nodesDB.Addrs, addr)
+	nodesDB.Addrs.delete(addr.Address)
 	return put(s)
 }
 
 //Put put an address into db.
-func Put(s *setting.Setting, addrs msg.Addrs) error {
+func putAddrs(s *setting.Setting, addrs msg.Addrs) error {
 	nodesDB.Lock()
 	defer nodesDB.Unlock()
 	if len(nodesDB.Addrs) > msg.MaxAddrs {
@@ -105,11 +123,11 @@ func Put(s *setting.Setting, addrs msg.Addrs) error {
 		if s.InBlacklist(addr.Address) {
 			continue
 		}
-		if len(nodesDB.Addrs) > msg.MaxAddrs {
+		if len(nodesDB.Addrs) > maxAddrs {
 			continue
 		}
-		if _, e := nodesDB.Addrs[addr]; !e {
-			nodesDB.Addrs[addr] = struct{}{}
+		if _, e := nodesDB.Addrs[addr.Key()]; !e {
+			nodesDB.Addrs.add(addr.Address, addr.Port)
 		}
 	}
 	return put(s)

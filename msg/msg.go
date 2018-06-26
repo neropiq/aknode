@@ -69,7 +69,7 @@ const (
 func TxType2DBHeader(typ tx.Type) (db.Header, error) {
 	switch typ {
 	case tx.TxNormal:
-		return db.HeaderTxBody, nil
+		return db.HeaderTxInfo, nil
 	case tx.TxRewardTicket:
 		return db.HeaderTxRewardTicket, nil
 	case tx.TxRewardFee:
@@ -109,17 +109,17 @@ func (it InvType) ToTxType() (tx.Type, error) {
 
 //Maxs for messages.
 const (
-	MaxLength = 2000000
+	MaxLength = 1000000
 	MaxAddrs  = 100
-	MaxInv    = 50000
+	MaxInv    = 100
 	MaxTx     = 500
 	MaxLeaves = 10000
 )
 
 const userAgent = "AKnode Versin 0.01"
 
-//MessageVersion is a version of the message.
-const MessageVersion = 1
+//messageVersion is a version of the message.
+const messageVersion = 1
 
 //Header  is a header of wire protocol.
 type Header struct {
@@ -139,8 +139,14 @@ type Version struct {
 
 //Addr is an IP address and port.
 type Addr struct {
-	Address string
+	Address []byte
 	Port    uint16
+}
+
+//Key returns a key for map.
+func (a *Addr) Key() string {
+	ip16 := net.IP(a.Address).To16()
+	return string(ip16)
 }
 
 //Addrs provides information on known nodes of the network.
@@ -240,7 +246,7 @@ func ReadVersion(buf []byte) (*Version, error) {
 	if err := arypack.Unmarshal(buf, &v); err != nil {
 		return nil, err
 	}
-	if v.Version != MessageVersion {
+	if v.Version != messageVersion {
 		return nil, errors.New("invalid version")
 	}
 	if v.Service != ServiceFull {
@@ -306,12 +312,12 @@ func ReadGetLeaves(buf []byte) (*GetLeaves, error) {
 //NewVersion returns Verstion struct.
 func NewVersion(s *setting.Setting, to Addr) *Version {
 	v := &Version{
-		Version:   MessageVersion,
+		Version:   messageVersion,
 		Service:   ServiceFull,
 		UserAgent: userAgent,
 		AddrTo:    to,
 		AddrFrom: Addr{
-			Address: s.MyHostName,
+			Address: s.MyHostIP,
 			Port:    s.Port,
 		},
 	}

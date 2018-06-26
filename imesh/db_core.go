@@ -21,6 +21,7 @@
 package imesh
 
 import (
+	"encoding/binary"
 	"errors"
 	"log"
 	"time"
@@ -50,17 +51,37 @@ const (
 
 //OutputStatus is status of an output.
 type OutputStatus struct {
-	IsUsed        bool
-	ConfirmedBy   tx.Hash
+	IsReferred    bool //referred from tx(s) input
+	IsSpent       bool //refered from a confirmed tx input
 	UsedByMinable map[[32]byte]db.Header
 }
 
 //TxInfo is for tx in db with sighash and status.
 type TxInfo struct {
-	BodyHash     tx.Hash
-	SigHash      tx.Hash
+	*tx.Body
+	SigNo        uint64
 	Status       byte
 	OutputStatus [3][]OutputStatus
+}
+
+func (ti *TxInfo) sigKey() []byte {
+	key := make([]byte, 8)
+	binary.LittleEndian.PutUint64(key, ti.SigNo)
+	return key[:5]
+}
+
+func (ti *TxInfo) nextSigKey(s *setting.Setting) error {
+	seq, err := s.DB.GetSequence([]byte("sequence"), (1<<40)-1)
+	if err != nil {
+		return err
+	}
+	defer seq.Release()
+	no, err := seq.Next()
+	if err != nil {
+		return err
+	}
+	ti.SigNo = no
+	return nil
 }
 
 // Has returns true if hash exists in db.
@@ -95,26 +116,13 @@ func GetTxInfo(s *setting.Setting, h tx.Hash) (*TxInfo, error) {
 	return &ti, err
 }
 
-//GetTxBody returns a transaction Body from  hash.
-func GetTxBody(s *setting.Setting, hash []byte) (*tx.Body, error) {
-	var body tx.Body
-	err := s.DB.View(func(txn *badger.Txn) error {
-		var ti TxInfo
-		if err2 := db.Get(txn, hash, &ti, db.HeaderTxInfo); err2 != nil {
-			return err2
-		}
-		return db.Get(txn, ti.BodyHash, &body, db.HeaderTxBody)
-	})
-	return &body, err
-}
-
 func getTxFunc(s *setting.Setting) func(hash []byte) (*tx.Body, error) {
 	return func(hash []byte) (*tx.Body, error) {
-		body, err := GetTxBody(s, hash)
+		ti, err := GetTxInfo(s, hash)
 		if err != nil {
 			return nil, err
 		}
-		return body, nil
+		return ti.Body, nil
 	}
 }
 
@@ -125,32 +133,30 @@ func IsValid(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 
 //GetTx returns a transaction  from  hash.
 func GetTx(s *setting.Setting, hash []byte) (*tx.Transaction, error) {
-	var body tx.Body
 	var sig tx.Signatures
 	var ti TxInfo
 	err := s.DB.View(func(txn *badger.Txn) error {
 		if err2 := db.Get(txn, hash, &ti, db.HeaderTxInfo); err2 != nil {
 			return err2
 		}
-		if err2 := db.Get(txn, ti.BodyHash, &body, db.HeaderTxBody); err2 != nil {
-			return err2
-		}
-		return db.Get(txn, ti.SigHash, &sig, db.HeaderTxSig)
+		return db.Get(txn, ti.sigKey(), &sig, db.HeaderTxSig)
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &tx.Transaction{
-		Body:       &body,
+		Body:       ti.Body,
 		Signatures: sig,
 	}, nil
 }
 
-//PutTx puts a transaction  into db.
 func putTx(s *setting.Setting, tr *tx.Transaction) error {
+
 	ti := TxInfo{
-		BodyHash: tr.Body.Hash(),
-		SigHash:  tr.Signatures.Hash(),
+		Body: tr.Body,
+	}
+	if err := ti.nextSigKey(s); err != nil {
+		return err
 	}
 	ti.OutputStatus[inoutTypeInputOutput] = make([]OutputStatus, len(tr.Outputs))
 	ti.OutputStatus[inoutTypeMultiSig] = make([]OutputStatus, len(tr.MultiSigOuts))
@@ -162,16 +168,13 @@ func putTx(s *setting.Setting, tr *tx.Transaction) error {
 		if err2 := db.Put(txn, tr.Hash(), &ti, db.HeaderTxInfo); err2 != nil {
 			return err2
 		}
-		if err2 := db.Put(txn, ti.BodyHash, tr.Body, db.HeaderTxBody); err2 != nil {
-			return err2
-		}
 		for _, prev := range inputHashes(tr) {
 			var ti TxInfo
 			if err := db.Get(txn, prev.Hash, &ti, db.HeaderTxInfo); err != nil {
 				return err
 			}
-			if !ti.OutputStatus[prev.Type][prev.Index].IsUsed {
-				ti.OutputStatus[prev.Type][prev.Index].IsUsed = true
+			if !ti.OutputStatus[prev.Type][prev.Index].IsReferred {
+				ti.OutputStatus[prev.Type][prev.Index].IsReferred = true
 				if err := db.Put(txn, prev.Hash, &ti, db.HeaderTxInfo); err != nil {
 					return err
 				}
@@ -182,8 +185,19 @@ func putTx(s *setting.Setting, tr *tx.Transaction) error {
 				}
 			}
 		}
-		return db.Put(txn, ti.SigHash, tr.Signatures, db.HeaderTxSig)
+		if err := putAddressToTx(s, txn, tr); err != nil {
+			return err
+		}
+		return db.Put(txn, ti.sigKey(), tr.Signatures, db.HeaderTxSig)
 	})
+}
+
+//PutTx puts a transaction  into db.
+func PutTx(s *setting.Setting, tr *tx.Transaction) error {
+	if err := tr.Check(s.Config, tx.TxNormal); err != nil {
+		return err
+	}
+	return putTx(s, tr)
 }
 
 func putUnresolvedTx(s *setting.Setting, tx *tx.Transaction) error {
@@ -268,7 +282,7 @@ func IsMinableTxValid(s *setting.Setting, tr *tx.Transaction) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		if ti.OutputStatus[prev.Type][prev.Index].IsUsed {
+		if ti.OutputStatus[prev.Type][prev.Index].IsReferred {
 			return false, nil
 		}
 	}

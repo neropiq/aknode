@@ -22,8 +22,6 @@ package leaves
 
 import (
 	"bytes"
-	"fmt"
-	"log"
 	"sort"
 	"sync"
 
@@ -42,15 +40,15 @@ var leaves = struct {
 }{}
 
 //Init loads leaves from DB.
-func Init(s *setting.Setting) {
+func Init(s *setting.Setting) error {
 	leaves.hash = nil
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &leaves.hash, db.HeaderLeaves)
 	})
 	if err != nil && err != badger.ErrKeyNotFound {
-		fmt.Println(err)
-		log.Fatal(err)
+		return err
 	}
+	return nil
 }
 
 //Get gets n random leaves. if <=0, it returns all leaves.

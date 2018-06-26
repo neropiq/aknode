@@ -58,6 +58,9 @@ func goResolve(s *setting.Setting) {
 					Type: typ,
 					Hash: h.Hash.Array(),
 				})
+				if typ == msg.InvTxRewardFee || typ == msg.InvTxRewardTicket {
+					addForMine(s, h.Hash, h.Type)
+				}
 			}
 			WriteAll(inv, msg.CmdInv)
 		}
@@ -80,7 +83,7 @@ func goResolve(s *setting.Setting) {
 					Hash: tr.Hash.Array(),
 				})
 			}
-			WriteGetData(inv)
+			writeGetData(inv)
 		}
 		//wait to collect noexsistence txs
 		time.Sleep(5 * time.Second)
@@ -88,7 +91,7 @@ func goResolve(s *setting.Setting) {
 }
 
 //GoCron starts cron jobs.
-func GoCron(s *setting.Setting) {
+func goCron(s *setting.Setting) {
 	go goResolve(s)
 
 	go func() {

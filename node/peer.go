@@ -47,10 +47,10 @@ const (
 
 //peers is a slice of connecting peers.
 var peers = struct {
-	Peers map[*Peer]struct{}
+	Peers map[*peer]struct{}
 	sync.RWMutex
 }{
-	Peers: make(map[*Peer]struct{}),
+	Peers: make(map[*peer]struct{}),
 }
 
 var banned = struct {
@@ -66,8 +66,8 @@ type wdata struct {
 	time time.Time
 }
 
-//Peer represetnts an opponent of a connection.
-type Peer struct {
+//peer represetnts an opponent of a connection.
+type peer struct {
 	*msg.Version
 	conn    *net.TCPConn
 	from    msg.Addr
@@ -76,18 +76,18 @@ type Peer struct {
 	sync.RWMutex
 }
 
-//NewPeer returns Peer struct.
-func NewPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*Peer, error) {
-	remote := conn.RemoteAddr().String()
+//newPeer returns Peer struct.
+func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, error) {
+	remote := conn.RemoteAddr().(*net.TCPAddr).IP
 	if s.InBlacklist(remote) {
 		return nil, errors.New("remote is in blacklist")
 	}
 	err := func() error {
 		banned.Lock()
 		defer banned.Unlock()
-		if t, exist := banned.addr[remote]; exist {
+		if t, exist := banned.addr[string(remote.To16())]; exist {
 			if t.Add(time.Hour).After(time.Now()) {
-				delete(banned.addr, remote)
+				delete(banned.addr, string(remote.To16()))
 			} else {
 				return errors.New("the remote node is banned now")
 			}
@@ -97,19 +97,19 @@ func NewPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*Peer, erro
 	if err != nil {
 		return nil, err
 	}
-	if v.AddrFrom.Address != "" && s.InBlacklist(v.AddrFrom.Address) {
+	if v.AddrFrom.Address != nil && s.InBlacklist(v.AddrFrom.Address) {
 		return nil, errors.New("remote is in blacklist")
 	}
-	p := &Peer{
+	p := &peer{
 		Version: v,
 		conn:    conn,
 		setting: s,
 		from: msg.Addr{
-			Address: conn.RemoteAddr().String(),
+			Address: remote,
 			Port:    v.AddrFrom.Port,
 		},
 	}
-	if v.AddrFrom.Address != "" {
+	if v.AddrFrom.Address != nil {
 		p.from.Address = v.AddrFrom.Address
 	}
 	peers.RLock()
@@ -121,7 +121,7 @@ func NewPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*Peer, erro
 }
 
 //Add adds to the Peer list.
-func (p *Peer) Add() error {
+func (p *peer) add() error {
 	peers.Lock()
 	defer peers.Unlock()
 	if len(peers.Peers) >= int(p.setting.MaxConnections)*2 {
@@ -131,15 +131,8 @@ func (p *Peer) Add() error {
 	return nil
 }
 
-//PeerNum returns number of peers
-func PeerNum() int {
-	peers.RLock()
-	defer peers.RUnlock()
-	return len(peers.Peers)
-}
-
 //Close closes a connection to a peer.
-func (p *Peer) Close() {
+func (p *peer) close() {
 	if err := p.conn.Close(); err != nil {
 		log.Println(err)
 	}
@@ -153,14 +146,14 @@ func WriteAll(m interface{}, cmd byte) {
 	peers.RLock()
 	defer peers.RUnlock()
 	for p := range peers.Peers {
-		if err := p.Write(m, cmd); err != nil {
+		if err := p.write(m, cmd); err != nil {
 			log.Println(err)
 		}
 	}
 }
 
 //WriteGetData writes a get_data command to all connected peers.
-func WriteGetData(invs msg.Inventories) {
+func writeGetData(invs msg.Inventories) {
 	peers.RLock()
 	defer peers.RUnlock()
 	for i := len(invs) - 1; i >= 0; i-- {
@@ -175,7 +168,7 @@ func WriteGetData(invs msg.Inventories) {
 	for p := range peers.Peers {
 		from := ((i / 2) * n) % len(invs)
 		to := (((i / 2) + 1) * n) % (len(invs) + 1)
-		if err := p.Write(invs[from:to], msg.CmdGetData); err != nil {
+		if err := p.write(invs[from:to], msg.CmdGetData); err != nil {
 			log.Println(err)
 		}
 		i++
@@ -183,7 +176,7 @@ func WriteGetData(invs msg.Inventories) {
 }
 
 //Write writes a packet to peer p.
-func (p *Peer) Write(m interface{}, cmd byte) error {
+func (p *peer) write(m interface{}, cmd byte) error {
 	p.Lock()
 	defer p.Unlock()
 	w := wdata{
@@ -211,7 +204,7 @@ func (p *Peer) Write(m interface{}, cmd byte) error {
 	return msg.Write(p.setting, m, cmd, p.conn)
 }
 
-func (p *Peer) isWritten(cmd byte, data []byte) int {
+func (p *peer) isWritten(cmd byte, data []byte) int {
 	p.RLock()
 	defer p.RUnlock()
 	for i, c := range p.written {
@@ -222,7 +215,7 @@ func (p *Peer) isWritten(cmd byte, data []byte) int {
 	return -1
 }
 
-func (p *Peer) received(cmd byte, data []byte) error {
+func (p *peer) received(cmd byte, data []byte) error {
 	i := p.isWritten(cmd, data)
 	if i < 0 {
 		return fmt.Errorf("no command for %v", cmd)
@@ -243,20 +236,20 @@ func nonce() msg.Nonce {
 }
 
 //Run runs a rouintine for a peer.
-func (p *Peer) Run(s *setting.Setting) {
+func (p *peer) Run(s *setting.Setting) {
 	if err := p.run(s); err != nil {
 		log.Println(err)
 		banned.Lock()
-		banned.addr[p.AddrFrom.Address] = time.Now()
+		banned.addr[string(net.IP(p.AddrFrom.Address).To16())] = time.Now()
 		banned.Unlock()
-		if err := Remove(s, p.AddrFrom); err != nil {
+		if err := remove(s, p.AddrFrom); err != nil {
 			log.Println(err)
 		}
 	}
 }
 
-func (p *Peer) run(s *setting.Setting) error {
-	defer p.Close()
+func (p *peer) run(s *setting.Setting) error {
+	defer p.close()
 	for {
 		var cmd byte
 		var buf []byte
@@ -269,13 +262,13 @@ func (p *Peer) run(s *setting.Setting) error {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
 				if p.isWritten(msg.CmdPing, nil) >= 0 {
 					err := fmt.Errorf("no response from %v", p.from)
-					if err := Remove(s, p.from); err != nil {
+					if err := remove(s, p.from); err != nil {
 						log.Println(err)
 					}
 					return err
 				}
 				n := nonce()
-				if err := p.Write(&n, msg.CmdPing); err != nil {
+				if err := p.write(&n, msg.CmdPing); err != nil {
 					return err
 				}
 				continue
@@ -289,7 +282,7 @@ func (p *Peer) run(s *setting.Setting) error {
 			if err != nil {
 				return err
 			}
-			if err := p.Write(v, msg.CmdPong); err != nil {
+			if err := p.write(v, msg.CmdPong); err != nil {
 				log.Println(err)
 				continue
 			}
@@ -304,8 +297,8 @@ func (p *Peer) run(s *setting.Setting) error {
 			}
 
 		case msg.CmdGetAddr:
-			adrs := Get(msg.MaxAddrs)
-			if err := p.Write(adrs, msg.CmdAddr); err != nil {
+			adrs := get(msg.MaxAddrs)
+			if err := p.write(adrs, msg.CmdAddr); err != nil {
 				log.Println(err)
 				return nil
 			}
@@ -318,7 +311,7 @@ func (p *Peer) run(s *setting.Setting) error {
 			if err != nil {
 				return err
 			}
-			if err := Put(s, *v); err != nil {
+			if err := putAddrs(s, *v); err != nil {
 				log.Println(err)
 				continue
 			}
@@ -386,7 +379,7 @@ func (p *Peer) run(s *setting.Setting) error {
 			if len(trs) == 0 {
 				continue
 			}
-			if err := p.Write(trs, msg.CmdTxs); err != nil {
+			if err := p.write(trs, msg.CmdTxs); err != nil {
 				log.Println(err)
 				return nil
 			}
@@ -424,7 +417,7 @@ func (p *Peer) run(s *setting.Setting) error {
 			for i := idx; i < len(ls) && i < msg.MaxLeaves; i++ {
 				h = append(h, ls[i].Array())
 			}
-			if err := p.Write(h, msg.CmdLeaves); err != nil {
+			if err := p.write(h, msg.CmdLeaves); err != nil {
 				log.Println(err)
 				return nil
 			}

@@ -18,39 +18,63 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package rpc
+package node
 
 import (
-	"fmt"
 	"log"
-	"net/http"
-	"time"
 
+	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/imesh"
+	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-//Run runs RPC server.
-func Run(setting *setting.Setting) {
-	ipport := fmt.Sprintf("%s:%d", setting.RPCBind, setting.RPCPort)
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		handle(setting, w, r)
-	})
+//TODO: need to add a miner address to output or ticket_output
+var mineCh = make(chan *imesh.HashWithType, 1)
 
-	s := &http.Server{
-		Addr:              ipport,
-		Handler:           mux,
-		ReadTimeout:       time.Minute,
-		WriteTimeout:      time.Minute,
-		ReadHeaderTimeout: time.Minute,
-		MaxHeaderBytes:    1 << 20,
+//AddForMine adds a minable tx for mine.
+func addForMine(s *setting.Setting, h tx.Hash, typ tx.Type) {
+	if (typ == tx.TxRewardFee && s.RunFeeMiner) ||
+		(typ == tx.TxRewardTicket && s.RunTicketMiner) {
+		if len(mineCh) != 0 {
+			<-mineCh
+		}
+		mineCh <- &imesh.HashWithType{
+			Hash: h,
+			Type: typ,
+		}
 	}
-	fmt.Println("Starting RPC Server on", ipport)
-	go func() {
-		log.Println(s.ListenAndServe())
-	}()
 }
 
-//Handle handles api calls.
-func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+func mine(s *setting.Setting, mtx *imesh.HashWithType) error {
+	tr, err := imesh.GetMinableTx(s, mtx.Hash, mtx.Type)
+	if err != nil {
+		return err
+	}
+	if err := tr.PoW(); err != nil {
+		return err
+	}
+	if err := tr.Check(s.Config, tx.TxNormal); err != nil {
+		return err
+	}
+	if err := imesh.PutTx(s, tr); err != nil {
+		return err
+	}
+	WriteAll(msg.Inventories{&msg.Inventory{
+		Type: msg.InvTxNormal,
+		Hash: tr.Hash().Array(),
+	}}, msg.CmdInv)
+	return nil
+}
+
+//RunMiner runs a miner
+func RunMiner(s *setting.Setting) {
+	go func() {
+		for h := range mineCh {
+			if err := mine(s, h); err != nil {
+				log.Println(err)
+			}
+		}
+	}()
+
 }

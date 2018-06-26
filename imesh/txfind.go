@@ -28,7 +28,6 @@ import (
 
 	"github.com/AidosKuneen/aklib"
 
-	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
@@ -54,7 +53,7 @@ type unresolvedTx struct {
 //Noexist represents a non-existence transaction.
 type Noexist struct {
 	*HashWithType
-	Sleep    time.Duration
+	Count    byte
 	Searched time.Time
 }
 
@@ -73,21 +72,12 @@ func Init(s *setting.Setting) error {
 	unresolved.Noexists = make(map[[32]byte]*Noexist)
 
 	var total uint64
-	tr := tx.Transaction{
-		Body: &tx.Body{
-			Outputs: make([]*tx.Output, 0, len(s.Config.Genesis)),
-		},
-	}
+	tr := tx.New(s.Config)
 	for adr, val := range s.Config.Genesis {
-		b, err := address.FromAddress58(adr)
-		if err != nil {
+		if err := tr.AddOutput(s.Config, adr, val); err != nil {
 			return err
 		}
 		total += val
-		tr.Outputs = append(tr.Outputs, &tx.Output{
-			Address: b,
-			Value:   val,
-		})
 	}
 	if total != aklib.ADKSupply {
 		return errors.New("invalid total supply")
@@ -97,7 +87,7 @@ func Init(s *setting.Setting) error {
 		return err
 	}
 	if !has {
-		if err := putTx(s, &tr); err != nil {
+		if err := putTx(s, tr); err != nil {
 			return err
 		}
 		t, err := GetTxInfo(s, tr.Hash())
@@ -108,7 +98,7 @@ func Init(s *setting.Setting) error {
 		if err := t.Put(s, tr.Hash()); err != nil {
 			return err
 		}
-		if err := leaves.CheckAdd(s, &tr); err != nil {
+		if err := leaves.CheckAdd(s, tr); err != nil {
 			return err
 		}
 	}
@@ -160,7 +150,6 @@ func AddNoexistTxHash(s *setting.Setting, h tx.Hash, typ tx.Type) error {
 			Hash: h,
 			Type: typ,
 		},
-		Sleep: time.Minute,
 	}
 	return nil
 }
@@ -207,13 +196,19 @@ func GetSearchingTx(s *setting.Setting) ([]Noexist, error) {
 	unresolved.Lock()
 	defer unresolved.Unlock()
 	r := make([]Noexist, 0, len(unresolved.Noexists))
-	for _, n := range unresolved.Noexists {
-		if !n.Searched.IsZero() && !n.Searched.Add(n.Sleep).Before(time.Now()) {
+	for h, n := range unresolved.Noexists {
+		sleep := (1 << (n.Count - 1)) * time.Minute
+		if !n.Searched.IsZero() && !n.Searched.Add(sleep).Before(time.Now()) {
 			continue
 		}
 		r = append(r, *n)
 		n.Searched = time.Now()
-		n.Sleep *= 2
+		if n.Count++; n.Count > 10 {
+			if err := putBrokenTx(s, n.Hash); err != nil {
+				return nil, err
+			}
+			delete(unresolved.Noexists, h)
+		}
 	}
 	return r, put(s)
 }
@@ -284,7 +279,6 @@ func (tr *unresolvedTx) dfs(s *setting.Setting, h [32]byte) error {
 						Hash: prev,
 						Type: tx.TxNormal,
 					},
-					Sleep: time.Minute,
 				}
 			}
 		} else {
@@ -324,7 +318,7 @@ func resolved(s *setting.Setting, tr *unresolvedTx, hs tx.Hash) error {
 		return putBrokenTx(s, hs)
 	}
 	if tr.Type == tx.TxNormal {
-		if err := putTx(s, tra); err != nil {
+		if err := PutTx(s, tra); err != nil {
 			return err
 		}
 		return leaves.CheckAdd(s, tra)

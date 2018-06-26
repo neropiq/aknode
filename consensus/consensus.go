@@ -18,39 +18,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package rpc
+package consensus
 
 import (
-	"fmt"
-	"log"
-	"net/http"
-	"time"
-
+	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-//Run runs RPC server.
-func Run(setting *setting.Setting) {
-	ipport := fmt.Sprintf("%s:%d", setting.RPCBind, setting.RPCPort)
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		handle(setting, w, r)
-	})
-
-	s := &http.Server{
-		Addr:              ipport,
-		Handler:           mux,
-		ReadTimeout:       time.Minute,
-		WriteTimeout:      time.Minute,
-		ReadHeaderTimeout: time.Minute,
-		MaxHeaderBytes:    1 << 20,
-	}
-	fmt.Println("Starting RPC Server on", ipport)
-	go func() {
-		log.Println(s.ListenAndServe())
-	}()
-}
-
-//Handle handles api calls.
-func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+//Confirm confirms txs and return hashes of confirmed txs.
+func Confirm(s *setting.Setting) ([]tx.Hash, error) {
+	return nil, nil
 }

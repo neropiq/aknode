@@ -26,6 +26,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
@@ -38,6 +39,7 @@ import (
 
 var s setting.Setting
 var a *address.Address
+var genesis []tx.Hash
 
 func setup(t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
@@ -53,12 +55,22 @@ func setup(t *testing.T) {
 	seed := address.GenerateSeed()
 	a, err = address.New(address.Height10, seed, s.Config)
 	if err != nil {
-		panic(err)
+		t.Error(err)
 	}
 	s.Config.Genesis = map[string]uint64{
 		a.Address58(): aklib.ADKSupply,
 	}
 	leaves.Init(&s)
+	if err := Init(&s); err != nil {
+		t.Error(err)
+	}
+	genesis, err = leaves.Get(1)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(genesis) != 1 {
+		t.Error("invalid genesis")
+	}
 }
 
 func teardown(t *testing.T) {
@@ -70,16 +82,6 @@ func teardown(t *testing.T) {
 func TestImesh(t *testing.T) {
 	setup(t)
 	defer teardown(t)
-	if err := Init(&s); err != nil {
-		t.Error(err)
-	}
-	genesis, err := leaves.Get(1)
-	if err != nil {
-		t.Error(err)
-	}
-	if len(genesis) != 1 {
-		t.Error("invalid genesis")
-	}
 	g, err := GetTx(&s, genesis[0])
 	if err != nil {
 		t.Error(err)
@@ -247,16 +249,6 @@ func TestImesh(t *testing.T) {
 func TestImesh2(t *testing.T) {
 	setup(t)
 	defer teardown(t)
-	if err := Init(&s); err != nil {
-		t.Error(err)
-	}
-	genesis, err := leaves.Get(1)
-	if err != nil {
-		t.Error(err)
-	}
-	if len(genesis) != 1 {
-		t.Error("invalid genesis", len(genesis))
-	}
 	tr := tx.New(s.Config, genesis[0])
 	tr.AddInput(genesis[0], 0)
 	if err := tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
@@ -350,16 +342,6 @@ func TestImesh3(t *testing.T) {
 	var zero [32]byte
 	var one [32]byte
 	one[0] = 1
-	if err := Init(&s); err != nil {
-		t.Error(err)
-	}
-	genesis, err := leaves.Get(1)
-	if err != nil {
-		t.Error(err)
-	}
-	if len(genesis) != 1 {
-		t.Error("invalid genesis")
-	}
 	tr := tx.New(s.Config, zero[:])
 	if err := tr.PoW(); err != nil {
 		t.Error(err)
@@ -398,5 +380,121 @@ func TestImesh3(t *testing.T) {
 	}
 	if !bytes.Equal(ne[0].Hash, one[:]) {
 		t.Error("invalid searching tx")
+	}
+	if unresolved.Noexists[one].Count != 1 {
+		t.Error("invalid count")
+	}
+	for i := 0; i < 10; i++ {
+		unresolved.Noexists[one].Searched = time.Now().Add(-24 * time.Hour)
+		ne, err = GetSearchingTx(&s)
+		if err != nil {
+			t.Error(err)
+		}
+		if len(ne) != 1 {
+			t.Error("invalid searching tx", len(ne), i)
+		}
+	}
+	if _, e := unresolved.Noexists[one]; e {
+		t.Error("should be removed")
+	}
+	broken, err := isBrokenTx(&s, one[:])
+	if err != nil {
+		t.Error(err)
+	}
+	if !broken {
+		t.Error("should be broken")
+	}
+}
+
+func TestImesh4(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+
+	hs, err := GetTxsFromAddress(&s, a.Address())
+	if err != nil {
+		t.Error(err)
+	}
+	if len(hs) != 1 {
+		t.Error("length should be 1")
+	}
+	if !bytes.Equal(hs[0], genesis[0]) {
+		t.Error("should be equal")
+	}
+	seed := address.GenerateSeed()
+	a1, err := address.New(address.Height10, seed, s.Config)
+	if err != nil {
+		t.Error(err)
+	}
+	tr := tx.New(s.Config, genesis[0])
+	tr.AddInput(genesis[0], 0)
+	if err := tr.AddOutput(s.Config, a1.Address58(), aklib.ADKSupply); err != nil {
+		t.Error(err)
+	}
+	if err := tr.Sign(a); err != nil {
+		t.Error(err)
+	}
+	if err := tr.PoW(); err != nil {
+		t.Error(err)
+	}
+	if err := CheckAddTx(&s, tr, tx.TxNormal); err != nil {
+		t.Error(err)
+	}
+
+	seed = address.GenerateSeed()
+	a2, err := address.New(address.Height10, seed, s.Config)
+	if err != nil {
+		t.Error(err)
+	}
+	tr2 := tx.New(s.Config, genesis[0])
+	tr2.AddInput(tr.Hash(), 0)
+	if err := tr2.AddOutput(s.Config, a2.Address58(), aklib.ADKSupply); err != nil {
+		t.Error(err)
+	}
+	if err := tr2.Sign(a1); err != nil {
+		t.Error(err)
+	}
+	if err := tr2.PoW(); err != nil {
+		t.Error(err)
+	}
+	if err := CheckAddTx(&s, tr2, tx.TxNormal); err != nil {
+		t.Error(err)
+	}
+	txs, err := Resolve(&s)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(txs) != 2 {
+		t.Error("invalid length of txs")
+	}
+
+	hs, err = GetTxsFromAddress(&s, a.Address())
+	if err != nil {
+		t.Error(err)
+	}
+	if len(hs) != 1 {
+		t.Error("length should be 1")
+	}
+	if !bytes.Equal(hs[0], tr.Hash()) {
+		t.Error("should be equal")
+	}
+	hs, err = GetTxsFromAddress(&s, a1.Address())
+	if err != nil {
+		t.Error(err)
+	}
+	if len(hs) != 1 {
+		t.Error("length should be 1")
+	}
+	if !bytes.Equal(hs[0], tr2.Hash()) {
+		t.Error("should be equal")
+	}
+	hs, err = GetTxsFromAddress(&s, a2.Address())
+	if err != nil {
+		t.Error(err)
+	}
+	if len(hs) != 1 {
+		t.Error("length should be 1")
+	}
+	if !bytes.Equal(hs[0], tr2.Hash()) {
+		t.Error("should be equal")
 	}
 }
