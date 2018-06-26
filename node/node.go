@@ -27,6 +27,8 @@ import (
 	"net"
 	"time"
 
+	"golang.org/x/net/proxy"
+
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/setting"
 	"github.com/vmihailenco/msgpack"
@@ -101,6 +103,14 @@ func lookup(s *setting.Setting) error {
 }
 
 func connect(s *setting.Setting) {
+	dialer := net.Dial
+	if s.Proxy != "" {
+		p, err := proxy.SOCKS5("tcp", s.Proxy, nil, proxy.Direct)
+		if err != nil {
+			log.Fatal(err)
+		}
+		dialer = p.Dial
+	}
 	for i := 0; i < int(s.MaxConnections); i++ {
 		go func() {
 			for {
@@ -114,10 +124,14 @@ func connect(s *setting.Setting) {
 					IP:   p.Address,
 					Port: int(p.Port),
 				}
-				tcpconn, err := net.DialTCP("tcp", nil, &to)
+				conn, err := dialer("tcp", to.String())
 				if err != nil {
 					log.Println(err)
 					continue
+				}
+				tcpconn, ok := conn.(*net.TCPConn)
+				if !ok {
+					log.Fatal("invalid connection")
 				}
 				if err := tcpconn.SetDeadline(time.Now().Add(rwTimeout)); err != nil {
 					log.Println(err)
