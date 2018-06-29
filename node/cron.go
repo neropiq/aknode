@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/AidosKuneen/aknode/imesh"
+	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/setting"
 )
@@ -40,11 +41,13 @@ func resolve() {
 
 func goResolve(s *setting.Setting) {
 	for range ch {
+		log.Println("resolving unresolved transactions...")
 		trs, err2 := imesh.Resolve(s)
 		if err2 != nil {
 			log.Println(err2)
 			continue
 		}
+		log.Println("resolved", len(trs), "transactions, broadcating them...")
 		if len(trs) != 0 {
 			inv := make(msg.Inventories, 0, len(trs))
 			for _, h := range trs {
@@ -70,6 +73,7 @@ func goResolve(s *setting.Setting) {
 			continue
 		}
 		if len(ts) != 0 {
+			log.Println("querying non-existent", len(ts), "transactions...")
 			inv := make(msg.Inventories, 0, len(ts))
 			for _, tr := range ts {
 				typ, err2 := msg.TxType2InvType(tr.Type)
@@ -96,8 +100,14 @@ func goCron(s *setting.Setting) {
 	go func() {
 		for {
 			time.Sleep(10 * time.Minute)
+			log.Println("querying latest leaves and node addressses..")
 			WriteAll(nil, msg.CmdGetLeaves)
 			WriteAll(nil, msg.CmdGetAddr)
+			peers.RLock()
+			log.Println("#node", len(peers.Peers))
+			peers.RUnlock()
+			log.Println("#leaves", leaves.Size())
+			log.Println("done")
 		}
 	}()
 	go func() {

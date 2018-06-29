@@ -51,6 +51,13 @@ func Init(s *setting.Setting) error {
 	return nil
 }
 
+//Size return # of leave
+func Size() int {
+	leaves.RLock()
+	defer leaves.RUnlock()
+	return len(leaves.hash)
+}
+
 //Get gets n random leaves. if <=0, it returns all leaves.
 func Get(n int) []tx.Hash {
 	leaves.RLock()

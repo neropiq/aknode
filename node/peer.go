@@ -145,6 +145,11 @@ func (p *peer) delete() {
 	delete(peers.Peers, p.remote.Address)
 }
 
+func isConnected(adr string) bool {
+	_, exist := peers.Peers[adr]
+	return exist
+}
+
 //WriteAll writes a command to all connected peers.
 func WriteAll(m interface{}, cmd byte) {
 	peers.RLock()

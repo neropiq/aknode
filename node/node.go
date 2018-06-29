@@ -72,6 +72,8 @@ func writeVersion(s *setting.Setting, to msg.Addr, conn *net.TCPConn) error {
 
 func lookup(s *setting.Setting) error {
 	if len(nodesDB.Addrs) < int(s.MaxConnections) {
+		log.Println("looking for DNS...")
+		i := 0
 		var adrs msg.Addrs
 		for _, d := range s.Config.DNS {
 			_, addrs, err := net.LookupSRV(d.Service, "tcp", d.Name)
@@ -81,11 +83,13 @@ func lookup(s *setting.Setting) error {
 			for _, n := range addrs {
 				adr := net.JoinHostPort(n.Target, strconv.Itoa(int(s.Config.DefaultPort)))
 				adrs = append(adrs, *msg.NewAddr(adr, msg.ServiceFull))
+				i++
 			}
 			if err := putAddrs(s, adrs...); err != nil {
 				return err
 			}
 		}
+		log.Println("found", i, "nodes from DNS")
 	}
 	return nil
 }
@@ -100,14 +104,22 @@ func connect(s *setting.Setting) {
 		dialer = p.Dial
 	}
 	for i := 0; i < int(s.MaxConnections); i++ {
-		go func() {
+		go func(i int) {
 			for {
-				ps := get(1)
-				if len(ps) == 0 {
+				ps := get(0)
+				var p msg.Addr
+				found := false
+				for _, p = range ps {
+					if !isConnected(p.Address) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					log.Println("#", i, "no peers found, sleeping")
 					time.Sleep(time.Minute)
 					continue
 				}
-				p := ps[0]
 				if err := remove(s, p); err != nil {
 					log.Println(err)
 				}
@@ -141,9 +153,10 @@ func connect(s *setting.Setting) {
 				if err := putAddrs(s, p); err != nil {
 					log.Println(err)
 				}
+				log.Println("#", i, "connected to", p.Address)
 				pr.run(s)
 			}
-		}()
+		}(i)
 	}
 }
 
@@ -169,7 +182,7 @@ func start(setting *setting.Setting) (*net.TCPListener, error) {
 			if err3 != nil {
 				if ne, ok := err3.(net.Error); ok {
 					if ne.Temporary() {
-						log.Println("AcceptTCP", err3)
+						log.Println("failed to accept:", err3)
 						continue
 					}
 				}
@@ -177,11 +190,10 @@ func start(setting *setting.Setting) (*net.TCPListener, error) {
 				return
 			}
 			go func() {
-				log.Println("handling")
+				log.Println("connected from", conn.RemoteAddr())
 				if err := handle(setting, conn); err != nil {
-					log.Println(err)
+					log.Println(conn.RemoteAddr(), ":", err)
 				}
-				log.Println("closing")
 				if err := conn.Close(); err != nil {
 					log.Println(err)
 				}
