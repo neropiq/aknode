@@ -26,22 +26,22 @@ import (
 )
 
 func TestSetting(t *testing.T) {
-	s, err := Load([]byte(`{}`))
-	if err != nil {
-		t.Error(err)
+	s, err2 := Load([]byte(`{}`))
+	if err2 != nil {
+		t.Error(err2)
 	}
 
 	if !strings.Contains(s.BaseDir(), "mainnet") {
 		t.Error("invalid basedir")
 	}
 
-	s, err = Load([]byte(`{
+	s, err2 = Load([]byte(`{
 		"testnet":1,
 		"blacklists":["www.google.com"],
 		"default_nodes":["www.google.com:80"]
 	}`))
-	if err != nil {
-		t.Error(err)
+	if err2 != nil {
+		t.Error(err2)
 	}
 
 	if !strings.Contains(s.BaseDir(), "testnet") {
@@ -51,13 +51,13 @@ func TestSetting(t *testing.T) {
 		t.Error(err)
 	}
 
-	s, err = Load([]byte(`{
+	s, err2 = Load([]byte(`{
 		"testnet":1,
 		"blacklists":["123.24.11.12"],
 		"default_nodes":["1.2.3.4:80"]
 	}`))
-	if err != nil {
-		t.Error(err)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if !s.InBlacklist("123.24.11.12:1234") {
 		t.Error("should be in blacklist")
@@ -72,11 +72,11 @@ func TestSetting(t *testing.T) {
 		t.Error("should not be in blacklist")
 	}
 
-	s, err = Load([]byte(`{
+	_, err2 = Load([]byte(`{
 		"testnet":1,
 		"blacklists":["1323.24.11.12"],
 	}`))
-	if err == nil {
+	if err2 == nil {
 		t.Error("should be error")
 	}
 }

@@ -43,19 +43,19 @@ var genesis []tx.Hash
 
 func setup(t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	var err error
+	var err2 error
 	if err := os.RemoveAll("./test_db"); err != nil {
 		log.Println(err)
 	}
-	s.DB, err = db.Open("./test_db")
-	if err != nil {
-		panic(err)
+	s.DB, err2 = db.Open("./test_db")
+	if err2 != nil {
+		panic(err2)
 	}
 	s.Config = aklib.DebugConfig
 	seed := address.GenerateSeed()
-	a, err = address.New(address.Height10, seed, s.Config)
-	if err != nil {
-		t.Error(err)
+	a, err2 = address.New(address.Height10, seed, s.Config)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	s.Config.Genesis = map[string]uint64{
 		a.Address58(): aklib.ADKSupply,
@@ -79,9 +79,9 @@ func teardown(t *testing.T) {
 func TestImesh(t *testing.T) {
 	setup(t)
 	defer teardown(t)
-	g, err := GetTx(&s, genesis[0])
-	if err != nil {
-		t.Error(err)
+	g, err2 := GetTx(&s, genesis[0])
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if !bytes.Equal(g.Hash(), genesis[0]) {
 		t.Error("should be equal")
@@ -134,9 +134,9 @@ func TestImesh(t *testing.T) {
 	if err := CheckAddTx(&s, tr0, tx.TxNormal); err != nil {
 		t.Error(err)
 	}
-	trs, err = Resolve(&s)
-	if err != nil {
-		t.Error(err)
+	trs, err2 = Resolve(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(trs) != 0 {
 		t.Error("invalid resolved tx")
@@ -171,9 +171,9 @@ func TestImesh(t *testing.T) {
 	if err := CheckAddTx(&s, tr2, tx.TxNormal); err != nil {
 		t.Error(err)
 	}
-	trs, err = Resolve(&s)
-	if err != nil {
-		t.Error(err)
+	trs, err2 = Resolve(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(trs) != 0 {
 		t.Error("invalid resolved tx")
@@ -186,9 +186,9 @@ func TestImesh(t *testing.T) {
 	if err := CheckAddTx(&s, tr1, tx.TxNormal); err != nil {
 		t.Error(err)
 	}
-	trs, err = Resolve(&s)
-	if err != nil {
-		t.Error(err)
+	trs, err2 = Resolve(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(trs) != 2 {
 		t.Fatal("invalid resolved tx", len(trs))
@@ -209,17 +209,17 @@ func TestImesh(t *testing.T) {
 	if err := CheckAddTx(&s, tr3, tx.TxRewardFee); err != nil {
 		t.Error(err)
 	}
-	trs, err = Resolve(&s)
-	if err != nil {
-		t.Error(err)
+	trs, err2 = Resolve(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(trs) != 1 {
 		t.Error("invalid resolved tx", len(trs))
 	}
 
-	it, err := tx.IssueTicket(s.Config, a, genesis[0])
-	if err != nil {
-		t.Error(err)
+	it, err2 := tx.IssueTicket(s.Config, a, genesis[0])
+	if err2 != nil {
+		t.Error(err2)
 	}
 
 	tr4 := tx.NewMinableTicket(s.Config, it.Hash(), genesis[0])
@@ -234,9 +234,9 @@ func TestImesh(t *testing.T) {
 	if err := CheckAddTx(&s, tr4, tx.TxRewardTicket); err != nil {
 		t.Error(err)
 	}
-	trs, err = Resolve(&s)
-	if err != nil {
-		t.Error(err)
+	trs, err2 = Resolve(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(trs) != 0 {
 		t.Error("invalid resolved tx", len(trs))
@@ -260,9 +260,9 @@ func TestImesh2(t *testing.T) {
 	if err := CheckAddTx(&s, tr, tx.TxNormal); err != nil {
 		t.Error(err)
 	}
-	trs, err := Resolve(&s)
-	if err != nil {
-		t.Error(err)
+	trs, err2 := Resolve(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(trs) != 1 {
 		t.Error("invalid resolved txs")
@@ -282,9 +282,9 @@ func TestImesh2(t *testing.T) {
 	if err := CheckAddTx(&s, tr1, tx.TxRewardFee); err != nil {
 		t.Error(err)
 	}
-	trs, err = Resolve(&s)
-	if err != nil {
-		t.Error(err)
+	trs, err2 = Resolve(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(trs) != 1 {
 		t.Error("invalid resolved txs")
@@ -292,9 +292,9 @@ func TestImesh2(t *testing.T) {
 	if _, err := GetMinableTx(&s, tr1.Hash(), tx.TxRewardFee); err != nil {
 		t.Error(err)
 	}
-	ts, err := GetRandomMinableTx(&s, tx.TxRewardFee)
-	if err != nil {
-		t.Error(err)
+	ts, err2 := GetRandomMinableTx(&s, tx.TxRewardFee)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if !bytes.Equal(ts.Hash(), tr1.Hash()) {
 		t.Error("invalid get random")
@@ -313,9 +313,9 @@ func TestImesh2(t *testing.T) {
 	if err := CheckAddTx(&s, tr2, tx.TxNormal); err != nil {
 		t.Error(err)
 	}
-	trs, err = Resolve(&s)
-	if err != nil {
-		t.Error(err)
+	trs, err2 = Resolve(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(trs) != 1 {
 		t.Error("invalid resolved txs", len(trs))
@@ -324,9 +324,9 @@ func TestImesh2(t *testing.T) {
 	if _, err := GetMinableTx(&s, tr1.Hash(), tx.TxRewardFee); err == nil {
 		t.Error("should be error")
 	}
-	valid, err := IsMinableTxValid(&s, tr1)
-	if err != nil {
-		t.Error(err)
+	valid, err2 := IsMinableTxValid(&s, tr1)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if valid {
 		t.Error("invalid validator")
@@ -346,17 +346,17 @@ func TestImesh3(t *testing.T) {
 	if err := CheckAddTx(&s, tr, tx.TxNormal); err != nil {
 		t.Error(err)
 	}
-	trs, err := Resolve(&s)
-	if err != nil {
-		t.Error(err)
+	trs, err2 := Resolve(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(trs) != 0 {
 		t.Error("invalid resolved txs", len(trs))
 	}
 
-	ne, err := GetSearchingTx(&s)
-	if err != nil {
-		t.Error(err)
+	ne, err2 := GetSearchingTx(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(ne) != 1 {
 		t.Error("invalid searching tx", len(ne))
@@ -368,9 +368,9 @@ func TestImesh3(t *testing.T) {
 	if err := AddNoexistTxHash(&s, one[:], tx.TxNormal); err != nil {
 		t.Error(err)
 	}
-	ne, err = GetSearchingTx(&s)
-	if err != nil {
-		t.Error(err)
+	ne, err2 = GetSearchingTx(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(ne) != 1 {
 		t.Error("invalid searching tx", len(ne))
@@ -383,9 +383,9 @@ func TestImesh3(t *testing.T) {
 	}
 	for i := 0; i < 10; i++ {
 		unresolved.Noexists[one].Searched = time.Now().Add(-24 * time.Hour)
-		ne, err = GetSearchingTx(&s)
-		if err != nil {
-			t.Error(err)
+		ne, err2 = GetSearchingTx(&s)
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if len(ne) != 1 {
 			t.Error("invalid searching tx", len(ne), i)
@@ -394,9 +394,9 @@ func TestImesh3(t *testing.T) {
 	if _, e := unresolved.Noexists[one]; e {
 		t.Error("should be removed")
 	}
-	broken, err := isBrokenTx(&s, one[:])
-	if err != nil {
-		t.Error(err)
+	broken, err2 := isBrokenTx(&s, one[:])
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if !broken {
 		t.Error("should be broken")
@@ -407,9 +407,9 @@ func TestImesh4(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	hs, err := GetTxsFromAddress(&s, a.Address())
-	if err != nil {
-		t.Error(err)
+	hs, err2 := GetTxsFromAddress(&s, a.Address())
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(hs) != 1 {
 		t.Error("length should be 1")
@@ -418,9 +418,9 @@ func TestImesh4(t *testing.T) {
 		t.Error("should be equal")
 	}
 	seed := address.GenerateSeed()
-	a1, err := address.New(address.Height10, seed, s.Config)
-	if err != nil {
-		t.Error(err)
+	a1, err2 := address.New(address.Height10, seed, s.Config)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	tr := tx.New(s.Config, genesis[0])
 	tr.AddInput(genesis[0], 0)
@@ -438,9 +438,9 @@ func TestImesh4(t *testing.T) {
 	}
 
 	seed = address.GenerateSeed()
-	a2, err := address.New(address.Height10, seed, s.Config)
-	if err != nil {
-		t.Error(err)
+	a2, err2 := address.New(address.Height10, seed, s.Config)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	tr2 := tx.New(s.Config, genesis[0])
 	tr2.AddInput(tr.Hash(), 0)
@@ -456,17 +456,17 @@ func TestImesh4(t *testing.T) {
 	if err := CheckAddTx(&s, tr2, tx.TxNormal); err != nil {
 		t.Error(err)
 	}
-	txs, err := Resolve(&s)
-	if err != nil {
-		t.Error(err)
+	txs, err2 := Resolve(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(txs) != 2 {
 		t.Error("invalid length of txs")
 	}
 
-	hs, err = GetTxsFromAddress(&s, a.Address())
-	if err != nil {
-		t.Error(err)
+	hs, err2 = GetTxsFromAddress(&s, a.Address())
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(hs) != 1 {
 		t.Error("length should be 1")
@@ -474,9 +474,9 @@ func TestImesh4(t *testing.T) {
 	if !bytes.Equal(hs[0], tr.Hash()) {
 		t.Error("should be equal")
 	}
-	hs, err = GetTxsFromAddress(&s, a1.Address())
-	if err != nil {
-		t.Error(err)
+	hs, err2 = GetTxsFromAddress(&s, a1.Address())
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(hs) != 1 {
 		t.Error("length should be 1")
@@ -484,9 +484,9 @@ func TestImesh4(t *testing.T) {
 	if !bytes.Equal(hs[0], tr2.Hash()) {
 		t.Error("should be equal")
 	}
-	hs, err = GetTxsFromAddress(&s, a2.Address())
-	if err != nil {
-		t.Error(err)
+	hs, err2 = GetTxsFromAddress(&s, a2.Address())
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(hs) != 1 {
 		t.Error("length should be 1")

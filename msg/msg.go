@@ -177,7 +177,7 @@ type Nonce [32]byte
 type LeavesFrom [32]byte
 
 //Write write a message to con.
-func Write(s *setting.Setting, m interface{}, cmd byte, conn io.ReadWriter) error {
+func Write(s *setting.Setting, m interface{}, cmd byte, conn io.Writer) error {
 	var dat []byte
 	if m != nil {
 		dat = arypack.Marshal(m)
@@ -228,9 +228,9 @@ func (bs *unbuf) Read(p []byte) (n int, err error) {
 }
 
 //ReadHeader read a message from con and returns msg type.
-func ReadHeader(s *setting.Setting, conn io.ReadWriter) (byte, []byte, error) {
+func ReadHeader(s *setting.Setting, conn io.Reader) (byte, []byte, error) {
 	var h Header
-	var err error
+	var err2 error
 	bs := &unbuf{
 		reader: conn,
 	}
@@ -248,8 +248,8 @@ func ReadHeader(s *setting.Setting, conn io.ReadWriter) (byte, []byte, error) {
 	buf := make([]byte, h.Length)
 	n := 0
 	for l := uint32(0); l < h.Length; l += uint32(n) {
-		if n, err = conn.Read(buf[l:]); err != nil {
-			return 0, nil, err
+		if n, err2 = conn.Read(buf[l:]); err2 != nil {
+			return 0, nil, err2
 		}
 	}
 	return h.Command, buf, nil
@@ -270,10 +270,10 @@ func ReadVersion(s *setting.Setting, buf []byte) (*Version, error) {
 	if v.AddrTo.Service != ServiceFull {
 		return nil, errors.New("unknown service")
 	}
-	if err := s.CheckAddress(string(v.AddrFrom.Address), true, true); err != nil {
+	if err := s.CheckAddress(v.AddrFrom.Address, true, true); err != nil {
 		return nil, err
 	}
-	if err := s.CheckAddress(string(v.AddrTo.Address), true, false); err != nil {
+	if err := s.CheckAddress(v.AddrTo.Address, true, false); err != nil {
 		return nil, err
 	}
 	return &v, nil
@@ -290,7 +290,7 @@ func ReadAddrs(s *setting.Setting, buf []byte) (*Addrs, error) {
 	}
 	for i := len(v) - 1; i >= 0; i-- {
 		adr := v[i]
-		if err := s.CheckAddress(string(adr.Address), true, false); err != nil {
+		if err := s.CheckAddress(adr.Address, true, false); err != nil {
 			if err != setting.ErrTorAddress {
 				return nil, err
 			}

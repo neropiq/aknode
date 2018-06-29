@@ -44,13 +44,13 @@ var genesis tx.Hash
 
 func setup(t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	var err error
+	var err2 error
 	if err := os.RemoveAll("./test_db"); err != nil {
 		log.Println(err)
 	}
-	s.DB, err = db.Open("./test_db")
-	if err != nil {
-		panic(err)
+	s.DB, err2 = db.Open("./test_db")
+	if err2 != nil {
+		panic(err2)
 	}
 
 	s.Config = aklib.DebugConfig
@@ -59,9 +59,9 @@ func setup(t *testing.T) {
 	s.Port = 1234
 	s.MyHostPort = ":1234"
 	seed := address.GenerateSeed()
-	a, err = address.New(address.Height10, seed, s.Config)
-	if err != nil {
-		t.Error(err)
+	a, err2 = address.New(address.Height10, seed, s.Config)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	s.Config.Genesis = map[string]uint64{
 		a.Address58(): aklib.ADKSupply,
@@ -71,9 +71,6 @@ func setup(t *testing.T) {
 		t.Error(err)
 	}
 	gs := leaves.Get(1)
-	if err != nil {
-		t.Error(err)
-	}
 	if len(gs) != 1 {
 		t.Error("invalid genesis")
 	}
@@ -156,14 +153,14 @@ func TestNode2(t *testing.T) {
 		t.Error(err)
 	}
 
-	l, err := start(&s)
-	if err != nil {
-		t.Error(err)
+	l, err2 := start(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	to := net.JoinHostPort(s.Bind, strconv.Itoa(int(s.Port)))
-	conn, err := net.DialTimeout("tcp", to, 3*time.Second)
-	if err != nil {
-		t.Error(err)
+	conn, err2 := net.DialTimeout("tcp", to, 3*time.Second)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	tcpconn, ok := conn.(*net.TCPConn)
 	if !ok {
@@ -178,24 +175,24 @@ func TestNode2(t *testing.T) {
 		t.Error(err)
 	}
 
-	cmd, _, err := msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, _, err2 := msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdVerack {
 		t.Error("message must be verack after Version")
 	}
 
-	cmd, buf, err := msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, buf, err2 := msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdVersion {
 		t.Error("cmd must be version for handshake")
 	}
-	v, err = msg.ReadVersion(&s1, buf)
-	if err != nil {
-		t.Error(err)
+	_, err2 = msg.ReadVersion(&s1, buf)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if err := msg.Write(&s1, nil, msg.CmdVerack, conn); err != nil {
 		t.Error(err)
@@ -206,16 +203,16 @@ func TestNode2(t *testing.T) {
 	if err := msg.Write(&s1, &nonce, msg.CmdPing, conn); err != nil {
 		t.Error(err)
 	}
-	cmd, buf, err = msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdPong {
 		t.Error("cmd must be pong")
 	}
-	n, err := msg.ReadNonce(buf)
-	if err != nil {
-		t.Error(err)
+	n, err2 := msg.ReadNonce(buf)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if *n != nonce {
 		t.Error("invalid ping or poing")
@@ -224,16 +221,16 @@ func TestNode2(t *testing.T) {
 	if err := msg.Write(&s1, nil, msg.CmdGetAddr, conn); err != nil {
 		t.Error(err)
 	}
-	cmd, buf, err = msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdAddr {
 		t.Error("cmd must be addr ")
 	}
-	adrs, err := msg.ReadAddrs(&s1, buf)
-	if err != nil {
-		t.Error(err)
+	adrs, err2 := msg.ReadAddrs(&s1, buf)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if *n != nonce {
 		t.Error("invalid ping or poing")
@@ -254,16 +251,16 @@ func TestNode2(t *testing.T) {
 	if err := msg.Write(&s1, &inv, msg.CmdInv, conn); err != nil {
 		t.Error(err)
 	}
-	cmd, buf, err = msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdGetData {
 		t.Error("cmd must be getdata")
 	}
-	rinv, err := msg.ReadInventories(buf)
-	if err != nil {
-		t.Error(err)
+	rinv, err2 := msg.ReadInventories(buf)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(rinv) != 1 {
 		t.Error("invalid inv", len(rinv))
@@ -284,16 +281,16 @@ func TestNode2(t *testing.T) {
 		t.Error(err)
 	}
 
-	cmd, buf, err = msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdInv {
 		t.Error("cmd must be txs")
 	}
-	invs2, err := msg.ReadInventories(buf)
-	if err != nil {
-		t.Error(err)
+	invs2, err2 := msg.ReadInventories(buf)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(invs2) != 1 {
 		t.Error("invalid inv")
@@ -305,16 +302,16 @@ func TestNode2(t *testing.T) {
 	if err := msg.Write(&s1, &inv, msg.CmdGetData, conn); err != nil {
 		t.Error(err)
 	}
-	cmd, buf, err = msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdTxs {
 		t.Error("cmd must be txs")
 	}
-	tr2, err := msg.ReadTxs(buf)
-	if err != nil {
-		t.Error(err)
+	tr2, err2 := msg.ReadTxs(buf)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(tr2) != 1 {
 		t.Error("invalid read txs")
@@ -330,16 +327,16 @@ func TestNode2(t *testing.T) {
 	if err := msg.Write(&s1, &lfrom, msg.CmdGetLeaves, conn); err != nil {
 		t.Error(err)
 	}
-	cmd, buf, err = msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdLeaves {
 		t.Error("cmd must be ")
 	}
-	rfrom, err := msg.ReadInventories(buf)
-	if err != nil {
-		t.Error(err)
+	rfrom, err2 := msg.ReadInventories(buf)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if len(rfrom) != 1 {
 		t.Error("invalid inv length", len(rfrom))
@@ -349,9 +346,9 @@ func TestNode2(t *testing.T) {
 	}
 
 	WriteAll(nil, msg.CmdGetLeaves)
-	cmd, _, err = msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, _, err2 = msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdGetLeaves {
 		t.Error("cmd must be get leaves")
@@ -368,16 +365,16 @@ func TestNode2(t *testing.T) {
 	}
 	tras := []*tx.Transaction{tra3, tra2}
 	for i := 0; i < 2; i++ {
-		cmd, buf, err = msg.ReadHeader(&s1, conn)
-		if err != nil {
-			t.Error(err)
+		cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if cmd != msg.CmdGetData {
 			t.Error("cmd must be get data")
 		}
-		rinv, err = msg.ReadInventories(buf)
-		if err != nil {
-			t.Error(err)
+		rinv, err2 = msg.ReadInventories(buf)
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if len(rinv) != 1 {
 			t.Error("invalid get data", len(rinv))
@@ -397,9 +394,9 @@ func TestNode2(t *testing.T) {
 	}
 
 	WriteAll(nil, msg.CmdGetAddr)
-	cmd, _, err = msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, _, err2 = msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdGetAddr {
 		t.Error("cmd must be get addr")
@@ -442,9 +439,9 @@ func TestNode2(t *testing.T) {
 	if err := msg.Write(&s1, &nonce, msg.CmdPing, conn); err == nil {
 		t.Error("should be banned")
 	}
-	conn, err = net.DialTimeout("tcp", to, 3*time.Second)
-	if err != nil {
-		t.Error(err)
+	conn, err2 = net.DialTimeout("tcp", to, 3*time.Second)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	v = msg.NewVersion(&s1, *msg.NewAddr(to, msg.ServiceFull))
 	if err := conn.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
@@ -453,7 +450,7 @@ func TestNode2(t *testing.T) {
 	if err := msg.Write(&s1, v, msg.CmdVersion, conn); err != nil {
 		t.Error(err)
 	}
-	if _, _, err = msg.ReadHeader(&s1, conn); err == nil {
+	if _, _, err := msg.ReadHeader(&s1, conn); err == nil {
 		t.Error("should be banned")
 	}
 	if err := l.Close(); err != nil {
@@ -465,13 +462,13 @@ func TestNode3(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	tcpAddr, err := net.ResolveTCPAddr("tcp", s1.MyHostPort)
-	if err != nil {
-		t.Error(err)
+	tcpAddr, err2 := net.ResolveTCPAddr("tcp", s1.MyHostPort)
+	if err2 != nil {
+		t.Error(err2)
 	}
-	l, err := net.ListenTCP("tcp", tcpAddr)
-	if err != nil {
-		t.Error(err)
+	l, err2 := net.ListenTCP("tcp", tcpAddr)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	ch := make(chan struct{})
 	go func() {
@@ -479,16 +476,16 @@ func TestNode3(t *testing.T) {
 			l.Close()
 			ch <- struct{}{}
 		}()
-		conn, err := l.AcceptTCP()
-		if err != nil {
-			t.Fatal(err)
+		conn, err3 := l.AcceptTCP()
+		if err3 != nil {
+			t.Error(err3)
 		}
 		if err := conn.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
 			t.Error(err)
 		}
-		p, err := readVersion(&s1, conn)
-		if err != nil {
-			t.Error(err)
+		p, err3 := readVersion(&s1, conn)
+		if err3 != nil {
+			t.Error(err3)
 		}
 		if err := writeVersion(&s1, p.remote, conn); err != nil {
 			t.Error(err)
@@ -507,14 +504,14 @@ func TestNode4(t *testing.T) {
 		return p.conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	}
 
-	l, err := start(&s)
-	if err != nil {
-		t.Error(err)
+	l, err2 := start(&s)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	to := net.JoinHostPort(s.Bind, strconv.Itoa(int(s.Port)))
-	conn, err := net.DialTimeout("tcp", to, 3*time.Second)
-	if err != nil {
-		t.Error(err)
+	conn, err2 := net.DialTimeout("tcp", to, 3*time.Second)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	tcpconn, ok := conn.(*net.TCPConn)
 	if !ok {
@@ -529,39 +526,39 @@ func TestNode4(t *testing.T) {
 		t.Error(err)
 	}
 
-	cmd, _, err := msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, _, err2 := msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdVerack {
 		t.Error("message must be verack after Version")
 	}
 
-	cmd, buf, err := msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, buf, err2 := msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdVersion {
 		t.Error("cmd must be version for handshake")
 	}
-	v, err = msg.ReadVersion(&s1, buf)
-	if err != nil {
-		t.Error(err)
+	_, err2 = msg.ReadVersion(&s1, buf)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if err := msg.Write(&s1, nil, msg.CmdVerack, conn); err != nil {
 		t.Error(err)
 	}
 	time.Sleep(4 * time.Second)
-	cmd, buf, err = msg.ReadHeader(&s1, conn)
-	if err != nil {
-		t.Error(err)
+	cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if cmd != msg.CmdPing {
 		t.Error("cmd must be ping")
 	}
-	n, err := msg.ReadNonce(buf)
-	if err != nil {
-		t.Error(err)
+	n, err2 := msg.ReadNonce(buf)
+	if err2 != nil {
+		t.Error(err2)
 	}
 	if err := msg.Write(&s1, n, msg.CmdPong, conn); err != nil {
 		t.Error(err)

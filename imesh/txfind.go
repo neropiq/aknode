@@ -82,9 +82,9 @@ func Init(s *setting.Setting) error {
 	if total != aklib.ADKSupply {
 		return errors.New("invalid total supply")
 	}
-	has, err := Has(s, tr.Hash())
-	if err != nil {
-		return err
+	has, err2 := Has(s, tr.Hash())
+	if err2 != nil {
+		return err2
 	}
 	if !has {
 		if err := putTx(s, tr); err != nil {
@@ -102,11 +102,11 @@ func Init(s *setting.Setting) error {
 			return err
 		}
 	}
-	err = s.DB.View(func(txn *badger.Txn) error {
+	err2 = s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &unresolved, db.HeaderUnresolvedInfo)
 	})
-	if err != nil && err != badger.ErrKeyNotFound {
-		return err
+	if err2 != nil && err2 != badger.ErrKeyNotFound {
+		return err2
 	}
 	for h, ut := range unresolved.Txs {
 		t, err := getUnresolvedTx(s, h[:])

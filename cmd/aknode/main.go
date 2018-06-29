@@ -98,14 +98,14 @@ func main() {
 	flag.StringVar(&fname, "fname", "~/.aknode/aknode.json", "setting file path")
 	flag.Parse()
 
-	s, err := ioutil.ReadFile(fname)
-	if err != nil {
-		fmt.Println(err)
+	s, err2 := ioutil.ReadFile(fname)
+	if err2 != nil {
+		fmt.Println(err2)
 		os.Exit(1)
 	}
-	setting, err := setting.Load(s)
-	if err != nil {
-		fmt.Println(err)
+	setting, err2 := setting.Load(s)
+	if err2 != nil {
+		fmt.Println(err2)
 		os.Exit(1)
 	}
 	if !verbose {
@@ -128,7 +128,7 @@ func main() {
 		fmt.Println(err)
 		log.Fatal(err)
 	}
-	if node.Start(setting); err != nil {
+	if err := node.Start(setting); err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
 	}

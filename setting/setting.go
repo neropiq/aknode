@@ -81,7 +81,6 @@ type Setting struct {
 //Load parse a json file fname , open DB and returns Settings struct .
 func Load(s []byte) (*Setting, error) {
 	var se Setting
-	var err error
 
 	if err := json.Unmarshal(s, &se); err != nil {
 		return nil, err
@@ -97,9 +96,9 @@ func Load(s []byte) (*Setting, error) {
 		}
 	}
 
-	usr, err := user.Current()
-	if err != nil {
-		return nil, err
+	usr, err2 := user.Current()
+	if err2 != nil {
+		return nil, err2
 	}
 	if se.RootDir == "" {
 		se.RootDir = filepath.Join(usr.HomeDir, ".aknode")
@@ -155,9 +154,9 @@ func Load(s []byte) (*Setting, error) {
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
 		return nil, err
 	}
-	se.DB, err = db.Open(dbDir)
-	if err != nil {
-		return nil, err
+	se.DB, err2 = db.Open(dbDir)
+	if err2 != nil {
+		return nil, err2
 	}
 	if err := os.MkdirAll(se.BaseDir(), 0755); err != nil {
 		return nil, err
@@ -196,11 +195,11 @@ func (s *Setting) CheckAddress(adr string, hasPort, isEmptyHost bool) error {
 		}
 		return ErrTorAddress
 	}
-	h, p, err := net.SplitHostPort(adr)
-	if err != nil && hasPort {
-		return err
+	h, p, err2 := net.SplitHostPort(adr)
+	if err2 != nil && hasPort {
+		return err2
 	}
-	if err == nil && !hasPort {
+	if err2 == nil && !hasPort {
 		return errors.New("should not have port number")
 	}
 	if hasPort {
@@ -219,6 +218,6 @@ func (s *Setting) CheckAddress(adr string, hasPort, isEmptyHost bool) error {
 		}
 		return nil
 	}
-	_, err = net.LookupIP(adr)
-	return err
+	_, err2 = net.LookupIP(adr)
+	return err2
 }

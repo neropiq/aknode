@@ -35,13 +35,13 @@ import (
 var s setting.Setting
 
 func setup(t *testing.T) {
-	var err error
+	var err2 error
 	if err := os.RemoveAll("./test_db"); err != nil {
 		t.Error(err)
 	}
-	s.DB, err = db.Open("./test_db")
-	if err != nil {
-		t.Error(err)
+	s.DB, err2 = db.Open("./test_db")
+	if err2 != nil {
+		t.Error(err2)
 	}
 	s.Config = aklib.TestConfig
 }

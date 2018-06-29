@@ -75,7 +75,11 @@ func (ti *TxInfo) nextSigKey(s *setting.Setting) error {
 	if err != nil {
 		return err
 	}
-	defer seq.Release()
+	defer func() {
+		if err2 := seq.Release(); err2 != nil {
+			log.Fatal(err2)
+		}
+	}()
 	no, err := seq.Next()
 	if err != nil {
 		return err
@@ -169,17 +173,17 @@ func putTx(s *setting.Setting, tr *tx.Transaction) error {
 			return err2
 		}
 		for _, prev := range inputHashes(tr) {
-			var ti TxInfo
-			if err := db.Get(txn, prev.Hash, &ti, db.HeaderTxInfo); err != nil {
+			var ti2 TxInfo
+			if err := db.Get(txn, prev.Hash, &ti2, db.HeaderTxInfo); err != nil {
 				return err
 			}
-			if !ti.OutputStatus[prev.Type][prev.Index].IsReferred {
-				ti.OutputStatus[prev.Type][prev.Index].IsReferred = true
-				if err := db.Put(txn, prev.Hash, &ti, db.HeaderTxInfo); err != nil {
+			if !ti2.OutputStatus[prev.Type][prev.Index].IsReferred {
+				ti2.OutputStatus[prev.Type][prev.Index].IsReferred = true
+				if err := db.Put(txn, prev.Hash, &ti2, db.HeaderTxInfo); err != nil {
 					return err
 				}
 			}
-			for h, header := range ti.OutputStatus[prev.Type][prev.Index].UsedByMinable {
+			for h, header := range ti2.OutputStatus[prev.Type][prev.Index].UsedByMinable {
 				if err := deleteMinableTx(txn, h[:], header); err != nil {
 					return err
 				}
@@ -262,11 +266,11 @@ func PutMinableTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 			if ti.OutputStatus[h.Type][h.Index].UsedByMinable == nil {
 				ti.OutputStatus[h.Type][h.Index].UsedByMinable = make(map[[32]byte]db.Header)
 			}
-			header, err := msg.TxType2DBHeader(typ)
+			header2, err := msg.TxType2DBHeader(typ)
 			if err != nil {
 				return err
 			}
-			ti.OutputStatus[h.Type][h.Index].UsedByMinable[tr.Hash().Array()] = header
+			ti.OutputStatus[h.Type][h.Index].UsedByMinable[tr.Hash().Array()] = header2
 			if err := db.Put(txn, h.Hash, &ti, db.HeaderTxInfo); err != nil {
 				return err
 			}
@@ -341,8 +345,8 @@ func GetRandomMinableTx(s *setting.Setting, typ tx.Type) (*tx.Transaction, error
 		}
 		var trr tx.Transaction
 		j := rand.R.Intn(len(hashes))
-		if err := db.Get(txn, hashes[j][1:], &trr, header); err != nil {
-			return err
+		if err2 := db.Get(txn, hashes[j][1:], &trr, header); err2 != nil {
+			return err2
 		}
 		tr = &trr
 		return nil

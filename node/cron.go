@@ -40,17 +40,17 @@ func resolve() {
 
 func goResolve(s *setting.Setting) {
 	for range ch {
-		trs, err := imesh.Resolve(s)
-		if err != nil {
-			log.Println(err)
+		trs, err2 := imesh.Resolve(s)
+		if err2 != nil {
+			log.Println(err2)
 			continue
 		}
 		if len(trs) != 0 {
 			inv := make(msg.Inventories, 0, len(trs))
 			for _, h := range trs {
-				typ, err := msg.TxType2InvType(h.Type)
-				if err != nil {
-					log.Println(err)
+				typ, err3 := msg.TxType2InvType(h.Type)
+				if err3 != nil {
+					log.Println(err3)
 					continue
 				}
 				inv = append(inv, &msg.Inventory{
@@ -64,17 +64,17 @@ func goResolve(s *setting.Setting) {
 			WriteAll(inv, msg.CmdInv)
 		}
 
-		ts, err := imesh.GetSearchingTx(s)
-		if err != nil {
-			log.Println(err)
+		ts, err2 := imesh.GetSearchingTx(s)
+		if err2 != nil {
+			log.Println(err2)
 			continue
 		}
 		if len(ts) != 0 {
 			inv := make(msg.Inventories, 0, len(ts))
 			for _, tr := range ts {
-				typ, err := msg.TxType2InvType(tr.Type)
-				if err != nil {
-					log.Println(err)
+				typ, err2 := msg.TxType2InvType(tr.Type)
+				if err2 != nil {
+					log.Println(err2)
 					continue
 				}
 				inv = append(inv, &msg.Inventory{

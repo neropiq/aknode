@@ -81,7 +81,7 @@ func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, erro
 	if s.InBlacklist(remote) {
 		return nil, errors.New("remote is in blacklist")
 	}
-	err := func() error {
+	err2 := func() error {
 		banned.Lock()
 		defer banned.Unlock()
 		if t, exist := banned.addr[remote]; exist {
@@ -93,16 +93,16 @@ func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, erro
 		}
 		return nil
 	}()
-	if err != nil {
-		return nil, err
+	if err2 != nil {
+		return nil, err2
 	}
 	if s.InBlacklist(v.AddrFrom.Address) {
 		return nil, errors.New("remote is in blacklist")
 	}
 	if !s.UseTor {
-		h, po, err := net.SplitHostPort(v.AddrFrom.Address)
-		if err != nil {
-			return nil, err
+		h, po, err2 := net.SplitHostPort(v.AddrFrom.Address)
+		if err2 != nil {
+			return nil, err2
 		}
 		if h == "" {
 			v.AddrFrom.Address = net.JoinHostPort(remote, po)
@@ -250,15 +250,15 @@ func (p *peer) run(s *setting.Setting) {
 	if err := p.runLoop(s); err != nil {
 		log.Println(err)
 		banned.Lock()
-		h, _, err := net.SplitHostPort(p.remote.Address)
-		if err != nil {
+		h, _, err2 := net.SplitHostPort(p.remote.Address)
+		if err2 != nil {
 			banned.addr[p.remote.Address] = time.Now()
 		} else {
 			banned.addr[h] = time.Now()
 		}
 		banned.Unlock()
-		if err := remove(s, p.remote); err != nil {
-			log.Println(err)
+		if err3 := remove(s, p.remote); err3 != nil {
+			log.Println(err3)
 		}
 	}
 }
@@ -273,19 +273,18 @@ func (p *peer) runLoop(s *setting.Setting) error {
 	for {
 		var cmd byte
 		var buf []byte
-		var err error
+		var err2 error
 		if err := setReadDeadline(p, time.Now().Add(connectionTimeout)); err != nil {
 			return err
 		}
-		cmd, buf, err = msg.ReadHeader(p.setting, p.conn)
-		if err != nil {
-			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+		cmd, buf, err2 = msg.ReadHeader(p.setting, p.conn)
+		if err2 != nil {
+			if ne, ok := err2.(net.Error); ok && ne.Timeout() {
 				if i := p.isWritten(msg.CmdPing, nil); i >= 0 {
-					err := fmt.Errorf("no response from %v", p.remote)
-					if err2 := remove(s, p.remote); err2 != nil {
-						log.Println(err2)
+					if err3 := remove(s, p.remote); err3 != nil {
+						log.Println(err3)
 					}
-					return err
+					return fmt.Errorf("no response from %v", p.remote)
 				}
 				n := nonce()
 				if err := p.write(&n, msg.CmdPing); err != nil {
@@ -293,7 +292,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 				}
 				continue
 			}
-			return err
+			return err2
 		}
 		switch cmd {
 		case msg.CmdPing:

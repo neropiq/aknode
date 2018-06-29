@@ -93,9 +93,9 @@ func lookup(s *setting.Setting) error {
 func connect(s *setting.Setting) {
 	dialer := net.Dial
 	if s.Proxy != "" {
-		p, err := proxy.SOCKS5("tcp", s.Proxy, nil, proxy.Direct)
-		if err != nil {
-			log.Fatal(err)
+		p, err2 := proxy.SOCKS5("tcp", s.Proxy, nil, proxy.Direct)
+		if err2 != nil {
+			log.Fatal(err2)
 		}
 		dialer = p.Dial
 	}
@@ -112,9 +112,9 @@ func connect(s *setting.Setting) {
 					log.Println(err)
 				}
 
-				conn, err := dialer("tcp", p.Address)
-				if err != nil {
-					log.Println(err)
+				conn, err3 := dialer("tcp", p.Address)
+				if err3 != nil {
+					log.Println(err3)
 					continue
 				}
 				tcpconn, ok := conn.(*net.TCPConn)
@@ -129,9 +129,9 @@ func connect(s *setting.Setting) {
 					log.Println(err)
 					continue
 				}
-				pr, err := readVersion(s, tcpconn)
-				if err != nil {
-					log.Println(err)
+				pr, err3 := readVersion(s, tcpconn)
+				if err3 != nil {
+					log.Println(err3)
 					continue
 				}
 				if err := pr.add(); err != nil {
@@ -149,27 +149,31 @@ func connect(s *setting.Setting) {
 
 func start(setting *setting.Setting) (*net.TCPListener, error) {
 	ipport := fmt.Sprintf("%s:%d", setting.Bind, setting.Port)
-	tcpAddr, err := net.ResolveTCPAddr("tcp", ipport)
-	if err != nil {
-		return nil, err
+	tcpAddr, err2 := net.ResolveTCPAddr("tcp", ipport)
+	if err2 != nil {
+		return nil, err2
 	}
-	l, err := net.ListenTCP("tcp", tcpAddr)
-	if err != nil {
-		return nil, err
+	l, err2 := net.ListenTCP("tcp", tcpAddr)
+	if err2 != nil {
+		return nil, err2
 	}
 	fmt.Printf("Starting node Server on " + ipport + "\n")
 	go func() {
-		defer l.Close()
+		defer func() {
+			if err := l.Close(); err != nil {
+				log.Println(err)
+			}
+		}()
 		for {
-			conn, err := l.AcceptTCP()
-			if err != nil {
-				if ne, ok := err.(net.Error); ok {
+			conn, err3 := l.AcceptTCP()
+			if err3 != nil {
+				if ne, ok := err3.(net.Error); ok {
 					if ne.Temporary() {
-						log.Println("AcceptTCP", err)
+						log.Println("AcceptTCP", err3)
 						continue
 					}
 				}
-				log.Println(err)
+				log.Println(err3)
 				return
 			}
 			go func() {
@@ -190,14 +194,14 @@ func start(setting *setting.Setting) (*net.TCPListener, error) {
 
 //Handle handles messages in tcp.
 func handle(s *setting.Setting, conn *net.TCPConn) error {
-	var err error
+	var err2 error
 	if err := conn.SetDeadline(time.Now().Add(rwTimeout)); err != nil {
 		return err
 	}
-	p, err := readVersion(s, conn)
-	if err != nil {
-		log.Println(err)
-		return err
+	p, err2 := readVersion(s, conn)
+	if err2 != nil {
+		log.Println(err2)
+		return err2
 	}
 
 	if err := writeVersion(s, p.remote, conn); err != nil {
