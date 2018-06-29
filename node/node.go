@@ -25,13 +25,13 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"time"
 
 	"golang.org/x/net/proxy"
 
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/setting"
-	"github.com/vmihailenco/msgpack"
 )
 
 func readVersion(s *setting.Setting, conn *net.TCPConn) (*peer, error) {
@@ -42,7 +42,7 @@ func readVersion(s *setting.Setting, conn *net.TCPConn) (*peer, error) {
 	if cmd != msg.CmdVersion {
 		return nil, errors.New("cmd must be version for handshake")
 	}
-	v, err := msg.ReadVersion(buf)
+	v, err := msg.ReadVersion(s, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -59,10 +59,7 @@ func writeVersion(s *setting.Setting, to msg.Addr, conn *net.TCPConn) error {
 		log.Println(err)
 		return err
 	}
-	enc := msgpack.NewEncoder(conn).StructAsArray(true)
-	if err := enc.Encode(v); err != nil {
-		return err
-	}
+
 	cmd, _, err := msg.ReadHeader(s, conn)
 	if err != nil {
 		return err
@@ -82,19 +79,10 @@ func lookup(s *setting.Setting) error {
 				return err
 			}
 			for _, n := range addrs {
-				lips, err := net.LookupIP(n.Target)
-				if err != nil {
-					return err
-				}
-				for _, ip := range lips {
-					adr := msg.Addr{
-						Address: ip,
-						Port:    n.Port,
-					}
-					adrs = append(adrs, adr)
-				}
+				adr := net.JoinHostPort(n.Target, strconv.Itoa(int(s.Config.DefaultPort)))
+				adrs = append(adrs, *msg.NewAddr(adr, msg.ServiceFull))
 			}
-			if err := putAddrs(s, adrs); err != nil {
+			if err := putAddrs(s, adrs...); err != nil {
 				return err
 			}
 		}
@@ -120,11 +108,11 @@ func connect(s *setting.Setting) {
 					continue
 				}
 				p := ps[0]
-				to := net.TCPAddr{
-					IP:   p.Address,
-					Port: int(p.Port),
+				if err := remove(s, p); err != nil {
+					log.Println(err)
 				}
-				conn, err := dialer("tcp", to.String())
+
+				conn, err := dialer("tcp", p.Address)
 				if err != nil {
 					log.Println(err)
 					continue
@@ -150,41 +138,24 @@ func connect(s *setting.Setting) {
 					log.Println(err)
 					continue
 				}
-				pr.Run(s)
+				if err := putAddrs(s, p); err != nil {
+					log.Println(err)
+				}
+				pr.run(s)
 			}
 		}()
 	}
 }
 
-//Bootstrap  connects to peers.
-func bootstrap(s *setting.Setting) error {
-	if err := lookup(s); err != nil {
-		return err
-	}
-	connect(s)
-	return nil
-}
-
-//Start starts a node server.
-func Start(setting *setting.Setting) error {
-	if err := initDB(setting); err != nil {
-		return err
-	}
-	if err := bootstrap(setting); err != nil {
-		return err
-	}
-	return start(setting)
-}
-
-func start(setting *setting.Setting) error {
+func start(setting *setting.Setting) (*net.TCPListener, error) {
 	ipport := fmt.Sprintf("%s:%d", setting.Bind, setting.Port)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", ipport)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	l, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fmt.Printf("Starting node Server on " + ipport + "\n")
 	go func() {
@@ -198,24 +169,29 @@ func start(setting *setting.Setting) error {
 						continue
 					}
 				}
-				log.Fatal(err)
+				log.Println(err)
+				return
 			}
-			if err := handle(setting, conn); err != nil {
+			go func() {
+				log.Println("handling")
+				if err := handle(setting, conn); err != nil {
+					log.Println(err)
+				}
+				log.Println("closing")
 				if err := conn.Close(); err != nil {
 					log.Println(err)
 				}
-			}
+			}()
 		}
 	}()
 	goCron(setting)
-	return err
+	return l, nil
 }
 
 //Handle handles messages in tcp.
 func handle(s *setting.Setting, conn *net.TCPConn) error {
 	var err error
 	if err := conn.SetDeadline(time.Now().Add(rwTimeout)); err != nil {
-		log.Println(err)
 		return err
 	}
 	p, err := readVersion(s, conn)
@@ -223,14 +199,30 @@ func handle(s *setting.Setting, conn *net.TCPConn) error {
 		log.Println(err)
 		return err
 	}
-	if err := writeVersion(s, p.from, conn); err != nil {
-		log.Println(err)
+
+	if err := writeVersion(s, p.remote, conn); err != nil {
 		return err
 	}
+
 	if err := p.add(); err != nil {
-		log.Println(err)
 		return err
 	}
-	go p.Run(s)
+	if err := putAddrs(s, p.remote); err != nil {
+		return err
+	}
+	p.run(s)
 	return nil
+}
+
+//Start starts a node server.
+func Start(setting *setting.Setting) error {
+	if err := initDB(setting); err != nil {
+		return err
+	}
+	if err := lookup(setting); err != nil {
+		return err
+	}
+	connect(setting)
+	_, err := start(setting)
+	return err
 }

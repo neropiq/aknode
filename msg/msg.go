@@ -23,7 +23,7 @@ package msg
 import (
 	"errors"
 	"io"
-	"net"
+	"log"
 
 	"github.com/AidosKuneen/aklib/arypack"
 	"github.com/AidosKuneen/aklib/db"
@@ -44,7 +44,7 @@ const (
 	CmdInv                       // Header + Inventories,broadcast
 	CmdGetData                   // Header+ Inventories,p2p
 	CmdTxs                       // Header+ Txs,p2p
-	CmdGetLeaves                 // Header + GetLeaves,p2p
+	CmdGetLeaves                 // Header + LeavesFrom,p2p
 	CmdLeaves                    // Header + Inventories,p2p
 	CmdClose                     //Header,p2p
 )
@@ -52,7 +52,6 @@ const (
 //Services in Version mesasge.
 const (
 	ServiceFull byte = iota
-	ServiceSPV
 )
 
 //InvType is a tx type of Inv.
@@ -131,7 +130,6 @@ type Header struct {
 //Version is a message when a node creates an outgoing connection.
 type Version struct {
 	Version   uint16
-	Service   byte
 	AddrFrom  Addr
 	AddrTo    Addr
 	UserAgent string
@@ -139,14 +137,16 @@ type Version struct {
 
 //Addr is an IP address and port.
 type Addr struct {
-	Address []byte
-	Port    uint16
+	Address string
+	Service byte
 }
 
-//Key returns a key for map.
-func (a *Addr) Key() string {
-	ip16 := net.IP(a.Address).To16()
-	return string(ip16)
+//NewAddr returns a Addr struct.
+func NewAddr(adr string, service byte) *Addr {
+	return &Addr{
+		Address: adr,
+		Service: service,
+	}
 }
 
 //Addrs provides information on known nodes of the network.
@@ -173,13 +173,8 @@ type Txs []*Tx
 //Nonce  is a  nonce for ping and pong.
 type Nonce [32]byte
 
-//Hashes  is a  slice of tx hash.
-type Hashes [][32]byte
-
-//GetLeaves is for getting leaves from From to To.
-type GetLeaves struct {
-	From [32]byte
-}
+//LeavesFrom is for getting leaves from from.
+type LeavesFrom [32]byte
 
 //Write write a message to con.
 func Write(s *setting.Setting, m interface{}, cmd byte, conn io.ReadWriter) error {
@@ -205,21 +200,44 @@ func Write(s *setting.Setting, m interface{}, cmd byte, conn io.ReadWriter) erro
 	return err
 }
 
+type unbuf struct {
+	reader io.Reader
+	last   byte
+	unread bool
+}
+
+func (bs *unbuf) ReadByte() (byte, error) {
+	if bs.unread {
+		bs.unread = false
+		return bs.last, nil
+	}
+	b := make([]byte, 1)
+	_, err := bs.reader.Read(b)
+	bs.last = b[0]
+	return b[0], err
+}
+func (bs *unbuf) UnreadByte() error {
+	if bs.unread {
+		return errors.New("called UnreadByte twice")
+	}
+	bs.unread = true
+	return nil
+}
+func (bs *unbuf) Read(p []byte) (n int, err error) {
+	return bs.reader.Read(p)
+}
+
 //ReadHeader read a message from con and returns msg type.
 func ReadHeader(s *setting.Setting, conn io.ReadWriter) (byte, []byte, error) {
 	var h Header
 	var err error
-
-	for {
-		dec := msgpack.NewDecoder(conn)
-		if err := dec.Decode(&h); err != nil {
-			if ne, ok := err.(net.Error); ok && ne.Temporary() {
-				continue
-			} else {
-				return 0, nil, err
-			}
-		}
-		break
+	bs := &unbuf{
+		reader: conn,
+	}
+	dec := msgpack.NewDecoder(bs)
+	if err := dec.Decode(&h); err != nil {
+		log.Println(err)
+		return 0, nil, err
 	}
 	if h.Length > MaxLength {
 		return 0, nil, errors.New("message is too big")
@@ -231,9 +249,6 @@ func ReadHeader(s *setting.Setting, conn io.ReadWriter) (byte, []byte, error) {
 	n := 0
 	for l := uint32(0); l < h.Length; l += uint32(n) {
 		if n, err = conn.Read(buf[l:]); err != nil {
-			if ne, ok := err.(net.Error); ok && ne.Temporary() {
-				continue
-			}
 			return 0, nil, err
 		}
 	}
@@ -241,7 +256,7 @@ func ReadHeader(s *setting.Setting, conn io.ReadWriter) (byte, []byte, error) {
 }
 
 //ReadVersion read and make a Version struct.
-func ReadVersion(buf []byte) (*Version, error) {
+func ReadVersion(s *setting.Setting, buf []byte) (*Version, error) {
 	var v Version
 	if err := arypack.Unmarshal(buf, &v); err != nil {
 		return nil, err
@@ -249,14 +264,23 @@ func ReadVersion(buf []byte) (*Version, error) {
 	if v.Version != messageVersion {
 		return nil, errors.New("invalid version")
 	}
-	if v.Service != ServiceFull {
+	if v.AddrFrom.Service != ServiceFull {
 		return nil, errors.New("unknown service")
+	}
+	if v.AddrTo.Service != ServiceFull {
+		return nil, errors.New("unknown service")
+	}
+	if err := s.CheckAddress(string(v.AddrFrom.Address), true, true); err != nil {
+		return nil, err
+	}
+	if err := s.CheckAddress(string(v.AddrTo.Address), true, false); err != nil {
+		return nil, err
 	}
 	return &v, nil
 }
 
 //ReadAddrs read and make a Addrs struct.
-func ReadAddrs(buf []byte) (*Addrs, error) {
+func ReadAddrs(s *setting.Setting, buf []byte) (*Addrs, error) {
 	var v Addrs
 	if err := arypack.Unmarshal(buf, &v); err != nil {
 		return nil, err
@@ -264,10 +288,19 @@ func ReadAddrs(buf []byte) (*Addrs, error) {
 	if len(v) > MaxAddrs {
 		return nil, errors.New("addrs is too long")
 	}
+	for i := len(v) - 1; i >= 0; i-- {
+		adr := v[i]
+		if err := s.CheckAddress(string(adr.Address), true, false); err != nil {
+			if err != setting.ErrTorAddress {
+				return nil, err
+			}
+			v = append(v[:i], v[i+1:]...)
+		}
+	}
 	return &v, nil
 }
 
-//ReadInventories read and make a Addrs struct.
+//ReadInventories read and make a Inventories struct.
 func ReadInventories(buf []byte) (Inventories, error) {
 	var v Inventories
 	if err := arypack.Unmarshal(buf, &v); err != nil {
@@ -279,7 +312,7 @@ func ReadInventories(buf []byte) (Inventories, error) {
 	return v, nil
 }
 
-//ReadTxs read and make a Addrs struct.
+//ReadTxs read and make a Txs struct.
 func ReadTxs(buf []byte) (Txs, error) {
 	var v Txs
 	if err := arypack.Unmarshal(buf, &v); err != nil {
@@ -291,7 +324,7 @@ func ReadTxs(buf []byte) (Txs, error) {
 	return v, nil
 }
 
-//ReadNonce read and make a Addrs struct.
+//ReadNonce read and make a Nonce struct.
 func ReadNonce(buf []byte) (*Nonce, error) {
 	var v Nonce
 	if err := arypack.Unmarshal(buf, &v); err != nil {
@@ -300,9 +333,9 @@ func ReadNonce(buf []byte) (*Nonce, error) {
 	return &v, nil
 }
 
-//ReadGetLeaves read and make a GetLeaves struct.
-func ReadGetLeaves(buf []byte) (*GetLeaves, error) {
-	var v GetLeaves
+//ReadLeavesFrom read and make a LeavesFrom struct.
+func ReadLeavesFrom(buf []byte) (*LeavesFrom, error) {
+	var v LeavesFrom
 	if err := arypack.Unmarshal(buf, &v); err != nil {
 		return nil, err
 	}
@@ -311,15 +344,10 @@ func ReadGetLeaves(buf []byte) (*GetLeaves, error) {
 
 //NewVersion returns Verstion struct.
 func NewVersion(s *setting.Setting, to Addr) *Version {
-	v := &Version{
+	return &Version{
 		Version:   messageVersion,
-		Service:   ServiceFull,
 		UserAgent: userAgent,
 		AddrTo:    to,
-		AddrFrom: Addr{
-			Address: s.MyHostIP,
-			Port:    s.Port,
-		},
+		AddrFrom:  *NewAddr(s.MyHostPort, ServiceFull),
 	}
-	return v
 }

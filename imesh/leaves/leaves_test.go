@@ -113,10 +113,7 @@ func TestLeaves(t *testing.T) {
 		t.Error("invalid init")
 	}
 
-	rs, err := Get(6)
-	if err != nil {
-		t.Error(err)
-	}
+	rs := Get(6)
 	if len(rs) != 4 {
 		t.Error("invalid init")
 	}

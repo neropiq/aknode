@@ -148,7 +148,7 @@ func main() {
 		explorer.Run(setting)
 	}
 	if setting.RunFeeMiner || setting.RunTicketMiner {
-		node.RunMiner(setting)
+		// node.RunMiner(setting)
 	}
 	<-make(chan struct{})
 }

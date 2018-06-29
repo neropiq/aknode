@@ -41,16 +41,16 @@ import (
 )
 
 const (
-	connectionTimeout = 20 * time.Minute
-	rwTimeout         = time.Minute
+	connectionTimeout = 10 * time.Minute
+	rwTimeout         = 30 * time.Second
 )
 
 //peers is a slice of connecting peers.
 var peers = struct {
-	Peers map[*peer]struct{}
+	Peers map[string]*peer
 	sync.RWMutex
 }{
-	Peers: make(map[*peer]struct{}),
+	Peers: make(map[string]*peer),
 }
 
 var banned = struct {
@@ -68,9 +68,8 @@ type wdata struct {
 
 //peer represetnts an opponent of a connection.
 type peer struct {
-	*msg.Version
 	conn    *net.TCPConn
-	from    msg.Addr
+	remote  msg.Addr
 	setting *setting.Setting
 	written []wdata
 	sync.RWMutex
@@ -78,16 +77,16 @@ type peer struct {
 
 //newPeer returns Peer struct.
 func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, error) {
-	remote := conn.RemoteAddr().(*net.TCPAddr).IP
+	remote := conn.RemoteAddr().(*net.TCPAddr).IP.String()
 	if s.InBlacklist(remote) {
 		return nil, errors.New("remote is in blacklist")
 	}
 	err := func() error {
 		banned.Lock()
 		defer banned.Unlock()
-		if t, exist := banned.addr[string(remote.To16())]; exist {
-			if t.Add(time.Hour).After(time.Now()) {
-				delete(banned.addr, string(remote.To16()))
+		if t, exist := banned.addr[remote]; exist {
+			if t.Add(time.Hour).Before(time.Now()) {
+				delete(banned.addr, remote)
 			} else {
 				return errors.New("the remote node is banned now")
 			}
@@ -97,25 +96,30 @@ func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, erro
 	if err != nil {
 		return nil, err
 	}
-	if v.AddrFrom.Address != nil && s.InBlacklist(v.AddrFrom.Address) {
+	if s.InBlacklist(v.AddrFrom.Address) {
 		return nil, errors.New("remote is in blacklist")
 	}
+	if !s.UseTor {
+		h, po, err := net.SplitHostPort(v.AddrFrom.Address)
+		if err != nil {
+			return nil, err
+		}
+		if h == "" {
+			v.AddrFrom.Address = net.JoinHostPort(remote, po)
+		}
+	}
 	p := &peer{
-		Version: v,
 		conn:    conn,
 		setting: s,
-		from: msg.Addr{
-			Address: remote,
-			Port:    v.AddrFrom.Port,
-		},
-	}
-	if v.AddrFrom.Address != nil {
-		p.from.Address = v.AddrFrom.Address
+		remote:  v.AddrFrom,
 	}
 	peers.RLock()
 	defer peers.RUnlock()
 	if len(peers.Peers) >= int(s.MaxConnections)*10 {
-		return nil, errors.New("peers is too big")
+		return nil, errors.New("peers are too much")
+	}
+	if _, exist := peers.Peers[p.remote.Address]; exist {
+		return nil, errors.New("already connected")
 	}
 	return p, nil
 }
@@ -127,25 +131,25 @@ func (p *peer) add() error {
 	if len(peers.Peers) >= int(p.setting.MaxConnections)*2 {
 		return errors.New("peers is too big")
 	}
-	peers.Peers[p] = struct{}{}
+	if _, exist := peers.Peers[p.remote.Address]; exist {
+		return errors.New("already connected")
+	}
+	peers.Peers[p.remote.Address] = p
+
 	return nil
 }
 
-//Close closes a connection to a peer.
-func (p *peer) close() {
-	if err := p.conn.Close(); err != nil {
-		log.Println(err)
-	}
+func (p *peer) delete() {
 	peers.Lock()
 	defer peers.Unlock()
-	delete(peers.Peers, p)
+	delete(peers.Peers, p.remote.Address)
 }
 
 //WriteAll writes a command to all connected peers.
 func WriteAll(m interface{}, cmd byte) {
 	peers.RLock()
 	defer peers.RUnlock()
-	for p := range peers.Peers {
+	for _, p := range peers.Peers {
 		if err := p.write(m, cmd); err != nil {
 			log.Println(err)
 		}
@@ -161,17 +165,25 @@ func writeGetData(invs msg.Inventories) {
 		invs[i], invs[j] = invs[j], invs[i]
 	}
 	n := 2 * len(invs) / len(peers.Peers)
-	if n == 0 {
-		n = 1
+	if n*len(peers.Peers) != 2*len(invs) {
+		n++
 	}
-	i := 0
-	for p := range peers.Peers {
-		from := ((i / 2) * n) % len(invs)
-		to := (((i / 2) + 1) * n) % (len(invs) + 1)
-		if err := p.write(invs[from:to], msg.CmdGetData); err != nil {
+	no := 0
+	for _, p := range peers.Peers {
+		winvs := make(msg.Inventories, 0, n)
+		start := no
+		for i := 0; i < n; i++ {
+			winvs = append(winvs, invs[no])
+			if no++; no >= len(invs) {
+				no = 0
+			}
+			if start == no {
+				break
+			}
+		}
+		if err := p.write(winvs, msg.CmdGetData); err != nil {
 			log.Println(err)
 		}
-		i++
 	}
 }
 
@@ -184,8 +196,6 @@ func (p *peer) write(m interface{}, cmd byte) error {
 		time: time.Now(),
 	}
 	switch cmd {
-	case msg.CmdVersion:
-		fallthrough
 	case msg.CmdGetLeaves:
 		fallthrough
 	case msg.CmdGetAddr:
@@ -236,34 +246,44 @@ func nonce() msg.Nonce {
 }
 
 //Run runs a rouintine for a peer.
-func (p *peer) Run(s *setting.Setting) {
-	if err := p.run(s); err != nil {
+func (p *peer) run(s *setting.Setting) {
+	if err := p.runLoop(s); err != nil {
 		log.Println(err)
 		banned.Lock()
-		banned.addr[string(net.IP(p.AddrFrom.Address).To16())] = time.Now()
+		h, _, err := net.SplitHostPort(p.remote.Address)
+		if err != nil {
+			banned.addr[p.remote.Address] = time.Now()
+		} else {
+			banned.addr[h] = time.Now()
+		}
 		banned.Unlock()
-		if err := remove(s, p.AddrFrom); err != nil {
+		if err := remove(s, p.remote); err != nil {
 			log.Println(err)
 		}
 	}
 }
 
-func (p *peer) run(s *setting.Setting) error {
-	defer p.close()
+//for test
+var setReadDeadline = func(p *peer, t time.Time) error {
+	return p.conn.SetReadDeadline(t)
+}
+
+func (p *peer) runLoop(s *setting.Setting) error {
+	defer p.delete()
 	for {
 		var cmd byte
 		var buf []byte
 		var err error
-		if err := p.conn.SetReadDeadline(time.Now().Add(connectionTimeout)); err != nil {
+		if err := setReadDeadline(p, time.Now().Add(connectionTimeout)); err != nil {
 			return err
 		}
 		cmd, buf, err = msg.ReadHeader(p.setting, p.conn)
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
-				if p.isWritten(msg.CmdPing, nil) >= 0 {
-					err := fmt.Errorf("no response from %v", p.from)
-					if err := remove(s, p.from); err != nil {
-						log.Println(err)
+				if i := p.isWritten(msg.CmdPing, nil); i >= 0 {
+					err := fmt.Errorf("no response from %v", p.remote)
+					if err2 := remove(s, p.remote); err2 != nil {
+						log.Println(err2)
 					}
 					return err
 				}
@@ -275,7 +295,6 @@ func (p *peer) run(s *setting.Setting) error {
 			}
 			return err
 		}
-
 		switch cmd {
 		case msg.CmdPing:
 			v, err := msg.ReadNonce(buf)
@@ -307,11 +326,11 @@ func (p *peer) run(s *setting.Setting) error {
 			if err := p.received(msg.CmdGetAddr, nil); err != nil {
 				return err
 			}
-			v, err := msg.ReadAddrs(buf)
+			v, err := msg.ReadAddrs(s, buf)
 			if err != nil {
 				return err
 			}
-			if err := putAddrs(s, *v); err != nil {
+			if err := putAddrs(s, *v...); err != nil {
 				log.Println(err)
 				continue
 			}
@@ -353,17 +372,13 @@ func (p *peer) run(s *setting.Setting) error {
 						Tx:   tr,
 					})
 				case msg.InvTxRewardFee:
-					tr, err := imesh.GetMinableTx(s, inv.Hash[:], tx.TxRewardFee)
-					if err != nil {
-						log.Println(err)
-						continue
-					}
-					trs = append(trs, &msg.Tx{
-						Type: inv.Type,
-						Tx:   tr,
-					})
+					fallthrough
 				case msg.InvTxRewardTicket:
-					tr, err := imesh.GetMinableTx(s, inv.Hash[:], tx.TxRewardTicket)
+					typ := tx.TxRewardFee
+					if inv.Type == msg.InvTxRewardTicket {
+						typ = tx.TxRewardTicket
+					}
+					tr, err := imesh.GetMinableTx(s, inv.Hash[:], typ)
 					if err != nil {
 						log.Println(err)
 						continue
@@ -405,17 +420,20 @@ func (p *peer) run(s *setting.Setting) error {
 			resolve()
 
 		case msg.CmdGetLeaves:
-			v, err := msg.ReadGetLeaves(buf)
+			v, err := msg.ReadLeavesFrom(buf)
 			if err != nil {
 				return err
 			}
 			ls := leaves.GetAll()
 			idx := sort.Search(len(ls), func(i int) bool {
-				return bytes.Compare(ls[i], v.From[:]) >= 0
+				return bytes.Compare(ls[i], v[:]) >= 0
 			})
-			h := make(msg.Hashes, 0, len(ls)-idx)
+			h := make(msg.Inventories, 0, len(ls)-idx)
 			for i := idx; i < len(ls) && i < msg.MaxLeaves; i++ {
-				h = append(h, ls[i].Array())
+				h = append(h, &msg.Inventory{
+					Type: msg.InvTxNormal,
+					Hash: ls[i].Array(),
+				})
 			}
 			if err := p.write(h, msg.CmdLeaves); err != nil {
 				log.Println(err)
@@ -439,9 +457,7 @@ func (p *peer) run(s *setting.Setting) error {
 				}
 			}
 			if len(v) == msg.MaxLeaves {
-				gl := &msg.GetLeaves{
-					From: v[len(v)-1].Hash,
-				}
+				gl := v[len(v)-1].Hash
 				WriteAll(&gl, msg.CmdGetLeaves)
 			}
 			resolve()

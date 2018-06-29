@@ -64,10 +64,7 @@ func setup(t *testing.T) {
 	if err := Init(&s); err != nil {
 		t.Error(err)
 	}
-	genesis, err = leaves.Get(1)
-	if err != nil {
-		t.Error(err)
-	}
+	genesis = leaves.Get(1)
 	if len(genesis) != 1 {
 		t.Error("invalid genesis")
 	}

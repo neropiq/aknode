@@ -52,7 +52,7 @@ func Init(s *setting.Setting) error {
 }
 
 //Get gets n random leaves. if <=0, it returns all leaves.
-func Get(n int) ([]tx.Hash, error) {
+func Get(n int) []tx.Hash {
 	leaves.RLock()
 	defer leaves.RUnlock()
 	r := make([]tx.Hash, len(leaves.hash))
@@ -63,9 +63,9 @@ func Get(n int) ([]tx.Hash, error) {
 		r[i], r[j] = r[j], r[i]
 	}
 	if n >= len(leaves.hash) || n <= 0 {
-		return r, nil
+		return r
 	}
-	return r[:n], nil
+	return r[:n]
 }
 
 //GetAll gets all leaves after sorting.

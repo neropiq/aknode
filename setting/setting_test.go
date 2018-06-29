@@ -21,7 +21,6 @@
 package setting
 
 import (
-	"net"
 	"strings"
 	"testing"
 )
@@ -48,12 +47,6 @@ func TestSetting(t *testing.T) {
 	if !strings.Contains(s.BaseDir(), "testnet") {
 		t.Error("invalid basedir")
 	}
-	if len(s.BlacklistIPs) == 0 {
-		t.Error("invalid blacklist")
-	}
-	if len(s.DefaultNodeIPs) == 0 {
-		t.Error("invalid default nodes")
-	}
 	if err := s.DB.Close(); err != nil {
 		t.Error(err)
 	}
@@ -66,24 +59,24 @@ func TestSetting(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(s.BlacklistIPs) != 1 {
-		t.Error("invalid blacklist")
-	}
-	if len(s.DefaultNodeIPs) != 1 {
-		t.Error("invalid default nodes")
-	}
-	adr, err := net.ResolveTCPAddr("tcp", "123.24.11.12:1234")
-	if err != nil {
-		t.Error(err)
-	}
-	if !s.InBlacklist(adr.IP) {
+	if !s.InBlacklist("123.24.11.12:1234") {
 		t.Error("should be in blacklist")
 	}
-	adr, err = net.ResolveTCPAddr("tcp", "123.24.11.123:1234")
-	if err != nil {
-		t.Error(err)
-	}
-	if s.InBlacklist(adr.IP) {
+	if s.InBlacklist("123.24.11.123:1234") {
 		t.Error("should not be in blacklist")
+	}
+	if !s.InBlacklist("123.24.11.12") {
+		t.Error("should be in blacklist")
+	}
+	if s.InBlacklist("123.24.11.123") {
+		t.Error("should not be in blacklist")
+	}
+
+	s, err = Load([]byte(`{
+		"testnet":1,
+		"blacklists":["1323.24.11.12"],
+	}`))
+	if err == nil {
+		t.Error("should be error")
 	}
 }

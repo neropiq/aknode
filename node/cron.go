@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/AidosKuneen/aknode/imesh"
-
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/setting"
 )
@@ -59,7 +58,7 @@ func goResolve(s *setting.Setting) {
 					Hash: h.Hash.Array(),
 				})
 				if typ == msg.InvTxRewardFee || typ == msg.InvTxRewardTicket {
-					addForMine(s, h.Hash, h.Type)
+					// addForMine(s, h.Hash, h.Type)
 				}
 			}
 			WriteAll(inv, msg.CmdInv)

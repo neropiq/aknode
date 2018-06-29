@@ -28,16 +28,11 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/dgraph-io/badger"
-)
-
-//Network types
-const (
-	NetworkIP byte = iota
-	NetworkTor
 )
 
 //Address represents an address.
@@ -48,16 +43,14 @@ type Address struct {
 
 //Setting is  a aknode setting.
 type Setting struct {
-	Debug        bool     `json:"debug"`
-	Testnet      byte     `json:"testnet"`
-	Blacklists   []string `json:"blacklists"`
-	BlacklistIPs []net.IP `json:"-"`
-	RootDir      string   `json:"root_dir"`
+	Debug      bool     `json:"debug"`
+	Testnet    byte     `json:"testnet"`
+	Blacklists []string `json:"blacklists"`
+	RootDir    string   `json:"root_dir"`
+	UseTor     bool     `json:"-"` //disabled
 
-	MyHostName     string         `json:"my_host"`
-	MyHostIP       net.IP         `json:"-"`
-	DefaultNodes   []string       `json:"default_nodes"`
-	DefaultNodeIPs []*net.TCPAddr `json:"-"`
+	MyHostPort   string   `json:"my_host_port"`
+	DefaultNodes []string `json:"default_nodes"`
 
 	Bind           string `json:"bind"`
 	Port           uint16 `json:"port"`
@@ -65,7 +58,6 @@ type Setting struct {
 	Proxy          string `json:"proxy"`
 
 	RunRPCServer      bool   `json:"run_rpc"`
-	RPCType           byte   `json:"rpc_type"`
 	RPCBind           string `json:"rpc_bind"`
 	RPCPort           uint16 `json:"rpc_port"`
 	RPCUser           string `json:"rpc_user"`
@@ -98,50 +90,49 @@ func Load(s []byte) (*Setting, error) {
 		return nil, errors.New("testnet must be 0(mainnet) or 1")
 	}
 	se.Config = aklib.Configs[se.Testnet]
-	netconf := aklib.Configs[se.Testnet]
 
-	se.BlacklistIPs, err = parseIPs(se.Blacklists...)
-	if err != nil {
-		return nil, err
+	for _, a := range se.Blacklists {
+		if err := se.CheckAddress(a, false, false); err != nil {
+			return nil, err
+		}
 	}
-	se.DefaultNodeIPs, err = parseTCPAddrsses(se.DefaultNodes...)
-	if err != nil {
-		return nil, err
-	}
-	ips, err := parseIPs(se.MyHostName)
-	if err != nil {
-		return nil, err
-	}
-	if len(ips) == 0 {
-		return nil, errors.New("invalid my_host_name")
-	}
-	se.MyHostIP = ips[0]
 
 	usr, err := user.Current()
 	if err != nil {
-		return nil, errors.New("testnet must be 0(mainnet) or 1")
+		return nil, err
 	}
 	if se.RootDir == "" {
 		se.RootDir = filepath.Join(usr.HomeDir, ".aknode")
+	}
+	if se.Port == 0 {
+		se.Port = se.Config.DefaultPort
+	}
+	if se.MyHostPort == "" {
+		if !se.UseTor {
+			se.MyHostPort = ":" + strconv.Itoa(int(se.Port))
+		} else {
+			return nil, errors.New("my_host_port is empty")
+		}
+	}
+	if err := se.CheckAddress(se.MyHostPort, true, true); err != nil {
+		return nil, err
 	}
 
 	if se.Bind == "" {
 		se.Bind = "0.0.0.0"
 	}
-	if se.Port == 0 {
-		se.Port = netconf.DefaultPort
+
+	if se.UseTor && se.Proxy == "" {
+		return nil, errors.New("should be proxied for using Tor")
 	}
 	if se.MaxConnections == 0 {
 		se.MaxConnections = 10
 	}
-	if se.RPCType != NetworkIP && se.RPCType != NetworkTor {
-		return nil, errors.New("invalid RPC type")
-	}
 	if se.RPCBind == "" {
-		se.RPCBind = "localhost"
+		se.RPCBind = "127.0.0.1"
 	}
 	if se.RPCPort == 0 {
-		se.RPCPort = netconf.DefaultRPCPort
+		se.RPCPort = se.Config.DefaultRPCPort
 	}
 	if se.RunRPCServer && (se.RPCUser == "" || se.RPCPassword == "") {
 		return nil, errors.New("You must specify rpc_user and rpc_password")
@@ -151,10 +142,10 @@ func Load(s []byte) (*Setting, error) {
 	}
 
 	if se.ExplorerBind == "" {
-		se.RPCBind = "localhost"
+		se.RPCBind = "127.0.0.1"
 	}
 	if se.ExplorerPort == 0 {
-		se.RPCPort = netconf.DefaultExplorerPort
+		se.RPCPort = se.Config.DefaultExplorerPort
 	}
 	if se.ExplorerMaxConnections == 0 {
 		se.ExplorerMaxConnections = 1
@@ -175,54 +166,59 @@ func Load(s []byte) (*Setting, error) {
 	return &se, nil
 }
 
-func parseIPs(adrs ...string) ([]net.IP, error) {
-	var ips []net.IP
-	for _, b := range adrs {
-		lips, err := net.LookupIP(b)
-		if err != nil {
-			return nil, err
-		}
-		ips = append(ips, lips...)
-	}
-	return ips, nil
-}
-
-func parseTCPAddrsses(adrs ...string) ([]*net.TCPAddr, error) {
-	var tcps []*net.TCPAddr
-	for _, b := range adrs {
-		h, p, err := net.SplitHostPort(b)
-		if err != nil {
-			return nil, err
-		}
-		ips, err := parseIPs(h)
-		if err != nil {
-			return nil, err
-		}
-		port, err := strconv.Atoi(p)
-		if err != nil {
-			return nil, err
-		}
-		for _, ip := range ips {
-			tcps = append(tcps, &net.TCPAddr{
-				IP:   ip,
-				Port: port,
-			})
-		}
-	}
-	return tcps, nil
-}
-
 //BaseDir returns a dir which contains a setting file and db dir.
 func (s *Setting) BaseDir() string {
 	return filepath.Join(s.RootDir, s.Config.Name)
 }
 
 //InBlacklist returns true if remote is in blacklist.
-func (s *Setting) InBlacklist(remote net.IP) bool {
-	for _, ip := range s.BlacklistIPs {
-		if ip.Equal(remote) {
+func (s *Setting) InBlacklist(remote string) bool {
+	h, _, err := net.SplitHostPort(remote)
+	if err == nil {
+		remote = h
+	}
+	for _, ip := range s.Blacklists {
+		if ip == remote {
 			return true
 		}
 	}
 	return false
+}
+
+//ErrTorAddress represents an error  tor address is used.
+var ErrTorAddress = errors.New("cannot use tor address")
+
+//CheckAddress checks an address adr.
+func (s *Setting) CheckAddress(adr string, hasPort, isEmptyHost bool) error {
+	if strings.HasSuffix(adr, ".onion") {
+		if s.UseTor {
+			return nil
+		}
+		return ErrTorAddress
+	}
+	h, p, err := net.SplitHostPort(adr)
+	if err != nil && hasPort {
+		return err
+	}
+	if err == nil && !hasPort {
+		return errors.New("should not have port number")
+	}
+	if hasPort {
+		po, err := strconv.Atoi(p)
+		if err != nil {
+			return err
+		}
+		if po > 0xffff || po <= 0 {
+			return errors.New("illegal port number")
+		}
+		adr = h
+	}
+	if adr == "" {
+		if !isEmptyHost {
+			return errors.New("empty host name")
+		}
+		return nil
+	}
+	_, err = net.LookupIP(adr)
+	return err
 }
