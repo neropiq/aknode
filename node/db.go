@@ -33,7 +33,7 @@ import (
 
 const maxAddrs = 1000
 
-type adrmap map[string]*msg.Addr
+type adrmap map[string]msg.Addr
 
 var nodesDB = struct {
 	Addrs adrmap
@@ -51,7 +51,7 @@ func initDB(s *setting.Setting) error {
 		return err
 	}
 	for _, n := range s.DefaultNodes {
-		nodesDB.Addrs[n] = msg.NewAddr(n, msg.ServiceFull)
+		nodesDB.Addrs[n] = *msg.NewAddr(n, msg.ServiceFull)
 	}
 	for adr := range nodesDB.Addrs {
 		if s.InBlacklist(adr) {
@@ -68,7 +68,7 @@ func get(n int) []msg.Addr {
 	r := make([]msg.Addr, len(nodesDB.Addrs))
 	i := 0
 	for _, a := range nodesDB.Addrs {
-		r[i] = *a
+		r[i] = a
 		i++
 	}
 
@@ -108,7 +108,7 @@ func putAddrs(s *setting.Setting, addrs ...msg.Addr) error {
 			continue
 		}
 		if _, e := nodesDB.Addrs[addr.Address]; !e {
-			nodesDB.Addrs[addr.Address] = &addr
+			nodesDB.Addrs[addr.Address] = addr
 		}
 	}
 	return put(s)

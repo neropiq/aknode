@@ -125,7 +125,7 @@ func Load(s []byte) (*Setting, error) {
 		return nil, errors.New("should be proxied for using Tor")
 	}
 	if se.MaxConnections == 0 {
-		se.MaxConnections = 10
+		se.MaxConnections = 5
 	}
 	if se.RPCBind == "" {
 		se.RPCBind = "127.0.0.1"

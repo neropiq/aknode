@@ -85,9 +85,9 @@ func lookup(s *setting.Setting) error {
 				adrs = append(adrs, *msg.NewAddr(adr, msg.ServiceFull))
 				i++
 			}
-			if err := putAddrs(s, adrs...); err != nil {
-				return err
-			}
+		}
+		if err := putAddrs(s, adrs...); err != nil {
+			return err
 		}
 		log.Println("found", i, "nodes from DNS")
 	}
@@ -106,10 +106,9 @@ func connect(s *setting.Setting) {
 	for i := 0; i < int(s.MaxConnections); i++ {
 		go func(i int) {
 			for {
-				ps := get(0)
 				var p msg.Addr
 				found := false
-				for _, p = range ps {
+				for _, p = range get(0) {
 					if !isConnected(p.Address) {
 						found = true
 						break

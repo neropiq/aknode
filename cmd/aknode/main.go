@@ -101,7 +101,7 @@ func main() {
 	var verbose bool
 	var fname string
 	flag.BoolVar(&verbose, "verbose", false, "outputs logs to stdout.")
-	flag.StringVar(&fname, "fname", defaultpath, "setting file path")
+	flag.StringVar(&fname, "config", defaultpath, "setting file path")
 	flag.Parse()
 
 	f, err2 := ioutil.ReadFile(fname)
