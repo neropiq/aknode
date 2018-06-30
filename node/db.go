@@ -44,7 +44,6 @@ var nodesDB = struct {
 
 //Init loads node IP addresses from DB.
 func initDB(s *setting.Setting) error {
-	nodesDB.Addrs = nil
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &nodesDB.Addrs, db.HeaderNodeIP)
 	})

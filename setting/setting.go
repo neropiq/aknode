@@ -85,7 +85,7 @@ func Load(s []byte) (*Setting, error) {
 	if err := json.Unmarshal(s, &se); err != nil {
 		return nil, err
 	}
-	if int(se.Testnet) > len(aklib.Configs) {
+	if int(se.Testnet) >= len(aklib.Configs) {
 		return nil, errors.New("testnet must be 0(mainnet) or 1")
 	}
 	se.Config = aklib.Configs[se.Testnet]
