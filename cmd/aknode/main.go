@@ -29,6 +29,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"syscall"
@@ -91,19 +92,24 @@ func onSigs(se *setting.Setting) {
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-
-	var verbose bool
-	var fname string
-	flag.BoolVar(&verbose, "verbose", false, "outputs logs to stdout.")
-	flag.StringVar(&fname, "fname", "~/.aknode/aknode.json", "setting file path")
-	flag.Parse()
-
-	s, err2 := ioutil.ReadFile(fname)
+	usr, err2 := user.Current()
 	if err2 != nil {
 		fmt.Println(err2)
 		os.Exit(1)
 	}
-	setting, err2 := setting.Load(s)
+	defaultpath := filepath.Join(usr.HomeDir, ".aknode", "aknode.json")
+	var verbose bool
+	var fname string
+	flag.BoolVar(&verbose, "verbose", false, "outputs logs to stdout.")
+	flag.StringVar(&fname, "fname", defaultpath, "setting file path")
+	flag.Parse()
+
+	f, err2 := ioutil.ReadFile(fname)
+	if err2 != nil {
+		fmt.Println(err2)
+		f = []byte("{}")
+	}
+	setting, err2 := setting.Load(f)
 	if err2 != nil {
 		fmt.Println(err2)
 		os.Exit(1)
