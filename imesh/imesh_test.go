@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AidosKuneen/cuckoo"
+
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
@@ -101,6 +103,9 @@ func TestImesh(t *testing.T) {
 	}
 	if err := tr.PoW(); err != nil {
 		t.Error(err)
+	}
+	if len(tr.Nonce) != cuckoo.ProofSize {
+		t.Error("invalid nonce", len(tr.Nonce))
 	}
 	if err := CheckAddTx(&s, tr, tx.TxNormal); err != nil {
 		t.Error(err)
