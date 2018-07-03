@@ -34,7 +34,7 @@ import (
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-func readVersion(s *setting.Setting, conn *net.TCPConn) (*peer, error) {
+func readVersion(s *setting.Setting, conn *net.TCPConn, nonce uint64) (*peer, error) {
 	cmd, buf, err := msg.ReadHeader(s, conn)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func readVersion(s *setting.Setting, conn *net.TCPConn) (*peer, error) {
 	if cmd != msg.CmdVersion {
 		return nil, errors.New("cmd must be version for handshake")
 	}
-	v, err := msg.ReadVersion(s, buf, verNonce)
+	v, err := msg.ReadVersion(s, buf, nonce)
 	if err != nil {
 		return nil, err
 	}
@@ -53,8 +53,8 @@ func readVersion(s *setting.Setting, conn *net.TCPConn) (*peer, error) {
 	return p, msg.Write(s, nil, msg.CmdVerack, conn)
 }
 
-func writeVersion(s *setting.Setting, to msg.Addr, conn *net.TCPConn) error {
-	v := msg.NewVersion(s, to, verNonce)
+func writeVersion(s *setting.Setting, to msg.Addr, conn *net.TCPConn, nonce uint64) error {
+	v := msg.NewVersion(s, to, nonce)
 	if err := msg.Write(s, v, msg.CmdVersion, conn); err != nil {
 		log.Println(err)
 		return err
@@ -136,11 +136,11 @@ func connect(s *setting.Setting) {
 					log.Println(err)
 					continue
 				}
-				if err := writeVersion(s, p, tcpconn); err != nil {
+				if err := writeVersion(s, p, tcpconn, verNonce); err != nil {
 					log.Println(err)
 					continue
 				}
-				pr, err3 := readVersion(s, tcpconn)
+				pr, err3 := readVersion(s, tcpconn, verNonce)
 				if err3 != nil {
 					log.Println(err3)
 					continue
@@ -209,13 +209,13 @@ func handle(s *setting.Setting, conn *net.TCPConn) error {
 	if err := conn.SetDeadline(time.Now().Add(rwTimeout)); err != nil {
 		return err
 	}
-	p, err2 := readVersion(s, conn)
+	p, err2 := readVersion(s, conn, verNonce)
 	if err2 != nil {
 		log.Println(err2)
 		return err2
 	}
 
-	if err := writeVersion(s, p.remote, conn); err != nil {
+	if err := writeVersion(s, p.remote, conn, verNonce); err != nil {
 		return err
 	}
 

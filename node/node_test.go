@@ -84,6 +84,9 @@ func setup(t *testing.T) {
 	nodesDB.Addrs = make(adrmap)
 	peers.Peers = make(map[string]*peer)
 	banned.addr = make(map[string]time.Time)
+	if err := initDB(&s); err != nil {
+		t.Error(err)
+	}
 
 }
 
@@ -483,11 +486,11 @@ func TestNode3(t *testing.T) {
 		if err := conn.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
 			t.Error(err)
 		}
-		p, err3 := readVersion(&s1, conn)
+		p, err3 := readVersion(&s1, conn, 0)
 		if err3 != nil {
-			t.Error(err3)
+			t.Fatal(err3)
 		}
-		if err := writeVersion(&s1, p.remote, conn); err != nil {
+		if err := writeVersion(&s1, p.remote, conn, 0); err != nil {
 			t.Error(err)
 		}
 	}()

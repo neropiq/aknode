@@ -22,6 +22,7 @@ package msg
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log"
 
@@ -278,7 +279,7 @@ func ReadVersion(s *setting.Setting, buf []byte, verNonce uint64) (*Version, err
 		return nil, err
 	}
 	if v.Nonce == verNonce {
-		return nil, errors.New("connected from self")
+		return nil, fmt.Errorf("connected from self %d==%d", v.Nonce, verNonce)
 	}
 	return &v, nil
 }
