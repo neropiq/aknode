@@ -170,7 +170,7 @@ func TestNode2(t *testing.T) {
 		t.Error(err)
 	}
 
-	v := msg.NewVersion(&s1, *msg.NewAddr(to, msg.ServiceFull))
+	v := msg.NewVersion(&s1, *msg.NewAddr(to, msg.ServiceFull), 0)
 	if err := msg.Write(&s1, v, msg.CmdVersion, conn); err != nil {
 		t.Error(err)
 	}
@@ -443,7 +443,7 @@ func TestNode2(t *testing.T) {
 	if err2 != nil {
 		t.Error(err2)
 	}
-	v = msg.NewVersion(&s1, *msg.NewAddr(to, msg.ServiceFull))
+	v = msg.NewVersion(&s1, *msg.NewAddr(to, msg.ServiceFull), 0)
 	if err := conn.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
 		t.Error(err)
 	}
@@ -521,7 +521,7 @@ func TestNode4(t *testing.T) {
 		t.Error(err)
 	}
 
-	v := msg.NewVersion(&s1, *msg.NewAddr(to, msg.ServiceFull))
+	v := msg.NewVersion(&s1, *msg.NewAddr(to, msg.ServiceFull), 0)
 	if err := msg.Write(&s1, v, msg.CmdVersion, conn); err != nil {
 		t.Error(err)
 	}

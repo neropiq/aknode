@@ -24,6 +24,7 @@ package imesh
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"log"
 	"sort"
@@ -174,6 +175,7 @@ func GetHisoty(s *setting.Setting, adr []byte, utxoOnly bool) ([]*InoutHash, err
 		copy(ihs2, ihs)
 		log.Println(len(ihs))
 		for _, ih := range ihs2 {
+			log.Println(hex.EncodeToString(ih.Hash))
 			if ih.Type == TypeOut || ih.Type == TypeMulout || ih.Type == TypeTicketout {
 				continue
 			}
@@ -204,7 +206,7 @@ func GetHisoty(s *setting.Setting, adr []byte, utxoOnly bool) ([]*InoutHash, err
 			default:
 				return nil, errors.New("invalid type")
 			}
-			log.Println(*ih2)
+			log.Println(hex.EncodeToString(ih2.Hash))
 			i := sort.Search(len(ihs), func(i int) bool {
 				return bytes.Compare(ihs[i].bytes(), ih2.bytes()) >= 0
 			})

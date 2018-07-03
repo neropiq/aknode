@@ -54,7 +54,7 @@ func readVersion(s *setting.Setting, conn *net.TCPConn) (*peer, error) {
 }
 
 func writeVersion(s *setting.Setting, to msg.Addr, conn *net.TCPConn) error {
-	v := msg.NewVersion(s, to)
+	v := msg.NewVersion(s, to, verNonce)
 	if err := msg.Write(s, v, msg.CmdVersion, conn); err != nil {
 		log.Println(err)
 		return err

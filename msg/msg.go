@@ -347,11 +347,12 @@ func ReadLeavesFrom(buf []byte) (*LeavesFrom, error) {
 }
 
 //NewVersion returns Verstion struct.
-func NewVersion(s *setting.Setting, to Addr) *Version {
+func NewVersion(s *setting.Setting, to Addr, nonce uint64) *Version {
 	return &Version{
 		Version:   messageVersion,
 		UserAgent: userAgent,
 		AddrTo:    to,
 		AddrFrom:  *NewAddr(s.MyHostPort, ServiceFull),
+		Nonce:     nonce,
 	}
 }
