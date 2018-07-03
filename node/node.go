@@ -42,7 +42,7 @@ func readVersion(s *setting.Setting, conn *net.TCPConn) (*peer, error) {
 	if cmd != msg.CmdVersion {
 		return nil, errors.New("cmd must be version for handshake")
 	}
-	v, err := msg.ReadVersion(s, buf)
+	v, err := msg.ReadVersion(s, buf, verNonce)
 	if err != nil {
 		return nil, err
 	}

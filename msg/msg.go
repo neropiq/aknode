@@ -130,6 +130,7 @@ type Header struct {
 //Version is a message when a node creates an outgoing connection.
 type Version struct {
 	Version   uint16
+	Nonce     uint64
 	AddrFrom  Addr
 	AddrTo    Addr
 	UserAgent string
@@ -256,7 +257,7 @@ func ReadHeader(s *setting.Setting, conn io.Reader) (byte, []byte, error) {
 }
 
 //ReadVersion read and make a Version struct.
-func ReadVersion(s *setting.Setting, buf []byte) (*Version, error) {
+func ReadVersion(s *setting.Setting, buf []byte, verNonce uint64) (*Version, error) {
 	var v Version
 	if err := arypack.Unmarshal(buf, &v); err != nil {
 		return nil, err
@@ -275,6 +276,9 @@ func ReadVersion(s *setting.Setting, buf []byte) (*Version, error) {
 	}
 	if err := s.CheckAddress(v.AddrTo.Address, true, false); err != nil {
 		return nil, err
+	}
+	if v.Nonce == verNonce {
+		return nil, errors.New("connected from self")
 	}
 	return &v, nil
 }

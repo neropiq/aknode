@@ -43,11 +43,67 @@ const (
 	StatusRejected    = 0xff
 )
 
+//Types for in/out txs.
 const (
-	inoutTypeInputOutput byte = iota
-	inoutTypeMultiSig
-	inoutTypeTicket
+	TypeIn = iota
+	TypeMulin
+	TypeTicketin
+	TypeOut
+	TypeMulout
+	TypeTicketout
 )
+
+//InoutHash represents in/out tx hashess.
+type InoutHash struct {
+	Hash  tx.Hash
+	Type  byte
+	Index byte
+}
+
+func newInoutHash(dat []byte) (*InoutHash, error) {
+	if len(dat) != 34 {
+		return nil, errors.New("invalid dat length")
+	}
+	return &InoutHash{
+		Hash:  dat[:32],
+		Type:  dat[32],
+		Index: dat[33],
+	}, nil
+}
+func (ih *InoutHash) bytes() []byte {
+	return inout2key(ih.Hash, ih.Type, ih.Index)
+}
+func inout2key(h tx.Hash, typ, no byte) []byte {
+	var r [34]byte
+	copy(r[:], h)
+	r[32] = typ
+	r[33] = no
+	return r[:]
+}
+
+func inputHashes(tr *tx.Body) []*InoutHash {
+	prevs := make([]*InoutHash, 0, 1+
+		len(tr.Inputs)+len(tr.MultiSigIns))
+	if tr.TicketInput != nil {
+		prevs = append(prevs, &InoutHash{
+			Type: TypeTicketin,
+			Hash: tr.TicketInput,
+		})
+	}
+	for _, prev := range tr.Inputs {
+		prevs = append(prevs, &InoutHash{
+			Type: TypeIn,
+			Hash: prev.PreviousTX,
+		})
+	}
+	for _, prev := range tr.MultiSigIns {
+		prevs = append(prevs, &InoutHash{
+			Type: TypeMulin,
+			Hash: prev.PreviousTX,
+		})
+	}
+	return prevs
+}
 
 //OutputStatus is status of an output.
 type OutputStatus struct {
@@ -58,7 +114,7 @@ type OutputStatus struct {
 
 //TxInfo is for tx in db with sighash and status.
 type TxInfo struct {
-	*tx.Body
+	Body         *tx.Body
 	SigNo        uint64
 	Status       byte
 	OutputStatus [3][]OutputStatus
@@ -162,17 +218,17 @@ func putTx(s *setting.Setting, tr *tx.Transaction) error {
 	if err := ti.nextSigKey(s); err != nil {
 		return err
 	}
-	ti.OutputStatus[inoutTypeInputOutput] = make([]OutputStatus, len(tr.Outputs))
-	ti.OutputStatus[inoutTypeMultiSig] = make([]OutputStatus, len(tr.MultiSigOuts))
+	ti.OutputStatus[TypeIn] = make([]OutputStatus, len(tr.Outputs))
+	ti.OutputStatus[TypeMulin] = make([]OutputStatus, len(tr.MultiSigOuts))
 	if tr.TicketInput != nil {
-		ti.OutputStatus[inoutTypeTicket] = make([]OutputStatus, 1)
+		ti.OutputStatus[TypeTicketin] = make([]OutputStatus, 1)
 	}
 
 	return s.DB.Update(func(txn *badger.Txn) error {
 		if err2 := db.Put(txn, tr.Hash(), &ti, db.HeaderTxInfo); err2 != nil {
 			return err2
 		}
-		for _, prev := range inputHashes(tr) {
+		for _, prev := range inputHashes(tr.Body) {
 			var ti2 TxInfo
 			if err := db.Get(txn, prev.Hash, &ti2, db.HeaderTxInfo); err != nil {
 				return err
@@ -232,7 +288,7 @@ func deleteMinableTx(txn *badger.Txn, h tx.Hash, header db.Header) error {
 	if err := db.Del(txn, h, header); err != nil {
 		return err
 	}
-	for _, prev := range inputHashes(&minTx) {
+	for _, prev := range inputHashes(minTx.Body) {
 		var ti TxInfo
 		if err := db.Get(txn, prev.Hash, &ti, db.HeaderTxInfo); err != nil {
 			return err
@@ -259,7 +315,7 @@ func PutMinableTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 	}
 	return s.DB.Update(func(txn *badger.Txn) error {
 		var ti TxInfo
-		for _, h := range inputHashes(tr) {
+		for _, h := range inputHashes(tr.Body) {
 			if err := db.Get(txn, h.Hash, &ti, db.HeaderTxInfo); err != nil {
 				return err
 			}
@@ -281,7 +337,7 @@ func PutMinableTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 
 //IsMinableTxValid returns true if all inputs are not used in imesh.
 func IsMinableTxValid(s *setting.Setting, tr *tx.Transaction) (bool, error) {
-	for _, prev := range inputHashes(tr) {
+	for _, prev := range inputHashes(tr.Body) {
 		ti, err := GetTxInfo(s, prev.Hash)
 		if err != nil {
 			return false, err
@@ -376,34 +432,4 @@ func isBrokenTx(s *setting.Setting, h []byte) (bool, error) {
 		return false, nil
 	}
 	return false, err
-}
-
-type inputHash struct {
-	Type  byte
-	Hash  tx.Hash
-	Index byte
-}
-
-func inputHashes(tr *tx.Transaction) []*inputHash {
-	prevs := make([]*inputHash, 0, 1+
-		len(tr.Inputs)+len(tr.MultiSigIns))
-	if tr.TicketInput != nil {
-		prevs = append(prevs, &inputHash{
-			Type: inoutTypeTicket,
-			Hash: tr.TicketInput,
-		})
-	}
-	for _, prev := range tr.Inputs {
-		prevs = append(prevs, &inputHash{
-			Type: inoutTypeInputOutput,
-			Hash: prev.PreviousTX,
-		})
-	}
-	for _, prev := range tr.MultiSigIns {
-		prevs = append(prevs, &inputHash{
-			Type: inoutTypeMultiSig,
-			Hash: prev.PreviousTX,
-		})
-	}
-	return prevs
 }

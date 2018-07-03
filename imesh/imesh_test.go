@@ -412,14 +412,14 @@ func TestImesh4(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	hs, err2 := GetTxsFromAddress(&s, a.Address())
+	hs, err2 := GetHisoty(&s, a.Address(), true)
 	if err2 != nil {
 		t.Error(err2)
 	}
 	if len(hs) != 1 {
 		t.Error("length should be 1")
 	}
-	if !bytes.Equal(hs[0], genesis[0]) {
+	if !bytes.Equal(hs[0].Hash, genesis[0]) || hs[0].Type != TypeOut {
 		t.Error("should be equal")
 	}
 	seed := address.GenerateSeed()
@@ -469,34 +469,55 @@ func TestImesh4(t *testing.T) {
 		t.Error("invalid length of txs")
 	}
 
-	hs, err2 = GetTxsFromAddress(&s, a.Address())
+	hs, err2 = GetHisoty(&s, a.Address(), true)
 	if err2 != nil {
 		t.Error(err2)
 	}
 	if len(hs) != 1 {
 		t.Error("length should be 1")
 	}
-	if !bytes.Equal(hs[0], tr.Hash()) {
+	if !bytes.Equal(hs[0].Hash, tr.Hash()) || hs[0].Type != TypeIn {
 		t.Error("should be equal")
 	}
-	hs, err2 = GetTxsFromAddress(&s, a1.Address())
+	hs, err2 = GetHisoty(&s, a.Address(), false)
+	if err2 != nil {
+		t.Error(err2)
+	}
+	if len(hs) != 2 {
+		t.Error("length should be 2", len(hs))
+	}
+	switch {
+	case (bytes.Equal(hs[0].Hash, tr.Hash()) && hs[0].Type == TypeIn) &&
+		(bytes.Equal(hs[1].Hash, genesis[0]) && hs[1].Type == TypeOut):
+	case (bytes.Equal(hs[0].Hash, genesis[0]) && hs[0].Type == TypeOut) &&
+		(bytes.Equal(hs[1].Hash, tr.Hash()) && hs[1].Type == TypeIn):
+	default:
+		t.Error("should be equal")
+		t.Error(hex.EncodeToString(hs[0].Hash))
+		t.Error(hs[0].Type)
+		t.Error(hex.EncodeToString(hs[1].Hash))
+		t.Error(hs[1].Type)
+		t.Error(hex.EncodeToString(genesis[0]))
+		t.Error(hex.EncodeToString(tr.Hash()))
+	}
+	hs, err2 = GetHisoty(&s, a1.Address(), true)
 	if err2 != nil {
 		t.Error(err2)
 	}
 	if len(hs) != 1 {
 		t.Error("length should be 1")
 	}
-	if !bytes.Equal(hs[0], tr2.Hash()) {
+	if !bytes.Equal(hs[0].Hash, tr2.Hash()) || hs[0].Type != TypeIn {
 		t.Error("should be equal")
 	}
-	hs, err2 = GetTxsFromAddress(&s, a2.Address())
+	hs, err2 = GetHisoty(&s, a2.Address(), true)
 	if err2 != nil {
 		t.Error(err2)
 	}
 	if len(hs) != 1 {
 		t.Error("length should be 1")
 	}
-	if !bytes.Equal(hs[0], tr2.Hash()) {
+	if !bytes.Equal(hs[0].Hash, tr2.Hash()) || hs[0].Type != TypeOut {
 		t.Error("should be equal")
 	}
 }

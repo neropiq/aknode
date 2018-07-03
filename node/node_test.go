@@ -190,7 +190,7 @@ func TestNode2(t *testing.T) {
 	if cmd != msg.CmdVersion {
 		t.Error("cmd must be version for handshake")
 	}
-	_, err2 = msg.ReadVersion(&s1, buf)
+	_, err2 = msg.ReadVersion(&s1, buf, 0)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -541,7 +541,7 @@ func TestNode4(t *testing.T) {
 	if cmd != msg.CmdVersion {
 		t.Error("cmd must be version for handshake")
 	}
-	_, err2 = msg.ReadVersion(&s1, buf)
+	_, err2 = msg.ReadVersion(&s1, buf, 0)
 	if err2 != nil {
 		t.Error(err2)
 	}

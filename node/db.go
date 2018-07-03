@@ -42,6 +42,8 @@ var nodesDB = struct {
 	Addrs: make(adrmap),
 }
 
+var verNonce uint64
+
 //Init loads node IP addresses from DB.
 func initDB(s *setting.Setting) error {
 	err := s.DB.View(func(txn *badger.Txn) error {
@@ -58,6 +60,7 @@ func initDB(s *setting.Setting) error {
 			delete(nodesDB.Addrs, adr)
 		}
 	}
+	verNonce = rand.R.Uint64()
 	return nil
 }
 
