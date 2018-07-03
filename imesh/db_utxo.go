@@ -25,6 +25,7 @@ package imesh
 import (
 	"bytes"
 	"errors"
+	"log"
 	"sort"
 
 	"github.com/AidosKuneen/aklib/db"
@@ -171,6 +172,7 @@ func GetHisoty(s *setting.Setting, adr []byte, utxoOnly bool) ([]*InoutHash, err
 	if !utxoOnly {
 		ihs2 := make([]*InoutHash, len(ihs))
 		copy(ihs2, ihs)
+		log.Println(len(ihs))
 		for _, ih := range ihs2 {
 			if ih.Type == TypeOut || ih.Type == TypeMulout || ih.Type == TypeTicketout {
 				continue
@@ -202,6 +204,7 @@ func GetHisoty(s *setting.Setting, adr []byte, utxoOnly bool) ([]*InoutHash, err
 			default:
 				return nil, errors.New("invalid type")
 			}
+			log.Println(*ih2)
 			i := sort.Search(len(ihs), func(i int) bool {
 				return bytes.Compare(ihs[i].bytes(), ih2.bytes()) >= 0
 			})
@@ -213,6 +216,7 @@ func GetHisoty(s *setting.Setting, adr []byte, utxoOnly bool) ([]*InoutHash, err
 				}
 			}
 		}
+		log.Println(len(ihs))
 	}
 	return ihs, nil
 }
