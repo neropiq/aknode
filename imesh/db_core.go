@@ -64,11 +64,13 @@ func newInoutHash(dat []byte) (*InoutHash, error) {
 	if len(dat) != 34 {
 		return nil, errors.New("invalid dat length")
 	}
-	return &InoutHash{
-		Hash:  dat[:32],
+	ih := &InoutHash{
+		Hash:  make(tx.Hash, 32),
 		Type:  dat[32],
 		Index: dat[33],
-	}, nil
+	}
+	copy(ih.Hash, dat[:32])
+	return ih, nil
 }
 func (ih *InoutHash) bytes() []byte {
 	return inout2key(ih.Hash, ih.Type, ih.Index)

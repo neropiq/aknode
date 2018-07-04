@@ -473,8 +473,9 @@ func TestImesh4(t *testing.T) {
 	if err2 != nil {
 		t.Error(err2)
 	}
+
 	if len(hs) != 1 {
-		t.Error("length should be 1")
+		t.Error("length should be 1", len(hs))
 	}
 	if !bytes.Equal(hs[0].Hash, tr.Hash()) || hs[0].Type != TypeIn {
 		t.Error("should be equal")
@@ -486,6 +487,7 @@ func TestImesh4(t *testing.T) {
 	if len(hs) != 2 {
 		t.Error("length should be 2", len(hs))
 	}
+
 	switch {
 	case (bytes.Equal(hs[0].Hash, tr.Hash()) && hs[0].Type == TypeIn) &&
 		(bytes.Equal(hs[1].Hash, genesis[0]) && hs[1].Type == TypeOut):
@@ -493,12 +495,6 @@ func TestImesh4(t *testing.T) {
 		(bytes.Equal(hs[1].Hash, tr.Hash()) && hs[1].Type == TypeIn):
 	default:
 		t.Error("should be equal")
-		t.Error(hex.EncodeToString(hs[0].Hash))
-		t.Error(hs[0].Type)
-		t.Error(hex.EncodeToString(hs[1].Hash))
-		t.Error(hs[1].Type)
-		t.Error(hex.EncodeToString(genesis[0]))
-		t.Error(hex.EncodeToString(tr.Hash()))
 	}
 	hs, err2 = GetHisoty(&s, a1.Address(), true)
 	if err2 != nil {

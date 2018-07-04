@@ -48,7 +48,7 @@ func updateAddressToTx(s *setting.Setting, txn *badger.Txn, adr []byte, addH, de
 		if i >= len(hashes) {
 			hashes = append(hashes, addH)
 		} else {
-			hashes = append(append(hashes[:i], addH), hashes[i:]...)
+			hashes = append(hashes[:i], append([][]byte{addH}, hashes[i:]...)...)
 		}
 	}
 	if delH != nil {
@@ -57,6 +57,8 @@ func updateAddressToTx(s *setting.Setting, txn *badger.Txn, adr []byte, addH, de
 		})
 		if i < len(hashes) && bytes.Equal(hashes[i], delH) {
 			hashes = append(hashes[:i], hashes[i+1:]...)
+		} else {
+			log.Println("not found", hex.EncodeToString(delH))
 		}
 	}
 	return db.Put(txn, adr, hashes, db.HeaderAddressToTx)
@@ -173,9 +175,7 @@ func GetHisoty(s *setting.Setting, adr []byte, utxoOnly bool) ([]*InoutHash, err
 	if !utxoOnly {
 		ihs2 := make([]*InoutHash, len(ihs))
 		copy(ihs2, ihs)
-		log.Println(len(ihs))
 		for _, ih := range ihs2 {
-			log.Println(hex.EncodeToString(ih.bytes()))
 			if ih.Type == TypeOut || ih.Type == TypeMulout || ih.Type == TypeTicketout {
 				continue
 			}
@@ -213,7 +213,7 @@ func GetHisoty(s *setting.Setting, adr []byte, utxoOnly bool) ([]*InoutHash, err
 				if i >= len(hashes) {
 					ihs = append(ihs, ih2)
 				} else {
-					ihs = append(append(ihs[:i], ih2), ihs[i:]...)
+					ihs = append(ihs[:i], append([]*InoutHash{ih2}, ihs[i:]...)...)
 				}
 			}
 		}
