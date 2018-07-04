@@ -206,10 +206,10 @@ func GetHisoty(s *setting.Setting, adr []byte, utxoOnly bool) ([]*InoutHash, err
 			default:
 				return nil, errors.New("invalid type")
 			}
-			log.Println(hex.EncodeToString(ih2.Hash))
 			i := sort.Search(len(ihs), func(i int) bool {
 				return bytes.Compare(ihs[i].bytes(), ih2.bytes()) >= 0
 			})
+			log.Println(hex.EncodeToString(ih2.Hash), i)
 			if i >= len(hashes) || !bytes.Equal(ihs[i].bytes(), ih2.bytes()) {
 				if i >= len(hashes) {
 					ihs = append(ihs, ih2)
@@ -217,6 +217,7 @@ func GetHisoty(s *setting.Setting, adr []byte, utxoOnly bool) ([]*InoutHash, err
 					ihs = append(append(ihs[:i], ih2), ihs[i+1:]...)
 				}
 			}
+			log.Println(len(ihs))
 		}
 		log.Println(len(ihs))
 	}
