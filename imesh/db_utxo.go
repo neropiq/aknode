@@ -26,6 +26,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"log"
 	"sort"
 
 	"github.com/AidosKuneen/aklib/db"
@@ -53,7 +54,10 @@ func updateAddressToTx(s *setting.Setting, txn *badger.Txn, adr []byte, addH, de
 		if i < len(hashes) && bytes.Equal(hashes[i], delH) {
 			hashes = append(hashes[:i], hashes[i+1:]...)
 		} else {
-			return errors.New("not found " + hex.EncodeToString(delH))
+			for i := range hashes {
+				log.Println(hex.EncodeToString(hashes[i]), hex.EncodeToString(adr))
+			}
+			log.Println("not found", hex.EncodeToString(delH), "maybe double spend")
 		}
 	}
 	return db.Put(txn, adr, hashes, db.HeaderAddressToTx)
