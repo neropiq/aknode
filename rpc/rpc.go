@@ -144,6 +144,8 @@ func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 			err = getleaves(s, &req, &res)
 		case "getlasthistory":
 			err = getlasthistory(s, &req, &res)
+		case "getrawtransaction":
+			err = getrawtransaction(s, &req, &res)
 	*/
 	default:
 		err = errors.New(req.Method + " not supperted")
