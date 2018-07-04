@@ -48,7 +48,7 @@ func updateAddressToTx(s *setting.Setting, txn *badger.Txn, adr []byte, addH, de
 		if i >= len(hashes) {
 			hashes = append(hashes, addH)
 		} else {
-			hashes = append(append(hashes[:i], addH), hashes[i+1:]...)
+			hashes = append(append(hashes[:i], addH), hashes[i:]...)
 		}
 	}
 	if delH != nil {
@@ -209,15 +209,11 @@ func GetHisoty(s *setting.Setting, adr []byte, utxoOnly bool) ([]*InoutHash, err
 			i := sort.Search(len(ihs), func(i int) bool {
 				return bytes.Compare(ihs[i].bytes(), ih2.bytes()) >= 0
 			})
-			log.Println(hex.EncodeToString(ih2.bytes()))
-			log.Println(hex.EncodeToString(ihs[0].bytes()))
 			if i >= len(hashes) || !bytes.Equal(ihs[i].bytes(), ih2.bytes()) {
 				if i >= len(hashes) {
 					ihs = append(ihs, ih2)
-					log.Println(len(ihs))
 				} else {
-					ihs = append(append(ihs[:i], ih2), ihs[i+1:]...)
-					log.Println(len(ihs))
+					ihs = append(append(ihs[:i], ih2), ihs[i:]...)
 				}
 			}
 		}
