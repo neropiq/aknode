@@ -163,7 +163,8 @@ func Has(s *setting.Setting, hash []byte) (bool, error) {
 }
 
 //Put puts a transaction info.
-func (ti *TxInfo) Put(s *setting.Setting, h tx.Hash) error {
+//called only from Init.
+func (ti *TxInfo) put(s *setting.Setting, h tx.Hash) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, h, ti, db.HeaderTxInfo)
 	})
@@ -212,8 +213,8 @@ func GetTx(s *setting.Setting, hash []byte) (*tx.Transaction, error) {
 	}, nil
 }
 
-func putTx(s *setting.Setting, tr *tx.Transaction) error {
-
+//called synchonously from resolve
+func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 	ti := TxInfo{
 		Body: tr.Body,
 	}
@@ -255,13 +256,14 @@ func putTx(s *setting.Setting, tr *tx.Transaction) error {
 }
 
 //PutTx puts a transaction  into db.
-func PutTx(s *setting.Setting, tr *tx.Transaction) error {
+func putTx(s *setting.Setting, tr *tx.Transaction) error {
 	if err := tr.Check(s.Config, tx.TxNormal); err != nil {
 		return err
 	}
-	return putTx(s, tr)
+	return putTxSub(s, tr)
 }
 
+//locked by mutex(unresolved)
 func putUnresolvedTx(s *setting.Setting, tx *tx.Transaction) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, tx.Hash(), tx, db.HeaderUnresolvedTx)
@@ -276,6 +278,7 @@ func getUnresolvedTx(s *setting.Setting, hash []byte) (*tx.Transaction, error) {
 	return &tr, err
 }
 
+//locked by mutex(unresolved)
 func deleteUnresolvedTx(s *setting.Setting, hash []byte) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Del(txn, hash, db.HeaderUnresolvedTx)
@@ -304,7 +307,8 @@ func deleteMinableTx(txn *badger.Txn, h tx.Hash, header db.Header) error {
 }
 
 //PutMinableTx puts a minable transaction into db.
-func PutMinableTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
+//called synchonously from resolve.
+func putMinableTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 	if typ != tx.TxRewardFee && typ != tx.TxRewardTicket {
 		return errors.New("invalid type")
 	}
@@ -412,6 +416,7 @@ func GetRandomMinableTx(s *setting.Setting, typ tx.Type) (*tx.Transaction, error
 	return tr, err
 }
 
+//locked by mutex(unresolved)
 func putBrokenTx(s *setting.Setting, h tx.Hash) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		err := txn.SetWithTTL(append([]byte{byte(db.HeaderBrokenTx)}, h...), nil, 24*time.Hour)

@@ -87,7 +87,7 @@ func Init(s *setting.Setting) error {
 		return err2
 	}
 	if !has {
-		if err := putTx(s, tr); err != nil {
+		if err := putTxSub(s, tr); err != nil {
 			return err
 		}
 		t, err := GetTxInfo(s, tr.Hash())
@@ -95,7 +95,7 @@ func Init(s *setting.Setting) error {
 			return err
 		}
 		t.Status = StatusConfirmed
-		if err := t.Put(s, tr.Hash()); err != nil {
+		if err := t.put(s, tr.Hash()); err != nil {
 			return err
 		}
 		if err := leaves.CheckAdd(s, tr); err != nil {
@@ -125,6 +125,7 @@ func Init(s *setting.Setting) error {
 	return nil
 }
 
+//locked by mutex (unresolved)
 func put(s *setting.Setting) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, nil, &unresolved, db.HeaderUnresolvedInfo)
@@ -318,12 +319,12 @@ func resolved(s *setting.Setting, tr *unresolvedTx, hs tx.Hash) error {
 		return putBrokenTx(s, hs)
 	}
 	if tr.Type == tx.TxNormal {
-		if err := PutTx(s, tra); err != nil {
+		if err := putTx(s, tra); err != nil {
 			return err
 		}
 		return leaves.CheckAdd(s, tra)
 	}
-	return PutMinableTx(s, tra, tr.Type)
+	return putMinableTx(s, tra, tr.Type)
 }
 
 func prevs(tr *tx.Transaction) []tx.Hash {

@@ -26,7 +26,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
-	"log"
 	"sort"
 
 	"github.com/AidosKuneen/aklib/db"
@@ -54,7 +53,7 @@ func updateAddressToTx(s *setting.Setting, txn *badger.Txn, adr []byte, addH, de
 		if i < len(hashes) && bytes.Equal(hashes[i], delH) {
 			hashes = append(hashes[:i], hashes[i+1:]...)
 		} else {
-			log.Println("not found", hex.EncodeToString(delH))
+			return errors.New("not found " + hex.EncodeToString(delH))
 		}
 	}
 	return db.Put(txn, adr, hashes, db.HeaderAddressToTx)
@@ -132,19 +131,18 @@ func putMultisigOutAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Trans
 	return nil
 }
 
+//should be called synchonously, but check for sure.
 func putAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction) error {
-	return s.DB.Update(func(txn *badger.Txn) error {
-		if err := putInputAddressToTx(s, txn, tr); err != nil {
-			return err
-		}
-		if err := putMultisigInAddressToTx(s, txn, tr); err != nil {
-			return err
-		}
-		if err := putOutputAddressToTx(s, txn, tr); err != nil {
-			return err
-		}
-		return putMultisigOutAddressToTx(s, txn, tr)
-	})
+	if err := putInputAddressToTx(s, txn, tr); err != nil {
+		return err
+	}
+	if err := putMultisigInAddressToTx(s, txn, tr); err != nil {
+		return err
+	}
+	if err := putOutputAddressToTx(s, txn, tr); err != nil {
+		return err
+	}
+	return putMultisigOutAddressToTx(s, txn, tr)
 }
 
 //GetHisoty returns utxo (or all outputs) and input hashes associated with  address adr.

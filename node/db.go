@@ -117,6 +117,7 @@ func putAddrs(s *setting.Setting, addrs ...msg.Addr) error {
 	return put(s)
 }
 
+//locked by mutex(nodesDB)
 func put(s *setting.Setting) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, nil, nodesDB.Addrs, db.HeaderNodeIP)

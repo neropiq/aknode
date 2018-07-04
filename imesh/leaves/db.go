@@ -109,6 +109,7 @@ func CheckAdd(s *setting.Setting, trs ...*tx.Transaction) error {
 	return put(s)
 }
 
+//locked by mutex(leaves)
 func put(s *setting.Setting) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, nil, leaves.hash, db.HeaderLeaves)
