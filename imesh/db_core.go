@@ -225,7 +225,7 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 	}
 	ti.OutputStatus[TypeIn] = make([]OutputStatus, len(tr.Outputs))
 	ti.OutputStatus[TypeMulin] = make([]OutputStatus, len(tr.MultiSigOuts))
-	if tr.TicketInput != nil {
+	if tr.TicketOutput != nil {
 		ti.OutputStatus[TypeTicketin] = make([]OutputStatus, 1)
 	}
 

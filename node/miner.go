@@ -21,7 +21,11 @@
 package node
 
 import (
+	"encoding/hex"
+	"errors"
 	"log"
+
+	"github.com/AidosKuneen/aklib"
 
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/tx"
@@ -29,26 +33,23 @@ import (
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-var mineCh = make(chan *imesh.HashWithType, 1)
+var mineCh chan *imesh.HashWithType
 
 //AddForMine adds a minable tx for mine.
-func addForMine(s *setting.Setting, h tx.Hash, typ tx.Type) {
-	if (typ == tx.TxRewardFee && s.RunFeeMiner) ||
-		(typ == tx.TxRewardTicket && s.RunTicketMiner) {
-		if len(mineCh) != 0 {
-			<-mineCh
-		}
-		mineCh <- &imesh.HashWithType{
-			Hash: h,
-			Type: typ,
-		}
+func addForMine(s *setting.Setting, tr *imesh.HashWithType) {
+	if len(mineCh) != 0 {
+		<-mineCh
 	}
+	mineCh <- tr
 }
 
 func mine(s *setting.Setting, mtx *imesh.HashWithType) error {
 	tr, err := imesh.GetMinableTx(s, mtx.Hash, mtx.Type)
 	if err != nil {
 		return err
+	}
+	if mtx.Type == tx.TxRewardFee && uint64(s.MinimumFee*aklib.ADK) > tr.Outputs[len(tr.Outputs)-1].Value {
+		return nil
 	}
 	madr, err := address.FromAddress58(s.MinerAddress)
 	if err != nil {
@@ -59,7 +60,10 @@ func mine(s *setting.Setting, mtx *imesh.HashWithType) error {
 		tr.Outputs[len(tr.Outputs)-1].Address = madr
 	case tx.TxRewardTicket:
 		tr.TicketOutput = madr
+	default:
+		return errors.New("invalid type")
 	}
+	log.Println("mining", hex.EncodeToString(tr.Hash()))
 	if err := tr.PoW(); err != nil {
 		return err
 	}
@@ -67,12 +71,14 @@ func mine(s *setting.Setting, mtx *imesh.HashWithType) error {
 		return err
 	}
 	Resolve()
-	log.Println("succeeded to mine, txid=", tr.Hash())
+	log.Println("succeeded to mine, txid=", hex.EncodeToString(tr.Hash()))
 	return nil
 }
 
 //RunMiner runs a miner
 func RunMiner(s *setting.Setting) {
+	mineCh = make(chan *imesh.HashWithType, 1)
+
 	go func() {
 		for h := range mineCh {
 			if err := mine(s, h); err != nil {

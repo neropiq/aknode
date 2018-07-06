@@ -21,9 +21,11 @@
 package node
 
 import (
+	"encoding/hex"
 	"log"
 	"time"
 
+	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/msg"
@@ -47,8 +49,11 @@ func goResolve(s *setting.Setting) {
 			log.Println(err2)
 			continue
 		}
-		log.Println("resolved", len(trs), "transactions, broadcating them...")
+		for _, tr := range trs {
+			log.Println("resolved txid:", hex.EncodeToString(tr.Hash))
+		}
 		if len(trs) != 0 {
+			log.Println(" broadcasting resolved txs...")
 			inv := make(msg.Inventories, 0, len(trs))
 			for _, h := range trs {
 				typ, err3 := msg.TxType2InvType(h.Type)
@@ -60,8 +65,9 @@ func goResolve(s *setting.Setting) {
 					Type: typ,
 					Hash: h.Hash.Array(),
 				})
-				if typ == msg.InvTxRewardFee || typ == msg.InvTxRewardTicket {
-					// addForMine(s, h.Hash, h.Type)
+				if (h.Type == tx.TxRewardFee && s.RunFeeMiner) ||
+					(h.Type == tx.TxRewardTicket && s.RunTicketMiner) {
+					addForMine(s, h)
 				}
 			}
 			WriteAll(inv, msg.CmdInv)
