@@ -147,7 +147,7 @@ func main() {
 		}()
 	}
 
-	if setting.RunRPCServer {
+	if setting.UsePublicRPC || setting.RPCUser != "" {
 		rpc.Run(setting)
 	}
 	if setting.RunExplorer {

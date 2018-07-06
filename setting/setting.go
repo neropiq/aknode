@@ -31,6 +31,7 @@ import (
 	"strings"
 
 	"github.com/AidosKuneen/aklib"
+	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/dgraph-io/badger"
 )
@@ -57,15 +58,13 @@ type Setting struct {
 	MaxConnections uint16 `json:"max_connections"`
 	Proxy          string `json:"proxy"`
 
-	RunRPCServer      bool   `json:"run_rpc"`
+	UsePublicRPC      bool   `json:"use_public_rpc"`
 	RPCBind           string `json:"rpc_bind"`
 	RPCPort           uint16 `json:"rpc_port"`
 	RPCUser           string `json:"rpc_user"`
 	RPCPassword       string `json:"rpc_password"`
 	RPCMaxConnections uint16 `json:"rpc_max_connections"`
-
-	UseWallet    bool   `json:"use_wallet"`
-	WalletNotify string `json:"wallet_notify"`
+	WalletNotify      string `json:"wallet_notify"`
 
 	RunValidator bool `json:"run_validator"`
 
@@ -74,8 +73,10 @@ type Setting struct {
 	ExplorerPort           uint16 `json:"explorer_port"`
 	ExplorerMaxConnections uint16 `json:"explorer_max_connections"`
 
-	RunFeeMiner    bool `json:"run_fee_miner"`
-	RunTicketMiner bool `json:"run_ticket_miner"`
+	MinimumFee     float64 `json:"minimum_fee"`
+	RunFeeMiner    bool    `json:"run_fee_miner"`
+	RunTicketMiner bool    `json:"run_ticket_miner"`
+	MinerAddress   string  `json:"miner_address"`
 
 	DB     *badger.DB    `json:"-"`
 	Config *aklib.Config `json:"-"`
@@ -136,7 +137,7 @@ func Load(s []byte) (*Setting, error) {
 	if se.RPCPort == 0 {
 		se.RPCPort = se.Config.DefaultRPCPort
 	}
-	if se.RunRPCServer && (se.RPCUser == "" || se.RPCPassword == "") {
+	if (se.RPCUser != "" && se.RPCPassword == "") || (se.RPCUser == "" && se.RPCPassword != "") {
 		return nil, errors.New("You must specify rpc_user and rpc_password")
 	}
 	if se.RPCMaxConnections == 0 {
@@ -151,6 +152,17 @@ func Load(s []byte) (*Setting, error) {
 	}
 	if se.ExplorerMaxConnections == 0 {
 		se.ExplorerMaxConnections = 1
+	}
+	if (se.RunFeeMiner || se.RunTicketMiner) && se.MinerAddress == "" {
+		return nil, errors.New("You must specify mining address")
+	}
+	if se.RunFeeMiner && se.MinimumFee == 0 {
+		se.MinimumFee = 0.001
+	}
+	if se.MinerAddress != "" {
+		if _, err := address.FromAddress58(se.MinerAddress); err != nil {
+			return nil, err
+		}
 	}
 
 	dbDir := filepath.Join(se.BaseDir(), "db")

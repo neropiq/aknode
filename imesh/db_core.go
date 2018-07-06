@@ -179,7 +179,9 @@ func GetTxInfo(s *setting.Setting, h tx.Hash) (*TxInfo, error) {
 	return &ti, err
 }
 
-func getTxFunc(s *setting.Setting) func(hash []byte) (*tx.Body, error) {
+//GetTxFunc is a func for getting tx from hash.
+//This is for funcs in tx  package.
+func GetTxFunc(s *setting.Setting) func(hash []byte) (*tx.Body, error) {
 	return func(hash []byte) (*tx.Body, error) {
 		ti, err := GetTxInfo(s, hash)
 		if err != nil {
@@ -191,7 +193,7 @@ func getTxFunc(s *setting.Setting) func(hash []byte) (*tx.Body, error) {
 
 //IsValid checks transaction tr is valid for a mamber of iMesh.
 func IsValid(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
-	return tr.CheckAll(getTxFunc(s), s.Config, typ)
+	return tr.CheckAll(GetTxFunc(s), s.Config, typ)
 }
 
 //GetTx returns a transaction  from  hash.

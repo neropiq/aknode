@@ -33,7 +33,7 @@ import (
 var ch = make(chan struct{}, 1)
 
 //Resolve run resolve routine.
-func resolve() {
+func Resolve() {
 	if len(ch) == 0 {
 		ch <- struct{}{}
 	}
@@ -113,7 +113,7 @@ func goCron(s *setting.Setting) {
 	go func() {
 		for {
 			time.Sleep(5 * time.Minute)
-			resolve()
+			Resolve()
 		}
 	}()
 }

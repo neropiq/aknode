@@ -313,7 +313,7 @@ func resolved(s *setting.Setting, tr *unresolvedTx, hs tx.Hash) error {
 	if tr.broken {
 		return putBrokenTx(s, hs)
 	}
-	if err := tra.CheckAll(getTxFunc(s), s.Config, tr.Type); err != nil {
+	if err := tra.CheckAll(GetTxFunc(s), s.Config, tr.Type); err != nil {
 		tr.broken = true
 		log.Println(err)
 		return putBrokenTx(s, hs)

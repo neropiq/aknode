@@ -355,7 +355,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 					continue
 				}
 			}
-			resolve()
+			Resolve()
 
 		case msg.CmdGetData:
 			invs, err := msg.ReadInventories(buf)
@@ -402,7 +402,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 				log.Println(err)
 				return nil
 			}
-			resolve()
+			Resolve()
 
 		case msg.CmdTxs:
 			vs, err := msg.ReadTxs(buf)
@@ -421,7 +421,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 					log.Println(err)
 				}
 			}
-			resolve()
+			Resolve()
 
 		case msg.CmdGetLeaves:
 			v, err := msg.ReadLeavesFrom(buf)
@@ -464,7 +464,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 				gl := v[len(v)-1].Hash
 				WriteAll(&gl, msg.CmdGetLeaves)
 			}
-			resolve()
+			Resolve()
 
 		case msg.CmdClose:
 			return nil

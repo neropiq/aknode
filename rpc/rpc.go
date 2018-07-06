@@ -31,6 +31,48 @@ import (
 	"github.com/AidosKuneen/aknode/setting"
 )
 
+type rpcfunc func(*setting.Setting, *Request, *Response) error
+
+var publicRPCs = map[string]rpcfunc{
+	// "sendrawtransaction": sendrawtransaction,
+	// "getnodeinfo":        getnodeinfo,
+	// "getleaves":          getleaves,
+	// "getlasthistory":     getlasthistory,
+	// "getrawtransaction":  getrawtransaction,
+	// "getminabletx":       getminabletx,
+}
+
+var rpcs = map[string]rpcfunc{
+	// "gettransaction":  gettransaction,
+	// "validateaddress": validateaddress,
+	// "getpeerlist":     getpeerlist,
+	// "addnode":         addnode,
+	// "clearbanned":     clearbanned,
+	// "stop":            dumpwallet,
+	// "setban":          setban,
+	// "listbanned":          listbanned,
+
+	// "getnewaddress":         getnewaddress,
+	// "listaccounts":          listaccounts,
+	// "listaddressgroupings":  listaddressgroupings,
+	// "settxfee":              settxfee,
+	// "walletpassphrase":      walletpassphrase,
+	// "sendmany":              sendmany,
+	// "sendfrom":              sendfrom,
+	// "sendtoaddress":         sendtoaddress,
+	// "getbalance":            getbalance,
+	// "listtransactions":      listtransactions,
+	// "getaddressesbyaccount": getaddressesbyaccount,
+	// "getaccount":            getaccount,
+	// "dumpwallet":            dumpwallet,
+	// "importwallet":            importwallet,
+	// "dumpprivseed":          dumpprivseed,
+	// "importprivseed":          importprivseed,
+	// "keypoolrefill":          keypoolrefill,
+	//"walletlock":walletlock,
+
+}
+
 //Run runs RPC server.
 func Run(setting *setting.Setting) {
 	ipport := fmt.Sprintf("%s:%d", setting.RPCBind, setting.RPCPort)
@@ -74,12 +116,20 @@ type Response struct {
 	ID     interface{} `json:"id"`
 }
 
-func isValidAuth(s *setting.Setting, r *http.Request) bool {
+func isValidAuth(s *setting.Setting, w http.ResponseWriter, r *http.Request) error {
 	username, password, ok := r.BasicAuth()
 	if !ok {
-		return false
+		return errors.New("user and password are not supplied")
 	}
-	return username == s.RPCUser && password == s.RPCPassword
+	if username == s.RPCUser && password == s.RPCPassword {
+		return nil
+	}
+	w.Header().Set("WWW-Authenticate", `Basic realm="MY REALM"`)
+	w.WriteHeader(401)
+	if _, err := w.Write([]byte("401 Unauthorized\n")); err != nil {
+		log.Println(err)
+	}
+	return errors.New("failed to auth")
 }
 
 //Handle handles api calls.
@@ -89,15 +139,7 @@ func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 			log.Fatal(err)
 		}
 	}()
-	if !isValidAuth(s, r) {
-		log.Println("failed to auth")
-		w.Header().Set("WWW-Authenticate", `Basic realm="MY REALM"`)
-		w.WriteHeader(401)
-		if _, err := w.Write([]byte("401 Unauthorized\n")); err != nil {
-			log.Println(err)
-		}
-		return
-	}
+
 	var req Request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), 400)
@@ -107,48 +149,28 @@ func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		ID: req.ID,
 	}
 	log.Println(req.Method, " is requested")
+	exist := false
 	var err error
-	switch req.Method {
-	/*
-		case "getnewaddress":
-			err = getnewaddress(s, &req, &res)
-		case "listaccounts":
-			err = listaccounts(s, &req, &res)
-		case "listaddressgroupings":
-			err = listaddressgroupings(s, &req, &res)
-		case "validateaddress":
-			err = validateaddress(s, &req, &res)
-		case "settxfee":
-			err = settxfee(s, &req, &res)
-		case "gettransaction":
-			err = gettransaction(s, &req, &res)
-		case "getbalance":
-			err = getbalance(s, &req, &res)
-		case "listtransactions":
-			err = listtransactions(s, &req, &res)
-		case "walletpassphrase":
-			err = walletpassphrase(s, &req, &res)
-		case "sendmany":
-			err = sendmany(s, &req, &res)
-		case "sendfrom":
-			err = sendfrom(s, &req, &res)
-		case "sendtoaddress":
-			err = sendtoaddress(s, &req, &res)
-		case "sendrawtransaction":
-			err = sendrawtransaction(s, &req, &res)
-		case "getnodeinfo":
-			err = getnodeinfo(s, &req, &res)
-		case "getpeerlist":
-			err = getpeerlist(s, &req, &res)
-		case "getleaves":
-			err = getleaves(s, &req, &res)
-		case "getlasthistory":
-			err = getlasthistory(s, &req, &res)
-		case "getrawtransaction":
-			err = getrawtransaction(s, &req, &res)
-	*/
-	default:
-		err = errors.New(req.Method + " not supperted")
+	if f, ok := publicRPCs[req.Method]; ok {
+		if !s.UsePublicRPC {
+			if err2 := isValidAuth(s, w, r); err2 != nil {
+				log.Println(err2)
+				return
+			}
+		}
+		exist = true
+		err = f(s, &req, &res)
+	}
+	if f, ok := rpcs[req.Method]; ok && s.RPCUser != "" {
+		if err2 := isValidAuth(s, w, r); err2 != nil {
+			log.Println(err2)
+			return
+		}
+		exist = true
+		err = f(s, &req, &res)
+	}
+	if !exist {
+		err = errors.New(req.Method + " is nots supported")
 	}
 	if err != nil {
 		res.Error = &Err{
