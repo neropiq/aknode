@@ -398,8 +398,10 @@ func putMinableTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 			if err := db.Get(txn, h.Hash, &ti, db.HeaderTxInfo); err != nil {
 				return err
 			}
-			if ti.OutputStatus[h.Type][h.Index].UsedByMinable != nil {
-				return errors.New("other minable tx(s) are refering same tx(s)")
+			if m := ti.OutputStatus[h.Type][h.Index].UsedByMinable; m != nil {
+				if err := deleteMinableTx(txn, m[:32], db.Header(m[32])); err != nil {
+					return err
+				}
 			}
 			header2, err := msg.TxType2DBHeader(typ)
 			if err != nil {
@@ -496,6 +498,7 @@ func GetRandomFeeTx(s *setting.Setting, min uint64) (*tx.Transaction, error) {
 				return false, err2
 			}
 			if trr.Outputs[len(trr.Outputs)-1].Value >= min {
+				log.Println("!")
 				return true, nil
 			}
 			return false, nil

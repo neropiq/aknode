@@ -24,6 +24,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/AidosKuneen/aklib"
@@ -228,20 +229,19 @@ func getminabletx(conf *setting.Setting, req *Request, res *Response) error {
 	min := 0.0
 	switch len(data) {
 	case 1:
-		typstr, ok := data[0].(string)
-		if ok {
-			if typstr != "ticket" {
+		switch v := data[0].(type) {
+		case string:
+			if v != "ticket" {
 				return errors.New("invalid type")
 			}
 			typ = tx.TxRewardTicket
-		} else {
-			min, ok = data[0].(float64)
-			if !ok {
-				return errors.New("invalid type")
-			}
+			log.Println("ticket")
+		case float64:
+			min = v
+			log.Println("fee", min)
+		default:
+			return errors.New("invalid type")
 		}
-	default:
-		return errors.New("invalid params")
 	}
 	var err error
 	var tr *tx.Transaction

@@ -234,13 +234,12 @@ func Start(setting *setting.Setting, debug bool) error {
 	if err := initDB(setting); err != nil {
 		return err
 	}
-	if debug {
-		return nil
+	if !debug {
+		if err := lookup(setting); err != nil {
+			return err
+		}
+		connect(setting)
 	}
-	if err := lookup(setting); err != nil {
-		return err
-	}
-	connect(setting)
 	_, err := start(setting)
 	return err
 }

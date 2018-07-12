@@ -10,10 +10,9 @@ This  library is the node server for Aidos Kuneen for step2,
 including:
 
 * Messaging between nodes (Testing)
-* Consensus (Not Yet)
+* Consensus / Validator (Not Yet)
 * Aidos Explorer (Not Yet)
-* Validator (Not Yet)
-* via RPC APIs with Wallet Service (Not Yet)
+* RPC APIs with Wallet Service (WIP)
 
 
 UNDER CONSTRUCTION
