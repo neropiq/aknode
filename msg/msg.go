@@ -118,8 +118,8 @@ const (
 
 const userAgent = "AKnode Versin 0.01"
 
-//messageVersion is a version of the message.
-const messageVersion = 1
+//MessageVersion is a version of the message.
+const MessageVersion = 1
 
 //Header  is a header of wire protocol.
 type Header struct {
@@ -139,8 +139,8 @@ type Version struct {
 
 //Addr is an IP address and port.
 type Addr struct {
-	Address string
-	Service byte
+	Address string `json:"address"`
+	Service byte   `json:"service"`
 }
 
 //NewAddr returns a Addr struct.
@@ -263,7 +263,7 @@ func ReadVersion(s *setting.Setting, buf []byte, verNonce uint64) (*Version, err
 	if err := arypack.Unmarshal(buf, &v); err != nil {
 		return nil, err
 	}
-	if v.Version != messageVersion {
+	if v.Version != MessageVersion {
 		return nil, errors.New("invalid version")
 	}
 	if v.AddrFrom.Service != ServiceFull {
@@ -350,7 +350,7 @@ func ReadLeavesFrom(buf []byte) (*LeavesFrom, error) {
 //NewVersion returns Verstion struct.
 func NewVersion(s *setting.Setting, to Addr, nonce uint64) *Version {
 	return &Version{
-		Version:   messageVersion,
+		Version:   MessageVersion,
 		UserAgent: userAgent,
 		AddrTo:    to,
 		AddrFrom:  *NewAddr(s.MyHostPort, ServiceFull),

@@ -25,52 +25,51 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
 	"github.com/AidosKuneen/aknode/setting"
+	"golang.org/x/net/netutil"
 )
 
 type rpcfunc func(*setting.Setting, *Request, *Response) error
 
 var publicRPCs = map[string]rpcfunc{
-	// "sendrawtransaction": sendrawtransaction,
-	// "getnodeinfo":        getnodeinfo,
-	// "getleaves":          getleaves,
-	// "getlasthistory":     getlasthistory,
-	// "getrawtransaction":  getrawtransaction,
-	// "getminabletx":       getminabletx,
+	"sendrawtx":      sendrawtx,
+	"getnodeinfo":    getnodeinfo,
+	"getleaves":      getleaves,
+	"getlasthistory": getlasthistory,
+	"getrawtx":       getrawtx,
+	"getminabletx":   getminabletx,
 }
 
 var rpcs = map[string]rpcfunc{
-	// "gettransaction":  gettransaction,
-	// "validateaddress": validateaddress,
-	// "getpeerlist":     getpeerlist,
-	// "addnode":         addnode,
-	// "clearbanned":     clearbanned,
-	// "stop":            dumpwallet,
-	// "setban":          setban,
-	// "listbanned":          listbanned,
+	//control
+	"listpeer":     listpeer,
+	"listbanned":   listbanned,
+	"stop":         stop,
+	"dumpwallet":   dumpwallet,
+	"importwallet": importwallet,
+	"dumpseed":     dumpseed,
 
-	// "getnewaddress":         getnewaddress,
-	// "listaccounts":          listaccounts,
-	// "listaddressgroupings":  listaddressgroupings,
-	// "settxfee":              settxfee,
-	// "walletpassphrase":      walletpassphrase,
-	// "sendmany":              sendmany,
-	// "sendfrom":              sendfrom,
-	// "sendtoaddress":         sendtoaddress,
-	// "getbalance":            getbalance,
-	// "listtransactions":      listtransactions,
-	// "getaddressesbyaccount": getaddressesbyaccount,
-	// "getaccount":            getaccount,
-	// "dumpwallet":            dumpwallet,
-	// "importwallet":            importwallet,
-	// "dumpprivseed":          dumpprivseed,
-	// "importprivseed":          importprivseed,
-	// "keypoolrefill":          keypoolrefill,
-	//"walletlock":walletlock,
+	//wallet
+	"gettransaction":       gettransaction,
+	"validateaddress":      validateaddress,
+	"getnewaddress":        getnewaddress,
+	"listaccounts":         listaccounts,
+	"listaddressgroupings": listaddressgroupings,
+	"settxfee":             settxfee,
+	"getbalance":           getbalance,
+	"listtransactions":     listtransactions,
+	"getaccount":           getaccount,
 
+	//send
+	"sendmany":         sendmany,
+	"sendfrom":         sendfrom,
+	"sendtoaddress":    sendtoaddress,
+	"walletpassphrase": walletpassphrase,
+	"walletlock":       walletlock,
 }
 
 //Run runs RPC server.
@@ -84,14 +83,24 @@ func Run(setting *setting.Setting) {
 	s := &http.Server{
 		Addr:              ipport,
 		Handler:           mux,
-		ReadTimeout:       time.Minute,
-		WriteTimeout:      time.Minute,
-		ReadHeaderTimeout: time.Minute,
+		ReadTimeout:       30 * time.Minute,
+		WriteTimeout:      30 * time.Minute,
+		ReadHeaderTimeout: 30 * time.Minute,
 		MaxHeaderBytes:    1 << 20,
 	}
 	fmt.Println("Starting RPC Server on", ipport)
 	go func() {
-		log.Println(s.ListenAndServe())
+		ln, err := net.Listen("tcp", s.Addr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		var l net.Listener
+		if setting.RPCMaxConnections == 0 {
+			l = ln
+		} else {
+			l = netutil.LimitListener(ln, int(setting.RPCMaxConnections))
+		}
+		log.Println(s.Serve(l))
 	}()
 }
 
@@ -125,10 +134,7 @@ func isValidAuth(s *setting.Setting, w http.ResponseWriter, r *http.Request) err
 		return nil
 	}
 	w.Header().Set("WWW-Authenticate", `Basic realm="MY REALM"`)
-	w.WriteHeader(401)
-	if _, err := w.Write([]byte("401 Unauthorized\n")); err != nil {
-		log.Println(err)
-	}
+	http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 	return errors.New("failed to auth")
 }
 
@@ -152,25 +158,29 @@ func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	exist := false
 	var err error
 	if f, ok := publicRPCs[req.Method]; ok {
+		exist = true
 		if !s.UsePublicRPC {
 			if err2 := isValidAuth(s, w, r); err2 != nil {
 				log.Println(err2)
 				return
 			}
 		}
-		exist = true
 		err = f(s, &req, &res)
 	}
-	if f, ok := rpcs[req.Method]; ok && s.RPCUser != "" {
-		if err2 := isValidAuth(s, w, r); err2 != nil {
-			log.Println(err2)
-			return
-		}
+	if f, ok := rpcs[req.Method]; ok {
 		exist = true
-		err = f(s, &req, &res)
+		if s.RPCUser == "" {
+			err = errors.New("non public RPCS are not allowed")
+		} else {
+			if err2 := isValidAuth(s, w, r); err2 != nil {
+				log.Println(err2)
+				return
+			}
+			err = f(s, &req, &res)
+		}
 	}
 	if !exist {
-		err = errors.New(req.Method + " is nots supported")
+		err = errors.New(req.Method + " is not supported")
 	}
 	if err != nil {
 		res.Error = &Err{

@@ -348,7 +348,7 @@ func TestNode2(t *testing.T) {
 		t.Error("invalid leaf")
 	}
 
-	WriteAll(nil, msg.CmdGetLeaves)
+	WriteAll(&s, nil, msg.CmdGetLeaves)
 	cmd, _, err2 = msg.ReadHeader(&s1, conn)
 	if err2 != nil {
 		t.Error(err2)
@@ -396,7 +396,7 @@ func TestNode2(t *testing.T) {
 		}
 	}
 
-	WriteAll(nil, msg.CmdGetAddr)
+	WriteAll(&s, nil, msg.CmdGetAddr)
 	cmd, _, err2 = msg.ReadHeader(&s1, conn)
 	if err2 != nil {
 		t.Error(err2)

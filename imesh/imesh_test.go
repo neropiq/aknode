@@ -297,7 +297,11 @@ func TestImesh2(t *testing.T) {
 	if _, err := GetMinableTx(&s, tr1.Hash(), tx.TxRewardFee); err != nil {
 		t.Error(err)
 	}
-	ts, err2 := GetRandomMinableTx(&s, tx.TxRewardFee)
+	_, err2 = GetRandomFeeTx(&s, 100)
+	if err2 == nil {
+		t.Error("should be error")
+	}
+	ts, err2 := GetRandomFeeTx(&s, 10)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -412,7 +416,7 @@ func TestImesh4(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	hs, err2 := GetHisoty(&s, a.Address(), true)
+	hs, err2 := GetHisoty(&s, a.Address58(), true)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -469,7 +473,7 @@ func TestImesh4(t *testing.T) {
 		t.Error("invalid length of txs")
 	}
 
-	hs, err2 = GetHisoty(&s, a.Address(), true)
+	hs, err2 = GetHisoty(&s, a.Address58(), true)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -480,7 +484,7 @@ func TestImesh4(t *testing.T) {
 	if !bytes.Equal(hs[0].Hash, tr.Hash()) || hs[0].Type != TypeIn {
 		t.Error("should be equal")
 	}
-	hs, err2 = GetHisoty(&s, a.Address(), false)
+	hs, err2 = GetHisoty(&s, a.Address58(), false)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -496,7 +500,7 @@ func TestImesh4(t *testing.T) {
 	default:
 		t.Error("should be equal")
 	}
-	hs, err2 = GetHisoty(&s, a1.Address(), true)
+	hs, err2 = GetHisoty(&s, a1.Address58(), true)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -506,7 +510,7 @@ func TestImesh4(t *testing.T) {
 	if !bytes.Equal(hs[0].Hash, tr2.Hash()) || hs[0].Type != TypeIn {
 		t.Error("should be equal")
 	}
-	hs, err2 = GetHisoty(&s, a2.Address(), true)
+	hs, err2 = GetHisoty(&s, a2.Address58(), true)
 	if err2 != nil {
 		t.Error(err2)
 	}

@@ -32,13 +32,21 @@ import (
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-var ch = make(chan struct{}, 1)
+var (
+	ch     = make(chan struct{}, 1)
+	notify chan []*imesh.HashWithType
+)
 
 //Resolve run resolve routine.
 func Resolve() {
 	if len(ch) == 0 {
 		ch <- struct{}{}
 	}
+}
+
+//RegisterNotifier registers a notifier for resolved txs.
+func RegisterNotifier(n chan []*imesh.HashWithType) {
+	notify = n
 }
 
 func goResolve(s *setting.Setting) {
@@ -70,7 +78,7 @@ func goResolve(s *setting.Setting) {
 					addForMine(s, h)
 				}
 			}
-			WriteAll(inv, msg.CmdInv)
+			WriteAll(s, inv, msg.CmdInv)
 		}
 
 		ts, err2 := imesh.GetSearchingTx(s)
@@ -92,7 +100,10 @@ func goResolve(s *setting.Setting) {
 					Hash: tr.Hash.Array(),
 				})
 			}
-			writeGetData(inv)
+			writeGetData(s, inv)
+		}
+		if notify != nil {
+			notify <- trs
 		}
 		//wait to collect noexsistence txs
 		time.Sleep(5 * time.Second)
@@ -107,8 +118,8 @@ func goCron(s *setting.Setting) {
 		for {
 			time.Sleep(10 * time.Minute)
 			log.Println("querying latest leaves and node addressses..")
-			WriteAll(nil, msg.CmdGetLeaves)
-			WriteAll(nil, msg.CmdGetAddr)
+			WriteAll(s, nil, msg.CmdGetLeaves)
+			WriteAll(s, nil, msg.CmdGetAddr)
 			peers.RLock()
 			log.Println("#node", len(peers.Peers))
 			peers.RUnlock()

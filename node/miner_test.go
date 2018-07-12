@@ -129,7 +129,7 @@ func TestMiner(t *testing.T) {
 	for i := 0; i < 30 && len(inout) == 0; i++ {
 		var err error
 		time.Sleep(10 * time.Second)
-		inout, err = imesh.GetHisoty(&s, a3.Address(), true)
+		inout, err = imesh.GetHisoty(&s, a3.Address58(), true)
 		if err != nil {
 			t.Error(err)
 		}
@@ -169,7 +169,7 @@ func TestMiner(t *testing.T) {
 	for i := 0; i < 30 && len(inout) == 0; i++ {
 		var err error
 		time.Sleep(10 * time.Second)
-		inout, err = imesh.GetHisoty(&s, a2.Address(), true)
+		inout, err = imesh.GetHisoty(&s, a2.Address58(), true)
 		if err != nil {
 			t.Error(err)
 		}

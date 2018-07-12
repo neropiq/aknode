@@ -43,6 +43,8 @@ import (
 const (
 	connectionTimeout = 10 * time.Minute
 	rwTimeout         = 30 * time.Second
+	//BanTime is time to be banned
+	BanTime = time.Hour
 )
 
 //peers is a slice of connecting peers.
@@ -70,9 +72,32 @@ type wdata struct {
 type peer struct {
 	conn    *net.TCPConn
 	remote  msg.Addr
-	setting *setting.Setting
 	written []wdata
 	sync.RWMutex
+}
+
+//GetBanned returns a banned list.
+func GetBanned() map[string]time.Time {
+	banned.RLock()
+	defer banned.RUnlock()
+	r := make(map[string]time.Time)
+	for k, v := range banned.addr {
+		r[k] = v
+	}
+	return r
+}
+
+//GetPeerlist returns a peer list.
+func GetPeerlist() []msg.Addr {
+	peers.RLock()
+	defer peers.RUnlock()
+	r := make([]msg.Addr, len(peers.Peers))
+	i := 0
+	for _, p := range peers.Peers {
+		r[i] = p.remote
+		i++
+	}
+	return r
 }
 
 //newPeer returns Peer struct.
@@ -85,7 +110,7 @@ func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, erro
 		banned.Lock()
 		defer banned.Unlock()
 		if t, exist := banned.addr[remote]; exist {
-			if t.Add(time.Hour).Before(time.Now()) {
+			if t.Add(BanTime).Before(time.Now()) {
 				delete(banned.addr, remote)
 			} else {
 				return errors.New("the remote node is banned now")
@@ -109,9 +134,8 @@ func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, erro
 		}
 	}
 	p := &peer{
-		conn:    conn,
-		setting: s,
-		remote:  v.AddrFrom,
+		conn:   conn,
+		remote: v.AddrFrom,
 	}
 	peers.RLock()
 	defer peers.RUnlock()
@@ -125,10 +149,10 @@ func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, erro
 }
 
 //Add adds to the Peer list.
-func (p *peer) add() error {
+func (p *peer) add(s *setting.Setting) error {
 	peers.Lock()
 	defer peers.Unlock()
-	if len(peers.Peers) >= int(p.setting.MaxConnections)*2 {
+	if len(peers.Peers) >= int(s.MaxConnections)*2 {
 		return errors.New("peers is too big")
 	}
 	if _, exist := peers.Peers[p.remote.Address]; exist {
@@ -150,19 +174,26 @@ func isConnected(adr string) bool {
 	return exist
 }
 
+//ConnSize returns number of connection peers.
+func ConnSize() int {
+	peers.RLock()
+	defer peers.RUnlock()
+	return len(peers.Peers)
+}
+
 //WriteAll writes a command to all connected peers.
-func WriteAll(m interface{}, cmd byte) {
+func WriteAll(s *setting.Setting, m interface{}, cmd byte) {
 	peers.RLock()
 	defer peers.RUnlock()
 	for _, p := range peers.Peers {
-		if err := p.write(m, cmd); err != nil {
+		if err := p.write(s, m, cmd); err != nil {
 			log.Println(err)
 		}
 	}
 }
 
 //WriteGetData writes a get_data command to all connected peers.
-func writeGetData(invs msg.Inventories) {
+func writeGetData(s *setting.Setting, invs msg.Inventories) {
 	peers.RLock()
 	defer peers.RUnlock()
 	for i := len(invs) - 1; i >= 0; i-- {
@@ -186,14 +217,14 @@ func writeGetData(invs msg.Inventories) {
 				break
 			}
 		}
-		if err := p.write(winvs, msg.CmdGetData); err != nil {
+		if err := p.write(s, winvs, msg.CmdGetData); err != nil {
 			log.Println(err)
 		}
 	}
 }
 
 //Write writes a packet to peer p.
-func (p *peer) write(m interface{}, cmd byte) error {
+func (p *peer) write(s *setting.Setting, m interface{}, cmd byte) error {
 	p.Lock()
 	defer p.Unlock()
 	w := wdata{
@@ -216,7 +247,7 @@ func (p *peer) write(m interface{}, cmd byte) error {
 	if err := p.conn.SetWriteDeadline(time.Now().Add(rwTimeout)); err != nil {
 		return err
 	}
-	return msg.Write(p.setting, m, cmd, p.conn)
+	return msg.Write(s, m, cmd, p.conn)
 }
 
 func (p *peer) isWritten(cmd byte, data []byte) int {
@@ -282,7 +313,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 		if err := setReadDeadline(p, time.Now().Add(connectionTimeout)); err != nil {
 			return err
 		}
-		cmd, buf, err2 = msg.ReadHeader(p.setting, p.conn)
+		cmd, buf, err2 = msg.ReadHeader(s, p.conn)
 		if err2 != nil {
 			if ne, ok := err2.(net.Error); ok && ne.Timeout() {
 				if i := p.isWritten(msg.CmdPing, nil); i >= 0 {
@@ -292,7 +323,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 					return fmt.Errorf("no response from %v", p.remote)
 				}
 				n := nonce()
-				if err := p.write(&n, msg.CmdPing); err != nil {
+				if err := p.write(s, &n, msg.CmdPing); err != nil {
 					return err
 				}
 				continue
@@ -305,7 +336,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 			if err != nil {
 				return err
 			}
-			if err := p.write(v, msg.CmdPong); err != nil {
+			if err := p.write(s, v, msg.CmdPong); err != nil {
 				log.Println(err)
 				continue
 			}
@@ -321,7 +352,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 
 		case msg.CmdGetAddr:
 			adrs := get(msg.MaxAddrs)
-			if err := p.write(adrs, msg.CmdAddr); err != nil {
+			if err := p.write(s, adrs, msg.CmdAddr); err != nil {
 				log.Println(err)
 				return nil
 			}
@@ -398,7 +429,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 			if len(trs) == 0 {
 				continue
 			}
-			if err := p.write(trs, msg.CmdTxs); err != nil {
+			if err := p.write(s, trs, msg.CmdTxs); err != nil {
 				log.Println(err)
 				return nil
 			}
@@ -439,7 +470,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 					Hash: ls[i].Array(),
 				})
 			}
-			if err := p.write(h, msg.CmdLeaves); err != nil {
+			if err := p.write(s, h, msg.CmdLeaves); err != nil {
 				log.Println(err)
 				return nil
 			}
@@ -462,7 +493,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 			}
 			if len(v) == msg.MaxLeaves {
 				gl := v[len(v)-1].Hash
-				WriteAll(&gl, msg.CmdGetLeaves)
+				WriteAll(s, &gl, msg.CmdGetLeaves)
 			}
 			Resolve()
 

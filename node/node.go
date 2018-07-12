@@ -145,7 +145,7 @@ func connect(s *setting.Setting) {
 					log.Println(err3)
 					continue
 				}
-				if err := pr.add(); err != nil {
+				if err := pr.add(s); err != nil {
 					log.Println(err)
 					continue
 				}
@@ -219,7 +219,7 @@ func handle(s *setting.Setting, conn *net.TCPConn) error {
 		return err
 	}
 
-	if err := p.add(); err != nil {
+	if err := p.add(s); err != nil {
 		return err
 	}
 	if err := putAddrs(s, p.remote); err != nil {
@@ -230,9 +230,12 @@ func handle(s *setting.Setting, conn *net.TCPConn) error {
 }
 
 //Start starts a node server.
-func Start(setting *setting.Setting) error {
+func Start(setting *setting.Setting, debug bool) error {
 	if err := initDB(setting); err != nil {
 		return err
+	}
+	if debug {
+		return nil
 	}
 	if err := lookup(setting); err != nil {
 		return err

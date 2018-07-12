@@ -29,6 +29,7 @@ import (
 	"log"
 	"sort"
 
+	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/setting"
@@ -150,14 +151,18 @@ func putAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction) err
 }
 
 //GetHisoty returns utxo (or all outputs) and input hashes associated with  address adr.
-func GetHisoty(s *setting.Setting, adr []byte, utxoOnly bool) ([]*InoutHash, error) {
+func GetHisoty(s *setting.Setting, adrstr string, utxoOnly bool) ([]*InoutHash, error) {
+	adrbyte, _, err := address.ParseAddress58(adrstr, s.Config)
+	if err != nil {
+		return nil, err
+	}
 	var hashes [][]byte
-	err := s.DB.View(func(txn *badger.Txn) error {
-		err := db.Get(txn, adr, &hashes, db.HeaderAddressToTx)
-		if err == badger.ErrKeyNotFound {
+	err = s.DB.View(func(txn *badger.Txn) error {
+		err2 := db.Get(txn, adrbyte, &hashes, db.HeaderAddressToTx)
+		if err2 == badger.ErrKeyNotFound {
 			return nil
 		}
-		return err
+		return err2
 	})
 	if err != nil {
 		return nil, err

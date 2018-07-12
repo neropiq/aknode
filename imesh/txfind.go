@@ -313,16 +313,19 @@ func resolved(s *setting.Setting, tr *unresolvedTx, hs tx.Hash) error {
 	if tr.broken {
 		return putBrokenTx(s, hs)
 	}
-	if err := tra.CheckAll(GetTxFunc(s), s.Config, tr.Type); err != nil {
+	if err := IsValid(s, tra, tr.Type); err != nil {
 		tr.broken = true
 		log.Println(err)
 		return putBrokenTx(s, hs)
 	}
 	if tr.Type == tx.TxNormal {
-		if err := putTx(s, tra); err != nil {
+		//We must add to imesh after adding to leave.
+		//If not and if an user stops aknode before adding to leave afeter adding to imesh,
+		//leaves will be broekn.
+		if err := leaves.CheckAdd(s, tra); err != nil {
 			return err
 		}
-		return leaves.CheckAdd(s, tra)
+		return putTx(s, tra)
 	}
 	return putMinableTx(s, tra, tr.Type)
 }

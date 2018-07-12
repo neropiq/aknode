@@ -35,17 +35,23 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
+//TxStatus is a stutus for eeach tx(confirmed or not)
+type TxStatus byte
+
 //Status is a status for tx.
 const (
-	StatusPending     = 0x00
-	StatusConfirmed   = 0x01
-	StatusDoubleSpend = 0xf0
-	StatusRejected    = 0xff
+	StatusPending     TxStatus = 0x00
+	StatusConfirmed            = 0x01
+	StatusDoubleSpend          = 0xf0
+	StatusRejected             = 0xff
 )
+
+//InOutHashType is a type in InOutHash struct.
+type InOutHashType byte
 
 //Types for in/out txs.
 const (
-	TypeIn = iota
+	TypeIn InOutHashType = iota
 	TypeMulin
 	TypeTicketin
 	TypeOut
@@ -53,11 +59,30 @@ const (
 	TypeTicketout
 )
 
+func (t InOutHashType) String() string {
+	switch t {
+	case TypeIn:
+		return "input"
+	case TypeMulin:
+		return "multisig_input"
+	case TypeTicketin:
+		return "ticket_input"
+	case TypeOut:
+		return "output"
+	case TypeMulout:
+		return "multisig_output"
+	case TypeTicketout:
+		return "ticket_output"
+	default:
+		return ""
+	}
+}
+
 //InoutHash represents in/out tx hashess.
 type InoutHash struct {
-	Hash  tx.Hash
-	Type  byte
-	Index byte
+	Hash  tx.Hash       `json:"hash"`
+	Type  InOutHashType `json:"type"`
+	Index byte          `json:"index"`
 }
 
 func newInoutHash(dat []byte) (*InoutHash, error) {
@@ -66,20 +91,32 @@ func newInoutHash(dat []byte) (*InoutHash, error) {
 	}
 	ih := &InoutHash{
 		Hash:  make(tx.Hash, 32),
-		Type:  dat[32],
+		Type:  InOutHashType(dat[32]),
 		Index: dat[33],
 	}
 	copy(ih.Hash, dat[:32])
 	return ih, nil
 }
 func (ih *InoutHash) bytes() []byte {
-	return inout2key(ih.Hash, ih.Type, ih.Index)
+	ary := inout2key(ih.Hash, ih.Type, ih.Index)
+	return ary[:]
 }
-func inout2key(h tx.Hash, typ, no byte) []byte {
+
+//Serialize returns serialized a 34 bytes array.
+func (ih *InoutHash) Serialize() [34]byte {
+	return inout2keyArray(ih.Hash, ih.Type, ih.Index)
+}
+
+func inout2keyArray(h tx.Hash, typ InOutHashType, no byte) [34]byte {
 	var r [34]byte
 	copy(r[:], h)
-	r[32] = typ
+	r[32] = byte(typ)
 	r[33] = no
+	return r
+}
+
+func inout2key(h tx.Hash, typ InOutHashType, no byte) []byte {
+	r := inout2keyArray(h, typ, no)
 	return r[:]
 }
 
@@ -107,18 +144,42 @@ func inputHashes(tr *tx.Body) []*InoutHash {
 	return prevs
 }
 
+//GetOutput returns an output related to InOutHash ih.
+//If ih is output, returns the output specified by ih.
+//If ih is input, return output refered by the input.
+func (ih *InoutHash) GetOutput(s *setting.Setting) (*tx.Output, error) {
+	tr, err := GetTxInfo(s, ih.Hash)
+	if err != nil {
+		return nil, err
+	}
+	switch ih.Type {
+	case TypeOut:
+		return tr.Body.Outputs[ih.Index], nil
+	case TypeIn:
+		in := tr.Body.Inputs[ih.Index]
+		prev, err := GetTxInfo(s, in.PreviousTX)
+		if err != nil {
+			return nil, err
+		}
+		return prev.Body.Outputs[in.Index], nil
+	default:
+		return nil, errors.New("type must be Input or Output")
+	}
+}
+
 //OutputStatus is status of an output.
 type OutputStatus struct {
-	IsReferred    bool //referred from tx(s) input
-	IsSpent       bool //refered from a confirmed tx input
-	UsedByMinable map[[32]byte]db.Header
+	IsReferred    bool   //referred from tx(s) input
+	IsSpent       bool   //refered from a confirmed tx input
+	UsedByMinable []byte //append(haash,type)
 }
 
 //TxInfo is for tx in db with sighash and status.
 type TxInfo struct {
 	Body         *tx.Body
 	SigNo        uint64
-	Status       byte
+	Status       TxStatus
+	Received     time.Time
 	OutputStatus [3][]OutputStatus
 }
 
@@ -144,6 +205,15 @@ func (ti *TxInfo) nextSigKey(s *setting.Setting) error {
 	}
 	ti.SigNo = no
 	return nil
+}
+
+//PreviousOutput returns an output of the input tx.
+func PreviousOutput(s *setting.Setting, in *tx.Input) (*tx.Output, error) {
+	prev, err := GetTxInfo(s, in.PreviousTX)
+	if err != nil {
+		return nil, err
+	}
+	return prev.Body.Outputs[in.Index], nil
 }
 
 // Has returns true if hash exists in db.
@@ -181,7 +251,7 @@ func GetTxInfo(s *setting.Setting, h tx.Hash) (*TxInfo, error) {
 
 //GetTxFunc is a func for getting tx from hash.
 //This is for funcs in tx  package.
-func GetTxFunc(s *setting.Setting) func(hash []byte) (*tx.Body, error) {
+func getTxFunc(s *setting.Setting) func(hash []byte) (*tx.Body, error) {
 	return func(hash []byte) (*tx.Body, error) {
 		ti, err := GetTxInfo(s, hash)
 		if err != nil {
@@ -193,7 +263,7 @@ func GetTxFunc(s *setting.Setting) func(hash []byte) (*tx.Body, error) {
 
 //IsValid checks transaction tr is valid for a mamber of iMesh.
 func IsValid(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
-	return tr.CheckAll(GetTxFunc(s), s.Config, typ)
+	return tr.CheckAll(getTxFunc(s), s.Config, typ)
 }
 
 //GetTx returns a transaction  from  hash.
@@ -218,7 +288,8 @@ func GetTx(s *setting.Setting, hash []byte) (*tx.Transaction, error) {
 //called synchonously from resolve
 func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 	ti := TxInfo{
-		Body: tr.Body,
+		Body:     tr.Body,
+		Received: time.Now(),
 	}
 	if err := ti.nextSigKey(s); err != nil {
 		return err
@@ -238,14 +309,14 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 			if err := db.Get(txn, prev.Hash, &ti2, db.HeaderTxInfo); err != nil {
 				return err
 			}
-			if !ti2.OutputStatus[prev.Type][prev.Index].IsReferred {
-				ti2.OutputStatus[prev.Type][prev.Index].IsReferred = true
+			if p := &(ti2.OutputStatus[prev.Type][prev.Index].IsReferred); !*p {
+				(*p) = true
 				if err := db.Put(txn, prev.Hash, &ti2, db.HeaderTxInfo); err != nil {
 					return err
 				}
 			}
-			for h, header := range ti2.OutputStatus[prev.Type][prev.Index].UsedByMinable {
-				if err := deleteMinableTx(txn, h[:], header); err != nil {
+			if m := ti2.OutputStatus[prev.Type][prev.Index].UsedByMinable; m != nil {
+				if err := deleteMinableTx(txn, m[:32], db.Header(m[32])); err != nil {
 					return err
 				}
 			}
@@ -300,7 +371,7 @@ func deleteMinableTx(txn *badger.Txn, h tx.Hash, header db.Header) error {
 		if err := db.Get(txn, prev.Hash, &ti, db.HeaderTxInfo); err != nil {
 			return err
 		}
-		delete(ti.OutputStatus[prev.Type][prev.Index].UsedByMinable, h.Array())
+		ti.OutputStatus[prev.Type][prev.Index].UsedByMinable = nil
 		if err := db.Put(txn, prev.Hash, &ti, db.HeaderTxInfo); err != nil {
 			return err
 		}
@@ -327,14 +398,14 @@ func putMinableTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 			if err := db.Get(txn, h.Hash, &ti, db.HeaderTxInfo); err != nil {
 				return err
 			}
-			if ti.OutputStatus[h.Type][h.Index].UsedByMinable == nil {
-				ti.OutputStatus[h.Type][h.Index].UsedByMinable = make(map[[32]byte]db.Header)
+			if ti.OutputStatus[h.Type][h.Index].UsedByMinable != nil {
+				return errors.New("other minable tx(s) are refering same tx(s)")
 			}
 			header2, err := msg.TxType2DBHeader(typ)
 			if err != nil {
 				return err
 			}
-			ti.OutputStatus[h.Type][h.Index].UsedByMinable[tr.Hash().Array()] = header2
+			ti.OutputStatus[h.Type][h.Index].UsedByMinable = append(tr.Hash(), byte(header2))
 			if err := db.Put(txn, h.Hash, &ti, db.HeaderTxInfo); err != nil {
 				return err
 			}
@@ -380,42 +451,63 @@ func GetMinableTx(s *setting.Setting, h tx.Hash, typ tx.Type) (*tx.Transaction, 
 	if valid {
 		return &tr, nil
 	}
-	return nil, errors.New("the tx is already invalid")
+	return nil, errors.New("the tx is already mined")
 }
 
-//GetRandomMinableTx gets a minable transaction from db.
-//The return is nil if not found.
-func GetRandomMinableTx(s *setting.Setting, typ tx.Type) (*tx.Transaction, error) {
-	if typ != tx.TxRewardFee && typ != tx.TxRewardTicket {
-		return nil, errors.New("invalid type")
-	}
-	header, err := msg.TxType2DBHeader(typ)
-	if err != nil {
-		log.Fatal(err)
-	}
+func getRandomMinableTx(s *setting.Setting, header db.Header, f func(*badger.Txn, tx.Hash) (bool, error)) (*tx.Transaction, error) {
 	var tr *tx.Transaction
-	err = s.DB.View(func(txn *badger.Txn) error {
+	err := s.DB.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
 		var hashes [][]byte
 		for it.Seek([]byte{byte(header)}); it.ValidForPrefix([]byte{byte(header)}); it.Next() {
-			if err != nil {
-				return err
+			h := it.Item().Key()[1:]
+			ok, err2 := f(txn, h)
+			if err2 != nil {
+				return err2
 			}
-			hashes = append(hashes, it.Item().Key())
+			if ok {
+				hashes = append(hashes, h)
+			}
 		}
 		if len(hashes) == 0 {
 			return nil
 		}
 		var trr tx.Transaction
 		j := rand.R.Intn(len(hashes))
-		if err2 := db.Get(txn, hashes[j][1:], &trr, header); err2 != nil {
+		if err2 := db.Get(txn, hashes[j], &trr, header); err2 != nil {
 			return err2
 		}
 		tr = &trr
 		return nil
 	})
+	if tr == nil {
+		return nil, errors.New("there is no minable tx")
+	}
 	return tr, err
+}
+
+//GetRandomFeeTx gets a fee minable transaction from db.
+func GetRandomFeeTx(s *setting.Setting, min uint64) (*tx.Transaction, error) {
+	return getRandomMinableTx(s, db.HeaderTxRewardFee,
+		func(txn *badger.Txn, h tx.Hash) (bool, error) {
+			var trr tx.Transaction
+			if err2 := db.Get(txn, h, &trr, db.HeaderTxRewardFee); err2 != nil {
+				return false, err2
+			}
+			if trr.Outputs[len(trr.Outputs)-1].Value >= min {
+				return true, nil
+			}
+			return false, nil
+		})
+}
+
+//GetRandomTicketTx gets a ticket minable transaction from db.
+func GetRandomTicketTx(s *setting.Setting) (*tx.Transaction, error) {
+	return getRandomMinableTx(s, db.HeaderTxRewardTicket,
+		func(txn *badger.Txn, h tx.Hash) (bool, error) {
+			return true, nil
+		})
 }
 
 //locked by mutex(unresolved)

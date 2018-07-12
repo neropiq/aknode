@@ -36,6 +36,9 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
+//Version is the version of aknode
+const Version = 1
+
 //Address represents an address.
 type Address struct {
 	Address string `json:"address"`
@@ -64,6 +67,7 @@ type Setting struct {
 	RPCUser           string `json:"rpc_user"`
 	RPCPassword       string `json:"rpc_password"`
 	RPCMaxConnections uint16 `json:"rpc_max_connections"`
+	RPCTxTag          string `json:"rpc_tx_tag"`
 	WalletNotify      string `json:"wallet_notify"`
 
 	RunValidator bool `json:"run_validator"`
@@ -80,6 +84,7 @@ type Setting struct {
 
 	DB     *badger.DB    `json:"-"`
 	Config *aklib.Config `json:"-"`
+	Stop   chan struct{} `json:"-"`
 }
 
 //Load parse a json file fname , open DB and returns Settings struct .
@@ -157,10 +162,10 @@ func Load(s []byte) (*Setting, error) {
 		return nil, errors.New("You must specify mining address")
 	}
 	if se.RunFeeMiner && se.MinimumFee == 0 {
-		se.MinimumFee = 0.001
+		se.MinimumFee = 0.05
 	}
 	if se.MinerAddress != "" {
-		if _, err := address.FromAddress58(se.MinerAddress); err != nil {
+		if _, _, err := address.ParseAddress58(se.MinerAddress, se.Config); err != nil {
 			return nil, err
 		}
 	}
@@ -175,8 +180,8 @@ func Load(s []byte) (*Setting, error) {
 	}
 	if err := os.MkdirAll(se.BaseDir(), 0755); err != nil {
 		return nil, err
-
 	}
+	se.Stop = make(chan struct{})
 	return &se, nil
 }
 

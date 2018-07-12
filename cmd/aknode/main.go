@@ -33,6 +33,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/AidosKuneen/aknode/explorer"
 	"github.com/AidosKuneen/aknode/imesh"
@@ -40,6 +41,8 @@ import (
 	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/rpc"
 	"github.com/AidosKuneen/aknode/setting"
+
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/natefinch/lumberjack"
 )
@@ -56,36 +59,25 @@ func onSigs(se *setting.Setting) {
 		s := <-sig
 		switch s {
 		case syscall.SIGHUP:
-			if err := se.DB.Close(); err != nil {
-				log.Println(err)
-			}
-			os.Exit(0)
+			log.Println("received SIGHUP")
+			se.Stop <- struct{}{}
 
 		// kill -SIGINT XXXX or Ctrl+c
 		case syscall.SIGINT:
-			if err := se.DB.Close(); err != nil {
-				log.Println(err)
-			}
-			os.Exit(0)
+			log.Println("received SIGINIT")
+			se.Stop <- struct{}{}
 
 		case syscall.SIGTERM:
-			if err := se.DB.Close(); err != nil {
-				log.Println(err)
-			}
-			os.Exit(0)
+			log.Println("received SIGTERM")
+			se.Stop <- struct{}{}
 
 		case syscall.SIGQUIT:
-			if err := se.DB.Close(); err != nil {
-				log.Println(err)
-			}
-			os.Exit(0)
+			log.Println("received SIGQIOT")
+			se.Stop <- struct{}{}
 
 		default:
 			log.Println("Unknown signal.")
-			if err := se.DB.Close(); err != nil {
-				log.Println(err)
-			}
-			os.Exit(0)
+			se.Stop <- struct{}{}
 		}
 	}()
 }
@@ -125,18 +117,44 @@ func main() {
 	}
 
 	onSigs(setting)
-
-	if err := imesh.Init(setting); err != nil {
+	if err := initialize(setting); err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
+	}
+
+	<-setting.Stop
+	time.Sleep(3 * time.Second)
+	if err := setting.DB.Close(); err != nil {
+		log.Println(err)
+	}
+	log.Println("aknode was stopped")
+}
+
+func checkWalletSeed(s *setting.Setting) error {
+	emp := rpc.IsSecretEmpty(s)
+	if emp {
+		fmt.Print("This is the first time you run RPC. Enter walletpassphrase...")
+		pwd, err := terminal.ReadPassword(int(syscall.Stdin)) //int conversion is needed for win
+		fmt.Println("")
+		if err != nil {
+			return err
+		}
+		if err := rpc.InitSecret(s, pwd); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func initialize(setting *setting.Setting) error {
+	if err := imesh.Init(setting); err != nil {
+		return err
 	}
 	if err := leaves.Init(setting); err != nil {
-		fmt.Println(err)
-		log.Fatal(err)
+		return err
 	}
-	if err := node.Start(setting); err != nil {
-		fmt.Println(err)
-		log.Fatal(err)
+	if err := node.Start(setting, false); err != nil {
+		return err
 	}
 
 	if setting.Debug {
@@ -147,6 +165,17 @@ func main() {
 		}()
 	}
 
+	if err := rpc.Init(setting); err != nil {
+		return err
+	}
+
+	rpc.GoNotify(setting)
+
+	if setting.RPCUser != "" {
+		if err := checkWalletSeed(setting); err != nil {
+			return err
+		}
+	}
 	if setting.UsePublicRPC || setting.RPCUser != "" {
 		rpc.Run(setting)
 	}
@@ -154,7 +183,7 @@ func main() {
 		explorer.Run(setting)
 	}
 	if setting.RunFeeMiner || setting.RunTicketMiner {
-		// node.RunMiner(setting)
+		node.RunMiner(setting)
 	}
-	<-make(chan struct{})
+	return nil
 }

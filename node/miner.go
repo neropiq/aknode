@@ -51,7 +51,7 @@ func mine(s *setting.Setting, mtx *imesh.HashWithType) error {
 	if mtx.Type == tx.TxRewardFee && uint64(s.MinimumFee*aklib.ADK) > tr.Outputs[len(tr.Outputs)-1].Value {
 		return nil
 	}
-	madr, err := address.FromAddress58(s.MinerAddress)
+	madr, _, err := address.ParseAddress58(s.MinerAddress, s.Config)
 	if err != nil {
 		return err
 	}
