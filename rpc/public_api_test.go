@@ -231,7 +231,6 @@ func testgetfeetx(t *testing.T, min float64, h tx.Hash) {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	t.Log(resp.Result)
 	var tr tx.Transaction
 	dat, ok := resp.Result.([]byte)
 	if !ok {
