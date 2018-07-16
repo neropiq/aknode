@@ -213,10 +213,6 @@ func checkResponse(t *testing.T, diff map[string]int64, acc string,
 		if !ok && i != len(tx.Outputs)-1 {
 			t.Error("invalid output #", i)
 		}
-		if ok && i == len(tx.Outputs)-1 {
-			t.Error("invalid output #", i)
-		}
-
 		if out.Value != v {
 			t.Error("invalid value", out.Value, v)
 		}
@@ -256,7 +252,7 @@ func checkResponse(t *testing.T, diff map[string]int64, acc string,
 			t.Error("invalid account")
 		}
 	}
-	if len(tx.Outputs)-1 != len(sendto) {
+	if len(tx.Outputs)-1 != len(sendto) && len(tx.Outputs) != len(sendto) {
 		t.Error("invalid number of send address")
 	}
 	if isConf {

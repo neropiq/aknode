@@ -148,7 +148,7 @@ func (p *postparam) post(usr, pwd string) error {
 	return json.Unmarshal(dat, p.resp)
 }
 
-func _TestAPIFee(t *testing.T) {
+func TestAPIFee(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 	Run(&s)

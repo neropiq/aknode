@@ -90,15 +90,14 @@ func buildTx(conf *setting.Setting, ac string, tag []byte, outputs ...output) (*
 	if change > 0 {
 		return nil, errors.New("insufficient balance")
 	}
-	if change == 0 {
-		return tr, nil
-	}
-	adr, err := newAddress2(conf, account)
-	if err != nil {
-		return nil, err
-	}
-	if err := tr.AddOutput(conf.Config, adr.Address58(), uint64(-change)); err != nil {
-		return nil, err
+	if change != 0 {
+		adr, err := newAddress2(conf, account)
+		if err != nil {
+			return nil, err
+		}
+		if err := tr.AddOutput(conf.Config, adr.Address58(), uint64(-change)); err != nil {
+			return nil, err
+		}
 	}
 	for _, a := range adrs {
 		if err := a.sign(conf, tr); err != nil {

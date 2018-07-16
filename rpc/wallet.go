@@ -339,6 +339,9 @@ func getUTXO(s *setting.Setting, acname string, checkSig bool) ([]*utxo, uint64,
 }
 
 func (adr *Address) sign(s *setting.Setting, tr *tx.Transaction) error {
+	if adr.address == nil {
+		return errors.New("call walletpassphrase first")
+	}
 	if err := tr.Sign(adr.address); err != nil {
 		return err
 	}
