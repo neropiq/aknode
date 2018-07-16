@@ -84,6 +84,7 @@ func GetBanned() map[string]time.Time {
 	for k, v := range banned.addr {
 		r[k] = v
 	}
+
 	return r
 }
 
@@ -409,9 +410,9 @@ func (p *peer) runLoop(s *setting.Setting) error {
 				case msg.InvTxRewardFee:
 					fallthrough
 				case msg.InvTxRewardTicket:
-					typ := tx.TxRewardFee
+					typ := tx.TypeRewardFee
 					if inv.Type == msg.InvTxRewardTicket {
-						typ = tx.TxRewardTicket
+						typ = tx.TypeRewardTicket
 					}
 					tr, err := imesh.GetMinableTx(s, inv.Hash[:], typ)
 					if err != nil {
@@ -487,7 +488,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 				if h.Type != msg.InvTxNormal {
 					return fmt.Errorf("invalid inventory type %v", h.Type)
 				}
-				if err := imesh.AddNoexistTxHash(s, h.Hash[:], tx.TxNormal); err != nil {
+				if err := imesh.AddNoexistTxHash(s, h.Hash[:], tx.TypeNormal); err != nil {
 					log.Println(err)
 				}
 			}

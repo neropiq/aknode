@@ -158,6 +158,11 @@ func AddNoexistTxHash(s *setting.Setting, h tx.Hash, typ tx.Type) error {
 //CheckAddTx adds trs into imeash if they are already resolved.
 //If not adds to search cron.
 func CheckAddTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
+	switch typ {
+	case tx.TypeNormal, tx.TypeRewardFee, tx.TypeRewardTicket:
+	default:
+		return errors.New("unknows type")
+	}
 	unresolved.Lock()
 	defer unresolved.Unlock()
 	has, err := Has(s, tr.Hash())
@@ -272,13 +277,13 @@ func (tr *unresolvedTx) dfs(s *setting.Setting, h [32]byte) error {
 			tr.broken = true
 			return nil
 		}
-		if ptr, ok := unresolved.Txs[prev.Array()]; !ok || ptr.Type != tx.TxNormal {
+		if ptr, ok := unresolved.Txs[prev.Array()]; !ok || ptr.Type != tx.TypeNormal {
 			tr.unresolved = true
 			if _, ok1 := unresolved.Noexists[prev.Array()]; !ok1 {
 				unresolved.Noexists[prev.Array()] = &Noexist{
 					HashWithType: &HashWithType{
 						Hash: prev,
-						Type: tx.TxNormal,
+						Type: tx.TypeNormal,
 					},
 				}
 			}
@@ -318,7 +323,7 @@ func resolved(s *setting.Setting, tr *unresolvedTx, hs tx.Hash) error {
 		log.Println(err)
 		return putBrokenTx(s, hs)
 	}
-	if tr.Type == tx.TxNormal {
+	if tr.Type == tx.TypeNormal {
 		//We must add to imesh after adding to leave.
 		//If not and if an user stops aknode before adding to leave afeter adding to imesh,
 		//leaves will be broekn.

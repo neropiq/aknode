@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	ch     = make(chan struct{}, 1)
+	ch     = make(chan struct{}, 2)
 	notify chan []*imesh.HashWithType
 )
 
@@ -44,8 +44,8 @@ func Resolve() {
 	}
 }
 
-//RegisterNotifier registers a notifier for resolved txs.
-func RegisterNotifier(n chan []*imesh.HashWithType) {
+//RegisterTxNotifier registers a notifier for resolved txs.
+func RegisterTxNotifier(n chan []*imesh.HashWithType) {
 	notify = n
 }
 
@@ -73,8 +73,8 @@ func goResolve(s *setting.Setting) {
 					Type: typ,
 					Hash: h.Hash.Array(),
 				})
-				if (h.Type == tx.TxRewardFee && s.RunFeeMiner) ||
-					(h.Type == tx.TxRewardTicket && s.RunTicketMiner) {
+				if (h.Type == tx.TypeRewardFee && s.RunFeeMiner) ||
+					(h.Type == tx.TypeRewardTicket && s.RunTicketMiner) {
 					addForMine(s, h)
 				}
 			}

@@ -68,6 +68,7 @@ type Setting struct {
 	RPCPassword       string `json:"rpc_password"`
 	RPCMaxConnections uint16 `json:"rpc_max_connections"`
 	RPCTxTag          string `json:"rpc_tx_tag"`
+	RPCAllowPublicPoW bool   `json:"rpc_allow_public_pow"`
 	WalletNotify      string `json:"wallet_notify"`
 
 	RunValidator bool `json:"run_validator"`

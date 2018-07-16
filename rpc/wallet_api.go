@@ -58,10 +58,7 @@ func getnewaddress(conf *setting.Setting, req *Request, res *Response) error {
 	mutex.Lock()
 	res.Result, err = newAddress10(conf, acc)
 	mutex.Unlock()
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) error {
@@ -80,9 +77,9 @@ func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) er
 			r1[1] = float64(utxo.value) / aklib.ADK
 			r1[2] = acc
 			r0 = append(r0, r1)
-			result = append(result, r0)
 		}
 	}
+	result = append(result, r0)
 	res.Result = result
 	return nil
 }
@@ -158,7 +155,7 @@ func listaccounts(conf *setting.Setting, req *Request, res *Response) error {
 		if err != nil {
 			return err
 		}
-		result[acc] = float64(ba) / aklib.ADKSupply
+		result[acc] = float64(ba) / aklib.ADK
 	}
 	res.Result = result
 	return nil
@@ -268,20 +265,28 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 		return errors.New("invalid params")
 	}
 	var amount int64
-	var dt *transaction
 	var detailss []*details
 	tr, err := imesh.GetTxInfo(conf, txid)
 	if err != nil {
 		return err
 	}
+	mutex.RLock()
+	defer mutex.RUnlock()
 	detailss = make([]*details, 0, len(tr.Body.Inputs)+len(tr.Body.Outputs))
 	for _, out := range tr.Body.Outputs {
 		dt, errr := newTransaction(tr, txid, out, false)
 		if errr != nil {
 			return errr
 		}
+		if dt.Account == nil {
+			continue
+		}
 		amount += int64(out.Value)
-		detailss = append(detailss, dt.toDetail())
+		det, err := dt.toDetail()
+		if err != nil {
+			return err
+		}
+		detailss = append(detailss, det)
 	}
 	for _, in := range tr.Body.Inputs {
 		out, err := imesh.PreviousOutput(conf, in)
@@ -292,23 +297,39 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 		if errr != nil {
 			return errr
 		}
+		if dt.Account == nil {
+			continue
+		}
 		amount -= int64(out.Value)
-		detailss = append(detailss, dt.toDetail())
+		det, err := dt.toDetail()
+		if err != nil {
+			return err
+		}
+		detailss = append(detailss, det)
 	}
 	nconf := 0
+	var bt *int64
+	var bh *string
+	var bi *int64
 	if tr.Status == imesh.StatusConfirmed {
 		nconf = nConfirm
+		var zero int64
+		t := tr.Body.Time.Unix()
+		emp := ""
+		bt = &t
+		bi = &zero
+		bh = &emp
 	}
 	res.Result = &gettx{
 		Amount:            float64(amount) / aklib.ADK,
 		Confirmations:     nconf,
-		Blocktime:         dt.Blocktime,
-		Blockhash:         dt.Blockhash,
-		Blockindex:        dt.Blockindex,
+		Blocktime:         bt,
+		Blockhash:         bh,
+		Blockindex:        bi,
 		Txid:              hex.EncodeToString(txid),
 		WalletConflicts:   []string{},
-		Time:              dt.Time,
-		TimeReceived:      dt.TimeReceived,
+		Time:              tr.Body.Time.Unix(),
+		TimeReceived:      tr.Received.Unix(),
 		BIP125Replaceable: "no",
 		Details:           detailss,
 	}
@@ -340,14 +361,17 @@ type transaction struct {
 	Abandoned         *bool  `json:"abandoned,omitempty"`
 }
 
-func (dt *transaction) toDetail() *details {
+func (dt *transaction) toDetail() (*details, error) {
+	if dt.Account == nil {
+		return nil, errors.New("Account is nil")
+	}
 	return &details{
 		Account:   *dt.Account,
 		Address:   dt.Address,
 		Category:  dt.Category,
 		Amount:    dt.Amount,
 		Abandoned: dt.Abandoned,
-	}
+	}, nil
 }
 
 //dont supprt over 1000 txs.
@@ -397,7 +421,7 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 		if acc != "*" && h.Account != acc {
 			continue
 		}
-		if skipped++; skipped < skip {
+		if skipped++; skipped <= skip {
 			continue
 		}
 		tr, err := imesh.GetTxInfo(conf, h.Hash)
@@ -420,9 +444,7 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 
 func newTransaction(tr *imesh.TxInfo, hash tx.Hash, out *tx.Output, isInput bool) (*transaction, error) {
 	adr := address.To58(out.Address)
-	mutex.Lock()
 	ac, ok := findAddress(adr)
-	mutex.Unlock()
 	f := false
 	emp := ""
 	var zero int64

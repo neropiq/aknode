@@ -176,6 +176,7 @@ type OutputStatus struct {
 
 //TxInfo is for tx in db with sighash and status.
 type TxInfo struct {
+	Hash         tx.Hash `msgpack:"-"`
 	Body         *tx.Body
 	SigNo        uint64
 	Status       TxStatus
@@ -238,6 +239,7 @@ func (ti *TxInfo) put(s *setting.Setting, h tx.Hash) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, h, ti, db.HeaderTxInfo)
 	})
+
 }
 
 //GetTxInfo gets a transaction info.
@@ -246,6 +248,7 @@ func GetTxInfo(s *setting.Setting, h tx.Hash) (*TxInfo, error) {
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, h, &ti, db.HeaderTxInfo)
 	})
+	ti.Hash = h
 	return &ti, err
 }
 
@@ -330,7 +333,7 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 
 //PutTx puts a transaction  into db.
 func putTx(s *setting.Setting, tr *tx.Transaction) error {
-	if err := tr.Check(s.Config, tx.TxNormal); err != nil {
+	if err := tr.Check(s.Config, tx.TypeNormal); err != nil {
 		return err
 	}
 	return putTxSub(s, tr)
@@ -382,7 +385,7 @@ func deleteMinableTx(txn *badger.Txn, h tx.Hash, header db.Header) error {
 //PutMinableTx puts a minable transaction into db.
 //called synchonously from resolve.
 func putMinableTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
-	if typ != tx.TxRewardFee && typ != tx.TxRewardTicket {
+	if typ != tx.TypeRewardFee && typ != tx.TypeRewardTicket {
 		return errors.New("invalid type")
 	}
 	if err := tr.Check(s.Config, typ); err != nil {
@@ -432,7 +435,7 @@ func IsMinableTxValid(s *setting.Setting, tr *tx.Transaction) (bool, error) {
 
 //GetMinableTx gets a minable transaction into db.
 func GetMinableTx(s *setting.Setting, h tx.Hash, typ tx.Type) (*tx.Transaction, error) {
-	if typ != tx.TxRewardFee && typ != tx.TxRewardTicket {
+	if typ != tx.TypeRewardFee && typ != tx.TypeRewardTicket {
 		return nil, errors.New("invalid type")
 	}
 	header, err := msg.TxType2DBHeader(typ)
@@ -498,7 +501,6 @@ func GetRandomFeeTx(s *setting.Setting, min uint64) (*tx.Transaction, error) {
 				return false, err2
 			}
 			if trr.Outputs[len(trr.Outputs)-1].Value >= min {
-				log.Println("!")
 				return true, nil
 			}
 			return false, nil

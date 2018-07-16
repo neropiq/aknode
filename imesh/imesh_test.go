@@ -98,7 +98,7 @@ func TestImesh(t *testing.T) {
 		t.Error(err)
 	}
 
-	if err := CheckAddTx(&s, tr, tx.TxNormal); err == nil {
+	if err := CheckAddTx(&s, tr, tx.TypeNormal); err == nil {
 		t.Error("should be error")
 	}
 	if err := tr.PoW(); err != nil {
@@ -107,7 +107,7 @@ func TestImesh(t *testing.T) {
 	if len(tr.Nonce) != cuckoo.ProofSize {
 		t.Error("invalid nonce", len(tr.Nonce))
 	}
-	if err := CheckAddTx(&s, tr, tx.TxNormal); err != nil {
+	if err := CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 	trs, err := Resolve(&s)
@@ -117,7 +117,7 @@ func TestImesh(t *testing.T) {
 	if len(trs) != 1 {
 		t.Error("invalid resolved txs")
 	}
-	if !bytes.Equal(trs[0].Hash, tr.Hash()) || trs[0].Type != tx.TxNormal {
+	if !bytes.Equal(trs[0].Hash, tr.Hash()) || trs[0].Type != tx.TypeNormal {
 		t.Error("invalid resolved tx")
 	}
 
@@ -129,14 +129,14 @@ func TestImesh(t *testing.T) {
 	if err := tr0.Sign(a); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, tr0, tx.TxNormal); err == nil {
+	if err := CheckAddTx(&s, tr0, tx.TypeNormal); err == nil {
 		t.Error("should be error")
 	}
 	if err := tr0.PoW(); err != nil {
 		t.Error(err)
 	}
 	t.Log(hex.EncodeToString(tr0.Hash()))
-	if err := CheckAddTx(&s, tr0, tx.TxNormal); err != nil {
+	if err := CheckAddTx(&s, tr0, tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 	trs, err2 = Resolve(&s)
@@ -173,7 +173,7 @@ func TestImesh(t *testing.T) {
 	t.Log(hex.EncodeToString(tr1.Hash()))
 	t.Log(hex.EncodeToString(tr2.Hash()))
 	t.Log(hex.EncodeToString(genesis[0]))
-	if err := CheckAddTx(&s, tr2, tx.TxNormal); err != nil {
+	if err := CheckAddTx(&s, tr2, tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 	trs, err2 = Resolve(&s)
@@ -188,7 +188,7 @@ func TestImesh(t *testing.T) {
 		t.Error(s)
 	}
 
-	if err := CheckAddTx(&s, tr1, tx.TxNormal); err != nil {
+	if err := CheckAddTx(&s, tr1, tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 	trs, err2 = Resolve(&s)
@@ -211,7 +211,7 @@ func TestImesh(t *testing.T) {
 		t.Error(err)
 	}
 
-	if err := CheckAddTx(&s, tr3, tx.TxRewardFee); err != nil {
+	if err := CheckAddTx(&s, tr3, tx.TypeRewardFee); err != nil {
 		t.Error(err)
 	}
 	trs, err2 = Resolve(&s)
@@ -236,7 +236,7 @@ func TestImesh(t *testing.T) {
 		t.Error(err)
 	}
 
-	if err := CheckAddTx(&s, tr4, tx.TxRewardTicket); err != nil {
+	if err := CheckAddTx(&s, tr4, tx.TypeRewardTicket); err != nil {
 		t.Error(err)
 	}
 	trs, err2 = Resolve(&s)
@@ -262,7 +262,7 @@ func TestImesh2(t *testing.T) {
 	if err := tr.PoW(); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, tr, tx.TxNormal); err != nil {
+	if err := CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 	trs, err2 := Resolve(&s)
@@ -284,7 +284,7 @@ func TestImesh2(t *testing.T) {
 	if err := tr1.Sign(a); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, tr1, tx.TxRewardFee); err != nil {
+	if err := CheckAddTx(&s, tr1, tx.TypeRewardFee); err != nil {
 		t.Error(err)
 	}
 	trs, err2 = Resolve(&s)
@@ -294,7 +294,7 @@ func TestImesh2(t *testing.T) {
 	if len(trs) != 1 {
 		t.Error("invalid resolved txs")
 	}
-	if _, err := GetMinableTx(&s, tr1.Hash(), tx.TxRewardFee); err != nil {
+	if _, err := GetMinableTx(&s, tr1.Hash(), tx.TypeRewardFee); err != nil {
 		t.Error(err)
 	}
 	_, err2 = GetRandomFeeTx(&s, 100)
@@ -319,7 +319,7 @@ func TestImesh2(t *testing.T) {
 	if err := tr2.PoW(); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, tr2, tx.TxNormal); err != nil {
+	if err := CheckAddTx(&s, tr2, tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 	trs, err2 = Resolve(&s)
@@ -330,7 +330,7 @@ func TestImesh2(t *testing.T) {
 		t.Error("invalid resolved txs", len(trs))
 	}
 
-	if _, err := GetMinableTx(&s, tr1.Hash(), tx.TxRewardFee); err == nil {
+	if _, err := GetMinableTx(&s, tr1.Hash(), tx.TypeRewardFee); err == nil {
 		t.Error("should be error")
 	}
 	valid, err2 := IsMinableTxValid(&s, tr1)
@@ -352,7 +352,7 @@ func TestImesh3(t *testing.T) {
 	if err := tr.PoW(); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, tr, tx.TxNormal); err != nil {
+	if err := CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 	trs, err2 := Resolve(&s)
@@ -374,7 +374,7 @@ func TestImesh3(t *testing.T) {
 		t.Error("invalid searching tx")
 	}
 
-	if err := AddNoexistTxHash(&s, one[:], tx.TxNormal); err != nil {
+	if err := AddNoexistTxHash(&s, one[:], tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 	ne, err2 = GetSearchingTx(&s)
@@ -442,7 +442,7 @@ func TestImesh4(t *testing.T) {
 	if err := tr.PoW(); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, tr, tx.TxNormal); err != nil {
+	if err := CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 
@@ -462,7 +462,7 @@ func TestImesh4(t *testing.T) {
 	if err := tr2.PoW(); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, tr2, tx.TxNormal); err != nil {
+	if err := CheckAddTx(&s, tr2, tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 	txs, err2 := Resolve(&s)

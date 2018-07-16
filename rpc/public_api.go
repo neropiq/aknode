@@ -21,7 +21,6 @@
 package rpc
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"log"
@@ -44,31 +43,41 @@ func sendrawtx(conf *setting.Setting, req *Request, res *Response) error {
 	if !ok {
 		return errors.New("invalid params")
 	}
-	txid := ""
+	var txent []byte
+	typ := tx.TypeNormal
 	switch len(data) {
 	case 2:
+		typ, ok = data[1].(tx.Type)
+		if !ok {
+			return errors.New("invalid type")
+		}
 		fallthrough
 	case 1:
-		txid, ok = data[0].(string)
+		txent, ok = data[0].([]byte)
 		if !ok {
 			return errors.New("invalid txid")
 		}
-	case 0:
 	default:
 		return errors.New("invalid params")
 	}
-	id, err := base64.StdEncoding.DecodeString(txid)
-	if err != nil {
-		return err
+	if typ == tx.TypeNotPoWed && !conf.RPCAllowPublicPoW {
+		return errors.New("PoW is not allowed")
 	}
 	var tr tx.Transaction
-	if err := arypack.Unmarshal(id, &tr); err != nil {
+	if err := arypack.Unmarshal(txent, &tr); err != nil {
 		return err
 	}
-	if err := imesh.IsValid(conf, &tr, tx.TxNormal); err != nil {
-		return err
+	if err2 := imesh.IsValid(conf, &tr, typ); err2 != nil {
+		return err2
 	}
-	if err := imesh.CheckAddTx(conf, &tr, tx.TxNormal); err != nil {
+	if typ == tx.TypeNotPoWed {
+		log.Println("started PoW for sendrawtx")
+		if err2 := tr.PoW(); err2 != nil {
+			return err2
+		}
+		typ = tx.TypeNormal
+	}
+	if err := imesh.CheckAddTx(conf, &tr, typ); err != nil {
 		return err
 	}
 	node.Resolve()
@@ -147,9 +156,9 @@ func getleaves(conf *setting.Setting, req *Request, res *Response) error {
 }
 
 type inoutHash struct {
-	Hash  tx.Hash `json:"hash"`
-	Type  string  `json:"type"`
-	Index byte    `json:"index"`
+	Hash  string              `json:"hash"`
+	Type  imesh.InOutHashType `json:"type"`
+	Index byte                `json:"index"`
 }
 
 func getlasthistory(conf *setting.Setting, req *Request, res *Response) error {
@@ -174,8 +183,8 @@ func getlasthistory(conf *setting.Setting, req *Request, res *Response) error {
 	r := make([]*inoutHash, len(ihs))
 	for i, ih := range ihs {
 		r[i] = &inoutHash{
-			Hash:  ih.Hash,
-			Type:  ih.Type.String(),
+			Hash:  ih.Hash.String(),
+			Type:  ih.Type,
 			Index: ih.Index,
 		}
 	}
@@ -213,7 +222,7 @@ func getrawtx(conf *setting.Setting, req *Request, res *Response) error {
 		return err
 	}
 	if !format {
-		res.Result = base64.StdEncoding.EncodeToString(arypack.Marshal(tr))
+		res.Result = arypack.Marshal(tr)
 		return nil
 	}
 	res.Result = tr
@@ -225,7 +234,7 @@ func getminabletx(conf *setting.Setting, req *Request, res *Response) error {
 	if !ok {
 		return errors.New("invalid params")
 	}
-	typ := tx.TxRewardFee
+	typ := tx.TypeRewardFee
 	min := 0.0
 	switch len(data) {
 	case 1:
@@ -234,18 +243,18 @@ func getminabletx(conf *setting.Setting, req *Request, res *Response) error {
 			if v != "ticket" {
 				return errors.New("invalid type")
 			}
-			typ = tx.TxRewardTicket
-			log.Println("ticket")
+			typ = tx.TypeRewardTicket
 		case float64:
 			min = v
-			log.Println("fee", min)
 		default:
 			return errors.New("invalid type")
 		}
+	default:
+		return errors.New("invalid params")
 	}
 	var err error
 	var tr *tx.Transaction
-	if typ == tx.TxRewardTicket {
+	if typ == tx.TypeRewardTicket {
 		tr, err = imesh.GetRandomTicketTx(conf)
 		if err != nil {
 			return err
@@ -256,6 +265,6 @@ func getminabletx(conf *setting.Setting, req *Request, res *Response) error {
 			return err
 		}
 	}
-	res.Result = base64.StdEncoding.EncodeToString(arypack.Marshal(tr))
+	res.Result = arypack.Marshal(tr)
 	return nil
 }

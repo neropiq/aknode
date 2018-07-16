@@ -48,7 +48,7 @@ func mine(s *setting.Setting, mtx *imesh.HashWithType) error {
 	if err != nil {
 		return err
 	}
-	if mtx.Type == tx.TxRewardFee && uint64(s.MinimumFee*aklib.ADK) > tr.Outputs[len(tr.Outputs)-1].Value {
+	if mtx.Type == tx.TypeRewardFee && uint64(s.MinimumFee*aklib.ADK) > tr.Outputs[len(tr.Outputs)-1].Value {
 		return nil
 	}
 	madr, _, err := address.ParseAddress58(s.MinerAddress, s.Config)
@@ -56,9 +56,9 @@ func mine(s *setting.Setting, mtx *imesh.HashWithType) error {
 		return err
 	}
 	switch mtx.Type {
-	case tx.TxRewardFee:
+	case tx.TypeRewardFee:
 		tr.Outputs[len(tr.Outputs)-1].Address = madr
-	case tx.TxRewardTicket:
+	case tx.TypeRewardTicket:
 		tr.TicketOutput = madr
 	default:
 		return errors.New("invalid type")
@@ -67,7 +67,7 @@ func mine(s *setting.Setting, mtx *imesh.HashWithType) error {
 	if err := tr.PoW(); err != nil {
 		return err
 	}
-	if err := imesh.CheckAddTx(s, tr, tx.TxNormal); err != nil {
+	if err := imesh.CheckAddTx(s, tr, tx.TypeNormal); err != nil {
 		return err
 	}
 	Resolve()

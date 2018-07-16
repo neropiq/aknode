@@ -26,19 +26,21 @@ import (
 	"errors"
 	"log"
 	"os/exec"
+	"sort"
 	"strings"
-
-	"github.com/AidosKuneen/aknode/imesh"
-	"github.com/AidosKuneen/aknode/node"
-	shellwords "github.com/mattn/go-shellwords"
 
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/arypack"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/consensus"
+	"github.com/AidosKuneen/aknode/imesh"
+	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/setting"
 
 	"github.com/dgraph-io/badger"
+
+	shellwords "github.com/mattn/go-shellwords"
 )
 
 const walletVersion = 1
@@ -50,9 +52,9 @@ type Address struct {
 }
 
 type account struct {
-	Index   uint32              `json:"index"`
-	Count2  uint32              `json:"count2"`
-	Address map[string]struct{} `json:"address"`
+	Index         uint32              `json:"index"`
+	CountAddress2 uint32              `json:"count_accress2"`
+	Address       map[string]struct{} `json:"address"`
 }
 
 type twallet struct {
@@ -96,7 +98,11 @@ func putHistory(s *setting.Setting, hist []*history) error {
 func getHistory(s *setting.Setting) ([]*history, error) {
 	var hist []*history
 	return hist, s.DB.View(func(txn *badger.Txn) error {
-		return db.Get(txn, nil, &hist, db.HeaderWalletHistory)
+		err := db.Get(txn, nil, &hist, db.HeaderWalletHistory)
+		if err == badger.ErrKeyNotFound {
+			return nil
+		}
+		return err
 	})
 }
 
@@ -108,11 +114,21 @@ func putWallet(s *setting.Setting) error {
 }
 
 //locked by mutex
-func putAddress(s *setting.Setting, adr *Address) error {
+func putAddress(s *setting.Setting, adr *Address, update bool) error {
 	if wallet.Secret.pwd == nil {
 		return errors.New("need to call walletpassphrase to encrypt address")
 	}
-	adr.EncAddress = encrypt(arypack.Marshal(adr.address), wallet.Secret.pwd)
+	if update {
+		adr.EncAddress = encrypt(arypack.Marshal(adr.address), wallet.Secret.pwd)
+	} else {
+		dat, err2 := decrypt(adr.EncAddress, wallet.Secret.pwd)
+		if err2 != nil {
+			return err2
+		}
+		if err := arypack.Unmarshal(dat, &adr.address); err != nil {
+			return err
+		}
+	}
 	name := adr.address.Address58()
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, []byte(name), adr, db.HeaderWalletAddress)
@@ -121,9 +137,19 @@ func putAddress(s *setting.Setting, adr *Address) error {
 
 //locked by mutex
 func getAddress(s *setting.Setting, name string) (*Address, error) {
+	if wallet.Secret.pwd == nil {
+		return nil, errors.New("need to call walletpassphrase to encrypt address")
+	}
 	var adr Address
 	return &adr, s.DB.View(func(txn *badger.Txn) error {
-		return db.Get(txn, []byte(name), &adr, db.HeaderWalletAddress)
+		if err := db.Get(txn, []byte(name), &adr, db.HeaderWalletAddress); err != nil {
+			return err
+		}
+		dat, err2 := decrypt(adr.EncAddress, wallet.Secret.pwd)
+		if err2 != nil {
+			return err2
+		}
+		return arypack.Unmarshal(dat, &adr.address)
 	})
 }
 
@@ -161,11 +187,11 @@ func InitSecret(s *setting.Setting, pwd []byte) error {
 	if wallet.Secret.EncSeed != nil {
 		return nil
 	}
-	wallet.Secret.seed = make([]byte, 32)
-	if _, err := rand.Read(wallet.Secret.seed); err != nil {
+	seed := make([]byte, 32)
+	if _, err := rand.Read(seed); err != nil {
 		panic(err)
 	}
-	wallet.Secret.EncSeed = encrypt(wallet.Secret.seed, pwd)
+	wallet.Secret.EncSeed = encrypt(seed, pwd)
 	return putWallet(s)
 }
 
@@ -197,7 +223,7 @@ func fillPool(s *setting.Setting) error {
 		adr := &Address{
 			address: a,
 		}
-		if err := putAddress(s, adr); err != nil {
+		if err := putAddress(s, adr, true); err != nil {
 			return err
 		}
 		wallet.Pool.Address = append(wallet.Pool.Address, a.Address58())
@@ -229,7 +255,19 @@ func updateLeaf(s *setting.Setting, sig *address.Signature, adr *Address, adrnam
 	}
 	return nil
 }
-
+func getAllUTXOs(s *setting.Setting, checkSig bool) ([]*utxo, uint64, error) {
+	var utxos []*utxo
+	var bals uint64
+	for ac := range wallet.Accounts {
+		u, bal, err := getUTXO(s, ac, checkSig)
+		if err != nil {
+			return nil, 0, err
+		}
+		utxos = append(utxos, u...)
+		bals += bal
+	}
+	return utxos, bals, nil
+}
 func getUTXO(s *setting.Setting, acname string, checkSig bool) ([]*utxo, uint64, error) {
 	var bal uint64
 	var utxos []*utxo
@@ -287,8 +325,14 @@ func getUTXO(s *setting.Setting, acname string, checkSig bool) ([]*utxo, uint64,
 				bal += u.value
 			}
 		}
-		if err := putAddress(s, adr); err != nil {
-			return nil, 0, err
+
+		if checkSig {
+			if adr == nil {
+				log.Fatal("invalid adr")
+			}
+			if err := putAddress(s, adr, true); err != nil {
+				return nil, 0, err
+			}
 		}
 	}
 	return utxos, bal, nil
@@ -307,7 +351,7 @@ func (adr *Address) sign(s *setting.Setting, tr *tx.Transaction) error {
 	if err := tr.Sign(adr.address); err != nil {
 		return err
 	}
-	return putAddress(s, adr)
+	return putAddress(s, adr, true)
 }
 
 func getAccount(s *setting.Setting, name string) (*account, error) {
@@ -326,7 +370,11 @@ func getAccount(s *setting.Setting, name string) (*account, error) {
 func newAddress10(s *setting.Setting, aname string) (string, error) {
 	ac, ok := wallet.Accounts[aname]
 	if !ok {
-		return "", errors.New("accout not found")
+		ac = &account{
+			Index:   uint32(len(wallet.Accounts)),
+			Address: make(map[string]struct{}),
+		}
+		wallet.Accounts[aname] = ac
 	}
 	if len(wallet.Pool.Address) == 0 {
 		return "", errors.New("pool is empty")
@@ -341,7 +389,7 @@ func newAddress2(s *setting.Setting, ac *account) (*address.Address, error) {
 	if wallet.Secret.pwd == nil {
 		return nil, errors.New("call walletpassphrase first")
 	}
-	seed := address.HDseed(wallet.Secret.seed, address.Height2, ac.Index, ac.Count2)
+	seed := address.HDseed(wallet.Secret.seed, address.Height2, ac.Index, ac.CountAddress2)
 	a, err := address.New(address.Height2, seed, s.Config)
 	if err != nil {
 		return nil, err
@@ -349,24 +397,21 @@ func newAddress2(s *setting.Setting, ac *account) (*address.Address, error) {
 	adr := &Address{
 		address: a,
 	}
-	if err := putAddress(s, adr); err != nil {
+	if err := putAddress(s, adr, true); err != nil {
 		return nil, err
 	}
 	ac.Address[a.Address58()] = struct{}{}
-	ac.Count2++
+	ac.CountAddress2++
 	return a, putWallet(s)
 }
 
 func findAddress(adrstr string) (string, bool) {
-	var isMine bool
-	var ac string
 	for name, acc := range wallet.Accounts {
-		_, isMine = acc.Address[adrstr]
-		if isMine {
-			ac = name
+		if _, isMine := acc.Address[adrstr]; isMine {
+			return name, true
 		}
 	}
-	return ac, isMine
+	return "", false
 }
 
 type history struct {
@@ -376,75 +421,143 @@ type history struct {
 
 //GoNotify runs gorouitine to get history of addresses in wallet.
 //This func needs to run even if RPC is stopped for collecting history.
-func GoNotify(s *setting.Setting) {
-	notify := make(chan []*imesh.HashWithType, 10)
-	node.RegisterNotifier(notify)
+func GoNotify(s *setting.Setting, creg func(chan []*imesh.HashWithType)) {
+	nnotify := make(chan []*imesh.HashWithType, 10)
+	node.RegisterTxNotifier(nnotify)
+	cnotify := make(chan []*imesh.HashWithType, 10)
+
+	if s.WalletNotify != "" {
+		if creg == nil {
+			consensus.RegisterTxNotifier(cnotify)
+		} else {
+			creg(cnotify)
+		}
+		go func() {
+			for noti := range cnotify {
+				if err := walletnotifyRunCommand(s, noti); err != nil {
+					log.Println(err)
+				}
+			}
+		}()
+	}
 	go func() {
-		for {
-			if err := walletnotify(s, notify); err != nil {
+		for noti := range nnotify {
+			trs := make([]*imesh.TxInfo, 0, len(noti))
+			for _, h := range noti {
+				if h.Type != tx.TypeNormal {
+					continue
+				}
+				tr, err := imesh.GetTxInfo(s, h.Hash)
+				if err != nil {
+					log.Println(err)
+				}
+				trs = append(trs, tr)
+			}
+			sort.Slice(trs, func(i, j int) bool {
+				return trs[i].Received.Before(trs[j].Received)
+			})
+			if err := walletnotifyUpdate(s, trs); err != nil {
 				log.Println(err)
+			}
+			if s.WalletNotify != "" {
+				cnotify <- noti
 			}
 		}
 	}()
 }
 
-func walletnotify(s *setting.Setting, notify chan []*imesh.HashWithType) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-	for noti := range notify {
-		hist, err := getHistory(s)
+var debugNotify chan string
+
+func walletnotifyRunCommand(s *setting.Setting, noti []*imesh.HashWithType) error {
+start:
+	for _, h := range noti {
+		if h.Type != tx.TypeNormal {
+			continue
+		}
+		tr, err := imesh.GetTxInfo(s, h.Hash)
 		if err != nil {
 			return err
 		}
-		for _, h := range noti {
-			if h.Type != tx.TxNormal {
+		for _, out := range tr.Body.Outputs {
+			log.Println(out.Address)
+			_, ok := findAddress(out.Address.String())
+			if !ok {
 				continue
 			}
-			tr, err := imesh.GetTxInfo(s, h.Hash)
+			str, err := runCommand(s, h.Hash)
 			if err != nil {
 				return err
 			}
-			for i, out := range tr.Body.Outputs {
-				ac, ok := findAddress(address.To58(out.Address))
-				if !ok {
-					continue
-				}
-				hist = append(hist, &history{
-					Account: ac,
-					InoutHash: imesh.InoutHash{
-						Type:  imesh.TypeOut,
-						Hash:  h.Hash,
-						Index: byte(i),
-					},
-				})
-				if _, err := runCommand(s, h.Hash); err != nil {
-					return err
-				}
+			if debugNotify != nil {
+				debugNotify <- str
 			}
-			for i, in := range tr.Body.Inputs {
-				out, err := imesh.PreviousOutput(s, in)
-				if err != nil {
-					return err
-				}
-				ac, ok := findAddress(address.To58(out.Address))
-				if !ok {
-					continue
-				}
-				hist = append(hist, &history{
-					Account: ac,
-					InoutHash: imesh.InoutHash{
-						Type:  imesh.TypeIn,
-						Hash:  h.Hash,
-						Index: byte(i),
-					},
-				})
-				if _, err := runCommand(s, h.Hash); err != nil {
-					return err
-				}
-			}
-			if err := putHistory(s, hist); err != nil {
+			continue start
+		}
+		for _, in := range tr.Body.Inputs {
+			out, err := imesh.PreviousOutput(s, in)
+			if err != nil {
 				return err
 			}
+			log.Println(out.Address)
+			_, ok := findAddress(out.Address.String())
+			if !ok {
+				continue
+			}
+			str, err := runCommand(s, h.Hash)
+			if err != nil {
+				return err
+			}
+			if debugNotify != nil {
+				debugNotify <- str
+			}
+			continue start
+		}
+		log.Println("didn't run cmd", h.Hash)
+	}
+	return nil
+}
+func walletnotifyUpdate(s *setting.Setting, trs []*imesh.TxInfo) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+	hist, err := getHistory(s)
+	if err != nil {
+		return err
+	}
+	for _, tr := range trs {
+		for i, out := range tr.Body.Outputs {
+			ac, ok := findAddress(out.Address.String())
+			if !ok {
+				continue
+			}
+			hist = append(hist, &history{
+				Account: ac,
+				InoutHash: imesh.InoutHash{
+					Type:  imesh.TypeOut,
+					Hash:  tr.Hash,
+					Index: byte(i),
+				},
+			})
+		}
+		for i, in := range tr.Body.Inputs {
+			out, err := imesh.PreviousOutput(s, in)
+			if err != nil {
+				return err
+			}
+			ac, ok := findAddress(out.Address.String())
+			if !ok {
+				continue
+			}
+			hist = append(hist, &history{
+				Account: ac,
+				InoutHash: imesh.InoutHash{
+					Type:  imesh.TypeIn,
+					Hash:  tr.Hash,
+					Index: byte(i),
+				},
+			})
+		}
+		if err := putHistory(s, hist); err != nil {
+			return err
 		}
 	}
 	return nil

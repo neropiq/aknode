@@ -68,11 +68,11 @@ const (
 //TxType2DBHeader return db beader from tx type.
 func TxType2DBHeader(typ tx.Type) (db.Header, error) {
 	switch typ {
-	case tx.TxNormal:
+	case tx.TypeNormal:
 		return db.HeaderTxInfo, nil
-	case tx.TxRewardTicket:
+	case tx.TypeRewardTicket:
 		return db.HeaderTxRewardTicket, nil
-	case tx.TxRewardFee:
+	case tx.TypeRewardFee:
 		return db.HeaderTxRewardFee, nil
 	default:
 		return 255, errors.New("invalid type")
@@ -82,11 +82,11 @@ func TxType2DBHeader(typ tx.Type) (db.Header, error) {
 //TxType2InvType return inventory type from tx type.
 func TxType2InvType(typ tx.Type) (InvType, error) {
 	switch typ {
-	case tx.TxNormal:
+	case tx.TypeNormal:
 		return InvTxNormal, nil
-	case tx.TxRewardTicket:
+	case tx.TypeRewardTicket:
 		return InvTxRewardTicket, nil
-	case tx.TxRewardFee:
+	case tx.TypeRewardFee:
 		return InvTxRewardFee, nil
 	default:
 		return 255, errors.New("invalid type")
@@ -97,11 +97,11 @@ func TxType2InvType(typ tx.Type) (InvType, error) {
 func (it InvType) ToTxType() (tx.Type, error) {
 	switch it {
 	case InvTxNormal:
-		return tx.TxNormal, nil
+		return tx.TypeNormal, nil
 	case InvTxRewardTicket:
-		return tx.TxRewardTicket, nil
+		return tx.TypeRewardTicket, nil
 	case InvTxRewardFee:
-		return tx.TxRewardFee, nil
+		return tx.TypeRewardFee, nil
 	default:
 		return 255, errors.New("invalid type")
 	}

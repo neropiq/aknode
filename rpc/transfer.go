@@ -25,17 +25,20 @@ import (
 	"log"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/node"
 
+	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-func buildTx(conf *setting.Setting, ac string, outputs ...output) (*tx.Transaction, error) {
+func buildTx(conf *setting.Setting, ac string, tag []byte, outputs ...output) (*tx.Transaction, error) {
 	tr := tx.New(conf.Config, leaves.Get(tx.DefaultPreviousSize)...)
+	tr.Message = tag
 	var outtotal uint64
 	for _, o := range outputs {
 		if err := tr.AddOutput(conf.Config, o.address, o.value); err != nil {
@@ -58,13 +61,16 @@ func buildTx(conf *setting.Setting, ac string, outputs ...output) (*tx.Transacti
 			utxos = append(utxos, u...)
 		}
 	} else {
-		account = wallet.Accounts[ac]
-		u, bal, err := getUTXO(conf, ac, true)
+		var ok bool
+		account, ok = wallet.Accounts[ac]
+		if !ok {
+			return nil, errors.New("invalid account")
+		}
+		var err error
+		utxos, total, err = getUTXO(conf, ac, true)
 		if err != nil {
 			return nil, err
 		}
-		total = bal
-		utxos = u
 	}
 	if outtotal > total {
 		return nil, errors.New("insufficient balance")
@@ -75,17 +81,16 @@ func buildTx(conf *setting.Setting, ac string, outputs ...output) (*tx.Transacti
 	i := sort.Search(len(utxos), func(i int) bool {
 		return utxos[i].value >= outtotal
 	})
-	change := outtotal
+	change := int64(outtotal)
+	var adrs []*address.Address
 	for ; i >= 0 && change > 0; i-- {
 		tr.AddInput(utxos[i].Hash, utxos[i].Index)
 		a, err := utxos[i].address.getAddress()
 		if err != nil {
 			return nil, err
 		}
-		if err := tr.Sign(a); err != nil {
-			return nil, err
-		}
-		change -= utxos[i].value
+		adrs = append(adrs, a)
+		change -= int64(utxos[i].value)
 	}
 	if change > 0 {
 		return nil, errors.New("insufficient balance")
@@ -97,7 +102,15 @@ func buildTx(conf *setting.Setting, ac string, outputs ...output) (*tx.Transacti
 	if err != nil {
 		return nil, err
 	}
-	return tr, tr.AddOutput(conf.Config, adr.Address58(), -change)
+	if err := tr.AddOutput(conf.Config, adr.Address58(), uint64(-change)); err != nil {
+		return nil, err
+	}
+	for _, a := range adrs {
+		if err := tr.Sign(a); err != nil {
+			return nil, err
+		}
+	}
+	return tr, nil
 }
 
 var powMutex sync.Mutex
@@ -108,25 +121,25 @@ type output struct {
 }
 
 //Send sends token.
-func Send(conf *setting.Setting, ac string, tag []byte, outputs ...output) (tx.Hash, error) {
+func Send(conf *setting.Setting, ac string, tag []byte, outputs ...output) (string, error) {
 	powMutex.Lock()
 	defer powMutex.Unlock()
-	tr, err := buildTx(conf, ac, outputs...)
+	tr, err := buildTx(conf, ac, tag, outputs...)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	tr.Message = tag
 	log.Println("starting PoW...")
 	if err := tr.PoW(); err != nil {
-		return nil, err
+		return "", err
 	}
-	if err := imesh.IsValid(conf, tr, tx.TxNormal); err != nil {
-		return nil, err
+	if err := imesh.IsValid(conf, tr, tx.TypeNormal); err != nil {
+		return "", err
 	}
-	if err := imesh.CheckAddTx(conf, tr, tx.TxNormal); err != nil {
-		return nil, err
+	if err := imesh.CheckAddTx(conf, tr, tx.TypeNormal); err != nil {
+		return "", err
 	}
 	node.Resolve()
+	time.Sleep(6 * time.Second)
 	log.Println("finished PoW. hash=", tr.Hash())
-	return tr.Hash(), nil
+	return tr.Hash().String(), nil
 }

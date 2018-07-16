@@ -37,10 +37,10 @@ func listpeer(conf *setting.Setting, req *Request, res *Response) error {
 func dumpseed(conf *setting.Setting, req *Request, res *Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
-	if wallet.Secret.seed == nil {
+	if wallet.Secret.seed == nil || wallet.Secret.pwd == nil {
 		return errors.New("call walletpassphrase first")
 	}
-	res.Result = address.HDSeed58(conf.Config, wallet.Secret.seed, []byte(""))
+	res.Result = address.HDSeed58(conf.Config, wallet.Secret.seed, wallet.Secret.pwd)
 	return nil
 }
 
@@ -53,7 +53,7 @@ type bans struct {
 
 func listbanned(conf *setting.Setting, req *Request, res *Response) error {
 	bs := node.GetBanned()
-	banned := make([]*bans, len(bs))
+	banned := make([]*bans, 0, len(bs))
 	for k, v := range bs {
 		banned = append(banned, &bans{
 			Address: k,
@@ -140,12 +140,14 @@ func importwallet(conf *setting.Setting, req *Request, res *Response) error {
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
+	pwd := wallet.Secret.pwd
 	wallet = *d.Wallet
+	wallet.Secret.pwd = pwd
 	if err := putHistory(conf, d.Hist); err != nil {
 		return err
 	}
 	for _, adr := range d.Address {
-		if err := putAddress(conf, adr); err != nil {
+		if err := putAddress(conf, adr, false); err != nil {
 			return err
 		}
 	}

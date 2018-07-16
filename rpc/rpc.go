@@ -142,7 +142,7 @@ func isValidAuth(s *setting.Setting, w http.ResponseWriter, r *http.Request) err
 func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if err := r.Body.Close(); err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 	}()
 

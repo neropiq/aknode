@@ -41,23 +41,20 @@ func walletpassphrase(conf *setting.Setting, req *Request, res *Response) error 
 	if !ok {
 		return errors.New("invalid password")
 	}
-	sec, ok := data[1].(time.Duration)
+	sec, ok := data[1].(uint)
 	if !ok {
 		return errors.New("invalid time")
 	}
 	mutex.Lock()
-	defer mutex.Lock()
+	defer mutex.Unlock()
 	if wallet.Secret.pwd != nil {
 		return errors.New("wallet is already unlocked")
 	}
 	if err := decryptSecret(conf, []byte(pwd)); err != nil {
 		return err
 	}
-	if err := fillPool(conf); err != nil {
-		return err
-	}
 	go func() {
-		time.Sleep(time.Second * sec)
+		time.Sleep(time.Second * time.Duration(sec))
 		mutex.Lock()
 		clearSecret()
 		mutex.Unlock()
