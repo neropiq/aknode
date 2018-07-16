@@ -230,16 +230,16 @@ func handle(s *setting.Setting, conn *net.TCPConn) error {
 }
 
 //Start starts a node server.
-func Start(setting *setting.Setting, debug bool) error {
+func Start(setting *setting.Setting, debug bool) (net.Listener, error) {
 	if err := initDB(setting); err != nil {
-		return err
+		return nil, err
 	}
 	if !debug {
 		if err := lookup(setting); err != nil {
-			return err
+			return nil, err
 		}
 		connect(setting)
 	}
-	_, err := start(setting)
-	return err
+	l, err := start(setting)
+	return l, err
 }

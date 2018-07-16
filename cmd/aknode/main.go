@@ -153,7 +153,7 @@ func initialize(setting *setting.Setting) error {
 	if err := leaves.Init(setting); err != nil {
 		return err
 	}
-	if err := node.Start(setting, false); err != nil {
+	if _, err := node.Start(setting, false); err != nil {
 		return err
 	}
 
@@ -169,7 +169,7 @@ func initialize(setting *setting.Setting) error {
 		return err
 	}
 
-	rpc.GoNotify(setting)
+	rpc.GoNotify(setting, nil)
 
 	if setting.RPCUser != "" {
 		if err := checkWalletSeed(setting); err != nil {

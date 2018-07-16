@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"testing"
@@ -45,6 +46,7 @@ import (
 var s, s1 setting.Setting
 var a *address.Address
 var genesis tx.Hash
+var l net.Listener
 
 func setup(t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
@@ -91,7 +93,9 @@ func setup(t *testing.T) {
 	s1.Port = 2345
 	s1.MyHostPort = ":2345"
 
-	if err := node.Start(&s, true); err != nil {
+	var err error
+	l, err = node.Start(&s, true)
+	if err != nil {
 		t.Error(err)
 	}
 
@@ -102,6 +106,9 @@ func teardown(t *testing.T) {
 		t.Error(err)
 	}
 	if err := os.RemoveAll("./wallet.dat"); err != nil {
+		t.Log(err)
+	}
+	if err := l.Close(); err != nil {
 		t.Log(err)
 	}
 }
