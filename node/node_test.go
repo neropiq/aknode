@@ -56,8 +56,8 @@ func setup(t *testing.T) {
 	s.Config = aklib.DebugConfig
 	s.MaxConnections = 1
 	s.Bind = "127.0.0.1"
-	s.Port = 1234
-	s.MyHostPort = ":1234"
+	s.Port = 44134
+	s.MyHostPort = ":44134"
 	seed := address.GenerateSeed()
 	a, err2 = address.New(address.Height10, seed, s.Config)
 	if err2 != nil {
