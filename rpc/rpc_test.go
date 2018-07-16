@@ -98,7 +98,10 @@ func setup(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
+	wallet.Secret.EncSeed = nil
+	wallet.Pool.Address = nil
+	wallet.Pool.Index = 0
+	wallet.Accounts = make(map[string]*account)
 }
 
 func teardown(t *testing.T) {
@@ -145,7 +148,7 @@ func (p *postparam) post(usr, pwd string) error {
 	return json.Unmarshal(dat, p.resp)
 }
 
-func TestAPIFee(t *testing.T) {
+func _TestAPIFee(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 	Run(&s)

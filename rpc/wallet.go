@@ -338,33 +338,11 @@ func getUTXO(s *setting.Setting, acname string, checkSig bool) ([]*utxo, uint64,
 	return utxos, bal, nil
 }
 
-func (adr *Address) getAddress() (*address.Address, error) {
-	abyte, err := decrypt(adr.EncAddress, wallet.Secret.pwd)
-	if err != nil {
-		return nil, err
-	}
-	var a address.Address
-	return &a, arypack.Unmarshal(abyte, &a)
-}
-
 func (adr *Address) sign(s *setting.Setting, tr *tx.Transaction) error {
 	if err := tr.Sign(adr.address); err != nil {
 		return err
 	}
 	return putAddress(s, adr, true)
-}
-
-func getAccount(s *setting.Setting, name string) (*account, error) {
-	a, ok := wallet.Accounts[name]
-	if ok {
-		return a, nil
-	}
-	a = &account{
-		Index:   uint32(len(wallet.Accounts) + 1),
-		Address: make(map[string]struct{}),
-	}
-	wallet.Accounts[name] = a
-	return a, putWallet(s)
 }
 
 func newAddress10(s *setting.Setting, aname string) (string, error) {

@@ -30,7 +30,6 @@ import (
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/node"
 
-	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/setting"
@@ -76,20 +75,16 @@ func buildTx(conf *setting.Setting, ac string, tag []byte, outputs ...output) (*
 		return nil, errors.New("insufficient balance")
 	}
 	sort.Slice(utxos, func(i, j int) bool {
-		return utxos[i].value < utxos[i].value
+		return utxos[i].value < utxos[j].value
 	})
 	i := sort.Search(len(utxos), func(i int) bool {
 		return utxos[i].value >= outtotal
 	})
 	change := int64(outtotal)
-	var adrs []*address.Address
+	var adrs []*Address
 	for ; i >= 0 && change > 0; i-- {
 		tr.AddInput(utxos[i].Hash, utxos[i].Index)
-		a, err := utxos[i].address.getAddress()
-		if err != nil {
-			return nil, err
-		}
-		adrs = append(adrs, a)
+		adrs = append(adrs, utxos[i].address)
 		change -= int64(utxos[i].value)
 	}
 	if change > 0 {
@@ -106,7 +101,7 @@ func buildTx(conf *setting.Setting, ac string, tag []byte, outputs ...output) (*
 		return nil, err
 	}
 	for _, a := range adrs {
-		if err := tr.Sign(a); err != nil {
+		if err := a.sign(conf, tr); err != nil {
 			return nil, err
 		}
 	}

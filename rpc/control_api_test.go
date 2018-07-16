@@ -306,9 +306,9 @@ func testimportwallet(t *testing.T, pwd []byte) {
 		prefix := []byte{byte(db.HeaderWalletAddress)}
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 			adrs = append(adrs, string(it.Item().Key()[1:]))
-			v, err := it.Item().ValueCopy(nil)
-			if err != nil {
-				return err
+			v, err2 := it.Item().ValueCopy(nil)
+			if err2 != nil {
+				return err2
 			}
 			dat = append(dat, v)
 		}
@@ -317,8 +317,8 @@ func testimportwallet(t *testing.T, pwd []byte) {
 	if err != nil {
 		t.Error(err)
 	}
-	if err := os.RemoveAll("./test_db"); err != nil {
-		t.Error(err)
+	if err2 := os.RemoveAll("./test_db"); err2 != nil {
+		t.Error(err2)
 	}
 	req := &Request{
 		JSONRPC: "1.0",
@@ -408,4 +408,7 @@ func testimportwallet(t *testing.T, pwd []byte) {
 		}
 		return nil
 	})
+	if err != nil {
+		t.Error(err)
+	}
 }
