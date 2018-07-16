@@ -259,7 +259,6 @@ func testgettickettx(t *testing.T, h tx.Hash) {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	t.Log(resp.Result)
 	var tr tx.Transaction
 	dat, ok := resp.Result.([]byte)
 	if !ok {

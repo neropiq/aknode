@@ -12,7 +12,7 @@ including:
 * Messaging between nodes (Testing)
 * Consensus / Validator (Not Yet)
 * Aidos Explorer (Not Yet)
-* RPC APIs with Wallet Service (WIP)
+* RPC APIs with Wallet Service (Testing)
 
 
 UNDER CONSTRUCTION

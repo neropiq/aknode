@@ -201,7 +201,7 @@ func checkResponse(t *testing.T, diff map[string]int64, acc string,
 	}
 	tx, err := imesh.GetTx(&s, txid)
 	if err != nil {
-		t.Error(err, txid)
+		t.Error(err, txid, result)
 	}
 	for i, out := range tx.Outputs {
 		t.Log("out", i, out.Address, out.Value)

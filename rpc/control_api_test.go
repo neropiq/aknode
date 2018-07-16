@@ -282,11 +282,10 @@ func testdumpwallet(t *testing.T) {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	r, err := ioutil.ReadFile("./wallet.dat")
+	_, err := ioutil.ReadFile("./wallet.dat")
 	if err != nil {
 		t.Error(err)
 	}
-	t.Log(string(r))
 }
 
 func testimportwallet(t *testing.T, pwd []byte) {
