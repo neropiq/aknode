@@ -170,10 +170,10 @@ func TestWalletAPI(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			wallet.Secret.pwd = nil
 			if err := gadr.sign(&s, tr); err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
+			wallet.Secret.pwd = nil
 			ac2val[adr2ac[preadr]] -= prev / 2
 			adr2val[preadr] /= 2
 		}
