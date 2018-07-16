@@ -488,7 +488,7 @@ func TestNode3(t *testing.T) {
 		}
 		p, err3 := readVersion(&s1, conn, 0)
 		if err3 != nil {
-			t.Fatal(err3)
+			t.Error(err3)
 		}
 		if err := writeVersion(&s1, p.remote, conn, 0); err != nil {
 			t.Error(err)

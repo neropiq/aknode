@@ -23,6 +23,7 @@ package rpc
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -31,6 +32,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/AidosKuneen/aidosd/aidos"
 	"github.com/AidosKuneen/aklib"
@@ -188,4 +190,104 @@ func TestAPIFee(t *testing.T) {
 	if resp.ID != "curltest" {
 		t.Error("id must be curltest")
 	}
+}
+
+func TestSig(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+
+	pwd := []byte("pwd")
+	if err := InitSecret(&s, pwd); err != nil {
+		t.Error(err)
+	}
+	if err := decryptSecret(&s, pwd); err != nil {
+		t.Error(err)
+	}
+	GoNotify(&s, nil)
+	adrs := newAddress(t, "")
+	tr := tx.New(s.Config, genesis)
+	tr.AddInput(genesis, 0)
+	if err := tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply-10*aklib.ADK); err != nil {
+		t.Error(err)
+	}
+	if err := tr.AddOutput(s.Config, adrs[0], 10*aklib.ADK); err != nil {
+		t.Error(err)
+	}
+	if err := tr.Sign(a); err != nil {
+		t.Error(err)
+	}
+	if err := tr.PoW(); err != nil {
+		t.Error(err)
+	}
+	if err := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
+		t.Fatal(err)
+	}
+	node.Resolve()
+	time.Sleep(6 * time.Second)
+	confirmAll(t, nil, true)
+	txid := testsendtoaddress2(t, adrs[0], 0.2)
+	confirmAll(t, nil, true)
+	wallet.Secret.pwd = pwd
+	aa, err := getAddress(&s, adrs[0])
+	if err != nil {
+		t.Error(err)
+	}
+	if aa.address.LeafNo() != 1 {
+		t.Error("invalid leaf no", aa.address.LeafNo())
+	}
+	tr = tx.New(s.Config, genesis)
+	tr.AddInput(txid, 0)
+	if err := tr.AddOutput(s.Config, a.Address58(), (0.2-0.1)*aklib.ADK); err != nil {
+		t.Error(err)
+	}
+	if err := tr.AddOutput(s.Config, adrs[0], 0.1*aklib.ADK); err != nil {
+		t.Error(err)
+	}
+	if err := aa.address.SetLeafNo(5); err != nil {
+		t.Error(err)
+	}
+	if err := tr.Sign(aa.address); err != nil {
+		t.Fatal(err)
+	}
+	if err := tr.PoW(); err != nil {
+		t.Error(err)
+	}
+	if err := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
+		t.Fatal(err)
+	}
+	node.Resolve()
+	time.Sleep(6 * time.Second)
+	confirmAll(t, nil, true)
+	testsendtoaddress2(t, adrs[1], 9.9)
+	confirmAll(t, nil, true)
+	aa, err = getAddress(&s, adrs[0])
+	if err != nil {
+		t.Error(err)
+	}
+	if aa.address.LeafNo() != 7 {
+		t.Error("invalid leaf no", aa.address.LeafNo())
+	}
+}
+
+func testsendtoaddress2(t *testing.T, adr1 string, v float64) tx.Hash {
+	req := &Request{
+		JSONRPC: "1.0",
+		ID:      "curltest",
+		Method:  "sendtoaddress",
+		Params:  []interface{}{adr1, v},
+	}
+	var resp Response
+	err := sendtoaddress(&s, req, &resp)
+	if err != nil {
+		t.Error(err)
+	}
+	txid, ok := resp.Result.(string)
+	if !ok {
+		t.Error("invalid resp")
+	}
+	h, err := hex.DecodeString(txid)
+	if err != nil {
+		t.Error(err)
+	}
+	return h
 }

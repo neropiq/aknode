@@ -327,8 +327,8 @@ func testimportwallet(t *testing.T, pwd []byte) {
 		Params:  []interface{}{"./wallet.dat"},
 	}
 	var resp Response
-	if err := importwallet(&s, req, &resp); err != nil {
-		t.Error(err)
+	if err2 := importwallet(&s, req, &resp); err2 != nil {
+		t.Error(err2)
 	}
 	if resp.Error != nil {
 		t.Error(resp.Error)
@@ -394,9 +394,9 @@ func testimportwallet(t *testing.T, pwd []byte) {
 			if adrs[i] != string(adr) {
 				t.Error("invalid address", adrs[i], string(adr))
 			}
-			v, err := it.Item().Value()
-			if err != nil {
-				return err
+			v, err2 := it.Item().Value()
+			if err2 != nil {
+				return err2
 			}
 			if !bytes.Equal(dat[i], v) {
 				t.Error("invalid address")

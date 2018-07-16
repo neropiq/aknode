@@ -22,6 +22,7 @@ package rpc
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"sort"
 	"sync"
@@ -72,7 +73,7 @@ func buildTx(conf *setting.Setting, ac string, tag []byte, outputs ...output) (*
 		}
 	}
 	if outtotal > total {
-		return nil, errors.New("insufficient balance")
+		return nil, fmt.Errorf("insufficient balance, needed %v, balance %v", outtotal, total)
 	}
 	sort.Slice(utxos, func(i, j int) bool {
 		return utxos[i].value < utxos[j].value
@@ -82,13 +83,16 @@ func buildTx(conf *setting.Setting, ac string, tag []byte, outputs ...output) (*
 	})
 	change := int64(outtotal)
 	var adrs []*Address
+	if i == len(utxos) {
+		i--
+	}
 	for ; i >= 0 && change > 0; i-- {
 		tr.AddInput(utxos[i].Hash, utxos[i].Index)
 		adrs = append(adrs, utxos[i].address)
 		change -= int64(utxos[i].value)
 	}
 	if change > 0 {
-		return nil, errors.New("insufficient balance")
+		return nil, fmt.Errorf("insufficient balance %v", change)
 	}
 	if change != 0 {
 		adr, err := newAddress2(conf, account)

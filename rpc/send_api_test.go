@@ -110,7 +110,7 @@ func TestSendAPI(t *testing.T) {
 	testwalletpassphrase2(t, string(pwd))
 	testsendmany(t, false, outadrs[0], outadrs[1], adr2ac)
 	testsendfrom(t, outadrs[2], adr2ac)
-	testsendtoaddress(t, outadrs0[0], adr2ac)
+	testsendtoaddress(t, outadrs0[0], 0.2)
 
 	ni := testgetnodeinfo(t)
 	if *ni.Balance != total {
@@ -188,7 +188,7 @@ func getDiff(t *testing.T, u0, u1 []*utxo) map[string]int64 {
 }
 
 func checkResponse(t *testing.T, diff map[string]int64, acc string,
-	resp *Response, sendto map[string]uint64, isConf bool) {
+	resp *Response, sendto map[string]uint64, isConf bool) tx.Hash {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
@@ -260,6 +260,7 @@ func checkResponse(t *testing.T, diff map[string]int64, acc string,
 			t.Error("invalid number of diff")
 		}
 	}
+	return txid
 }
 
 func testwalletpassphrase1(pwd string, t float64) error {
@@ -339,12 +340,12 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 
 }
 
-func testsendtoaddress(t *testing.T, adr1 string, adr2ac map[string]string) {
+func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 	req := &Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "sendtoaddress",
-		Params:  []interface{}{adr1, 0.2},
+		Params:  []interface{}{adr1, v},
 	}
 	var resp Response
 	utxo0, _, err := getAllUTXOs(&s, false)
@@ -370,7 +371,7 @@ func testsendtoaddress(t *testing.T, adr1 string, adr2ac map[string]string) {
 		t.Error(err)
 	}
 	diff = getDiff(t, utxo0, utxo2)
-	checkResponse(t, diff, "*", &resp, map[string]uint64{
+	return checkResponse(t, diff, "*", &resp, map[string]uint64{
 		adr1: uint64(0.2 * aklib.ADK),
 	}, true)
 }

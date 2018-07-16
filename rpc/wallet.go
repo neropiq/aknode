@@ -248,7 +248,9 @@ func updateLeaf(s *setting.Setting, sig *address.Signature, adr *Address, adrnam
 	if err != nil {
 		return err
 	}
-	if address.Encode58(sigadr) == adrname && adr.address.LeafNo() <= uint64(signo) {
+	log.Println(signo, address.To58(sigadr))
+
+	if address.To58(sigadr) == adrname && adr.address.LeafNo() <= uint64(signo) {
 		if err := adr.address.SetLeafNo(uint64(signo) + 1); err != nil {
 			return err
 		}
