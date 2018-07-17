@@ -116,6 +116,7 @@ func TestSendAPI(t *testing.T) {
 	if *ni.Balance != total {
 		t.Error("invalid nodeinfo")
 	}
+	time.Sleep(5 * time.Second) //wait for finishing walletnotify
 }
 
 func testgetnodeinfo(t *testing.T) *nodeInfo {
