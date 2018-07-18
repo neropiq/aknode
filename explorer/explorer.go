@@ -36,7 +36,7 @@ var tmpl = template.New("")
 
 //Run runs explorer server.
 func Run(setting *setting.Setting) {
-	if _, err := tmpl.ParseGlob(wwwPath + "www/*.tpl"); err != nil {
+	if _, err := tmpl.ParseGlob(wwwPath + "public/*.tpl"); err != nil {
 		log.Fatal(err)
 	}
 
@@ -51,7 +51,7 @@ func Run(setting *setting.Setting) {
 	})
 	for _, stat := range []string{"img", "css", "js"} {
 		mux.HandleFunc("/"+stat+"/", func(w http.ResponseWriter, r *http.Request) {
-			http.StripPrefix("/"+stat+"/", http.FileServer(http.Dir(stat+"/")))
+			http.FileServer(http.Dir(stat + "/"))
 		})
 	}
 
