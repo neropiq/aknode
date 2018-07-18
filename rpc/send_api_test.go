@@ -116,6 +116,9 @@ func TestSendAPI(t *testing.T) {
 	if *ni.Balance != total {
 		t.Error("invalid nodeinfo")
 	}
+	if ni.TxNo != 5 {
+		t.Error("invalid txno", ni.TxNo)
+	}
 	time.Sleep(5 * time.Second) //wait for finishing walletnotify
 }
 
@@ -158,9 +161,6 @@ func testgetnodeinfo(t *testing.T) *nodeInfo {
 	}
 	if result.Leaves != leaves.Size() {
 		t.Error("invalid leave size")
-	}
-	if result.TxNo != 5 {
-		t.Error("invalid txno")
 	}
 	return result
 }
