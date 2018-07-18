@@ -39,7 +39,8 @@ import (
 func TestSendAPI(t *testing.T) {
 	setup(t)
 	defer teardown(t)
-
+	ni2 := testgetnodeinfo(t)
+	t.Log(ni2.TxNo)
 	pwd := []byte("pwd")
 	if err := InitSecret(&s, pwd); err != nil {
 		t.Error(err)

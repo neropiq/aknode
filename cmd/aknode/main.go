@@ -18,8 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-////go:generate go get github.com/rakyll/statik;statik -src=./www
-
 package main
 
 import (

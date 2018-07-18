@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -269,11 +270,12 @@ func teststop(t *testing.T) {
 }
 
 func testdumpwallet(t *testing.T) {
+	wdat := filepath.Join(tdir, "tmp.dat")
 	req := &Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "dumpwallet",
-		Params:  []interface{}{"./wallet.dat"},
+		Params:  []interface{}{wdat},
 	}
 	var resp Response
 	if err := dumpwallet(&s, req, &resp); err != nil {
@@ -282,13 +284,14 @@ func testdumpwallet(t *testing.T) {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	_, err := ioutil.ReadFile("./wallet.dat")
+	_, err := ioutil.ReadFile(wdat)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func testimportwallet(t *testing.T, pwd []byte) {
+	wdat := filepath.Join(tdir, "tmp.dat")
 	bu := wallet
 	wallet = twallet{
 		Accounts: make(map[string]*account),
@@ -324,7 +327,7 @@ func testimportwallet(t *testing.T, pwd []byte) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "importwallet",
-		Params:  []interface{}{"./wallet.dat"},
+		Params:  []interface{}{wdat},
 	}
 	var resp Response
 	if err2 := importwallet(&s, req, &resp); err2 != nil {

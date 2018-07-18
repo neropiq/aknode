@@ -24,10 +24,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/AidosKuneen/aknode/setting"
 	"github.com/alecthomas/template"
+	"github.com/gobuffalo/packr"
 )
 
 const wwwPath = "../cmd/aknode/"
@@ -36,8 +38,13 @@ var tmpl = template.New("")
 
 //Run runs explorer server.
 func Run(setting *setting.Setting) {
-	if _, err := tmpl.ParseGlob(wwwPath + "public/*.tpl"); err != nil {
-		log.Fatal(err)
+	box := packr.NewBox(filepath.Join(wwwPath, "templates"))
+	for _, t := range box.List() {
+		str, err := box.MustString(t)
+		if err != nil {
+			log.Fatal(err)
+		}
+		tmpl = template.Must(tmpl.Parse(str))
 	}
 
 	ipport := fmt.Sprintf("%s:%d", setting.ExplorerBind, setting.ExplorerPort)
@@ -50,8 +57,9 @@ func Run(setting *setting.Setting) {
 		searchHandle(setting, w, r)
 	})
 	for _, stat := range []string{"img", "css", "js"} {
+		box := packr.NewBox(filepath.Join(wwwPath, stat))
 		mux.HandleFunc("/"+stat+"/", func(w http.ResponseWriter, r *http.Request) {
-			http.FileServer(http.Dir(stat + "/"))
+			http.StripPrefix("/"+stat+"/", http.FileServer(box))
 		})
 	}
 

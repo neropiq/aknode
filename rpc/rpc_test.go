@@ -49,9 +49,14 @@ var s, s1 setting.Setting
 var a *address.Address
 var genesis tx.Hash
 var l net.Listener
+var tdir string
 
 func setup(t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	tdir = os.TempDir()
+	if err := os.Mkdir(tdir, 0755); err != nil {
+		t.Fatal(err)
+	}
 	var err2 error
 	if err := os.RemoveAll("./test_db"); err != nil {
 		log.Println(err)
@@ -110,7 +115,7 @@ func teardown(t *testing.T) {
 	if err := os.RemoveAll("./test_db"); err != nil {
 		t.Error(err)
 	}
-	if err := os.RemoveAll("./wallet.dat"); err != nil {
+	if err := os.RemoveAll(tdir); err != nil {
 		t.Log(err)
 	}
 	if err := l.Close(); err != nil {
