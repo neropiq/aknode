@@ -28,7 +28,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/AidosKuneen/aklib"
+
 	"github.com/AidosKuneen/aklib/address"
+	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/node"
 
@@ -116,39 +119,81 @@ func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 	}
 }
+
+type addressAmount struct {
+	Address string
+	Amount  float64
+}
+type multisig struct {
+	N       int
+	Address struct {
+		HasSign bool
+		addressAmount
+	}
+}
+
 func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id := q.Get("id")
 	txid, err := hex.DecodeString(id)
 	if err != nil {
-		log.Println(err)
 		renderError(w, err.Error())
 	}
 	ok, err := imesh.Has(s, txid)
 	if err != nil {
-		log.Println(err)
 		renderError(w, err.Error())
 	}
 	if !ok {
 		renderError(w, notFound)
 	}
+	ti, err := imesh.GetTxInfo(s, txid)
+	if !ok {
+		renderError(w, err.Error())
+	}
+
 	info := struct {
-		Created  time.Time
-		Received time.Time
-		Status   byte
-		Inputs   struct {
-			Address string
-			Amount  float64
+		Created      time.Time
+		Received     time.Time
+		Status       imesh.TxStatus
+		Inputs       []*addressAmount
+		MInputs      []*multisig
+		Outputs      []*addressAmount
+		MOutputs     []*multisig
+		TicketInput  string
+		TicketOutput string
+		Message      string
+		MessageStr   string
+		Nonce        []uint32
+		GNonce       uint32
+		LockTime     time.Time
+		Parents      []tx.Hash
+	}{
+		Created:    ti.Body.Time,
+		Received:   ti.Received,
+		Status:     ti.Status,
+		Inputs:     make([]*addressAmount, len(ti.Body.Inputs)),
+		MInputs:    make([]*multisig, len(ti.Body.MultiSigIns)),
+		Outputs:    make([]*addressAmount, len(ti.Body.Outputs)),
+		MOutputs:   make([]*multisig, len(ti.Body.MultiSigOuts)),
+		Message:    hex.EncodeToString(ti.Body.Message),
+		MessageStr: string(ti.Body.Message),
+		Nonce:      ti.Body.Nonce,
+		GNonce:     ti.Body.Gnonce,
+		LockTime:   ti.Body.LockTime,
+		Parents:    ti.Body.Parent,
+	}
+	for i, inp := range ti.Body.Inputs {
+		prev, err := imesh.PreviousOutput(s, inp)
+		if err != nil {
+			renderError(w, err.Error())
 		}
-		MInputs struct {
-			N       int
-			Address struct {
-				HasSign bool
-				Address string
-				Amount  float64
-			}
-		}
-	}{}
+		info.Inputs[i].Address = prev.Address.String()
+		info.Inputs[i].Amount = float64(prev.Value) / aklib.ADK
+	}
+	for i, out := range ti.Body.Outputs {
+		info.Inputs[i].Address = out.Address.String()
+		info.Inputs[i].Amount = float64(out.Value) / aklib.ADK
+	}
 	err = tmpl.ExecuteTemplate(w, "tx.tpl", &info)
 	if err != nil {
 		log.Print(err)
@@ -159,6 +204,7 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 }
 
 func renderError(w http.ResponseWriter, str string) {
+	log.Println(str)
 	err := tmpl.ExecuteTemplate(w, "err.tpl", str)
 	if err != nil {
 		log.Print(err)

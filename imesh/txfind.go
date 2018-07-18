@@ -68,6 +68,7 @@ var unresolved = struct {
 
 //Init initialize imesh db and unresolved txs.
 func Init(s *setting.Setting) error {
+	txno.TxNo = 0
 	unresolved.Txs = make(map[[32]byte]*unresolvedTx)
 	unresolved.Noexists = make(map[[32]byte]*Noexist)
 
