@@ -37,7 +37,7 @@ import (
 )
 
 //Version is the version of aknode
-const Version = 1
+const Version = "1.0.0"
 
 //Address represents an address.
 type Address struct {
@@ -47,6 +47,7 @@ type Address struct {
 
 //Setting is  a aknode setting.
 type Setting struct {
+	Version    string
 	Debug      bool     `json:"debug"`
 	Testnet    byte     `json:"testnet"`
 	Blacklists []string `json:"blacklists"`
@@ -91,7 +92,6 @@ type Setting struct {
 //Load parse a json file fname , open DB and returns Settings struct .
 func Load(s []byte) (*Setting, error) {
 	var se Setting
-
 	if err := json.Unmarshal(s, &se); err != nil {
 		return nil, err
 	}

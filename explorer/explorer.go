@@ -21,18 +21,28 @@
 package explorer
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
 	"path/filepath"
 	"time"
 
+	"github.com/AidosKuneen/aklib/address"
+	"github.com/AidosKuneen/aknode/imesh/leaves"
+	"github.com/AidosKuneen/aknode/node"
+
+	"github.com/AidosKuneen/aknode/imesh"
+
 	"github.com/AidosKuneen/aknode/setting"
 	"github.com/alecthomas/template"
 	"github.com/gobuffalo/packr"
 )
 
-const wwwPath = "../cmd/aknode/static"
+const (
+	wwwPath  = "../cmd/aknode/static"
+	notFound = "we couldn't find what you are looking for."
+)
 
 var tmpl = template.New("")
 
@@ -55,6 +65,12 @@ func Run(setting *setting.Setting) {
 	})
 	mux.HandleFunc("/search/", func(w http.ResponseWriter, r *http.Request) {
 		searchHandle(setting, w, r)
+	})
+	mux.HandleFunc("/tx/", func(w http.ResponseWriter, r *http.Request) {
+		txHandle(setting, w, r)
+	})
+	mux.HandleFunc("/address/", func(w http.ResponseWriter, r *http.Request) {
+		addressHandle(setting, w, r)
 	})
 	for _, stat := range []string{"img", "css", "js"} {
 		box := packr.NewBox(filepath.Join(wwwPath, stat))
@@ -79,37 +95,90 @@ func Run(setting *setting.Setting) {
 
 //Handle handles api calls.
 func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
-	// var ni *giota.GetNodeInfoResponse
-	// var txs *giota.GetTransactionsToApproveResponse
-	// var err1 error
-	// var err2 error
-	// var server string = "http://localhost:14266"
-	// for i := 0; i < 5; i++ {
-	// 	//		server = giota.RandomNode()
-	// 	api := giota.NewAPI(server, client)
-	// 	ni, err1 = api.GetNodeInfo()
-	// 	txs, err2 = api.GetTransactionsToApprove(27)
-	// 	if err1 == nil && err2 == nil {
-	// 		break
-	// 	}
-	// }
-	// if renderIfError(w, err1, err2) {
-	// 	return
-	// }
+	info := struct {
+		Net     string
+		Version string
+		Peers   int
+		Time    time.Time
+		Txs     uint64
+		Leaves  int
+	}{
+		Net:     s.Config.Name,
+		Version: setting.Version,
+		Peers:   node.ConnSize(),
+		Time:    time.Now(),
+		Txs:     imesh.GetTxNo(),
+		Leaves:  leaves.Size(),
+	}
 
-	// err := tmpl.ExecuteTemplate(w, "index.tpl", struct {
-	// 	Server   string
-	// 	NodeInfo *giota.GetNodeInfoResponse
-	// 	Tx       *giota.GetTransactionsToApproveResponse
-	// }{
-	// 	server,
-	// 	ni,
-	// 	txs,
-	// })
-	// if err != nil {
-	// 	log.Print(err)
-	// }
+	err := tmpl.ExecuteTemplate(w, "index.tpl", &info)
+	if err != nil {
+		log.Print(err)
+	}
+}
+func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	id := q.Get("id")
+	txid, err := hex.DecodeString(id)
+	if err != nil {
+		log.Println(err)
+		renderError(w, err.Error())
+	}
+	ok, err := imesh.Has(s, txid)
+	if err != nil {
+		log.Println(err)
+		renderError(w, err.Error())
+	}
+	if !ok {
+		renderError(w, notFound)
+	}
+	info := struct {
+		Created  time.Time
+		Received time.Time
+		Status   byte
+		Inputs   struct {
+			Address string
+			Amount  float64
+		}
+		MInputs struct {
+			N       int
+			Address struct {
+				HasSign bool
+				Address string
+				Amount  float64
+			}
+		}
+	}{}
+	err = tmpl.ExecuteTemplate(w, "tx.tpl", &info)
+	if err != nil {
+		log.Print(err)
+	}
+}
+
+func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+}
+
+func renderError(w http.ResponseWriter, str string) {
+	err := tmpl.ExecuteTemplate(w, "err.tpl", str)
+	if err != nil {
+		log.Print(err)
+	}
 }
 
 func searchHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	id := q.Get("id")
+	_, err1 := hex.DecodeString(id)
+	_, _, err2 := address.ParseAddress58(id, s.Config)
+	switch {
+	case err1 == nil:
+		http.Redirect(w, r, "/tx?id="+id, http.StatusFound)
+		return
+	case err2 == nil:
+		http.Redirect(w, r, "/address?id="+id, http.StatusFound)
+		return
+	default:
+		renderError(w, notFound)
+		return
+	}
 }

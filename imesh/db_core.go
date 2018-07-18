@@ -424,6 +424,7 @@ func updateTxNo(s *setting.Setting, txn *badger.Txn) error {
 func getTxNo(s *setting.Setting) error {
 	return s.DB.View(func(txn *badger.Txn) error {
 		err := db.Get(txn, nil, &txno.TxNo, db.HeaderTxNo)
+		log.Println(err)
 		if err == badger.ErrKeyNotFound {
 			txno.TxNo = 0
 			return nil

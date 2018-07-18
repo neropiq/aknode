@@ -284,8 +284,7 @@ func testdumpwallet(t *testing.T) {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	_, err := ioutil.ReadFile(wdat)
-	if err != nil {
+	if _, err := ioutil.ReadFile(wdat); err != nil {
 		t.Error(err)
 	}
 }

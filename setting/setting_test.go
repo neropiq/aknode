@@ -75,7 +75,7 @@ func TestSetting(t *testing.T) {
 	_, err2 = Load([]byte(`{
 		"testnet":1,
 		"blacklists":["1323.24.11.12"],
-	}`))
+		}`))
 	if err2 == nil {
 		t.Error("should be error")
 	}

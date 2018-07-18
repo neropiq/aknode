@@ -86,7 +86,7 @@ func sendrawtx(conf *setting.Setting, req *Request, res *Response) error {
 }
 
 type nodeInfo struct {
-	Version         int     `json:"version"`
+	Version         string  `json:"version"`
 	ProtocolVersion int     `json:"protocolversion"`
 	WalletVersion   int     `json:"walletversion"`
 	Balance         *uint64 `json:"balance,omitempty"`
