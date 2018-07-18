@@ -122,7 +122,7 @@ func Init(s *setting.Setting) error {
 		}
 		unresolved.Txs[h] = tr
 	}
-	return nil
+	return getTxNo(s)
 }
 
 //locked by mutex (unresolved)
@@ -336,9 +336,9 @@ func resolved(s *setting.Setting, tr *unresolvedTx, hs tx.Hash) error {
 }
 
 func prevs(tr *tx.Transaction) []tx.Hash {
-	prevs := make([]tx.Hash, 0, len(tr.Previous)+1+
+	prevs := make([]tx.Hash, 0, len(tr.Parent)+1+
 		len(tr.Inputs)+len(tr.MultiSigIns))
-	prevs = append(prevs, tr.Previous...)
+	prevs = append(prevs, tr.Parent...)
 	if tr.TicketInput != nil {
 		prevs = append(prevs, tr.TicketInput)
 	}

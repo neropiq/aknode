@@ -127,7 +127,7 @@ func isVisited(trs []*tx.Transaction) map[[32]byte]*txsearch {
 		txs[l.Array()] = &txsearch{}
 	}
 	for _, tr := range trs {
-		for _, prev := range tr.Previous {
+		for _, prev := range tr.Parent {
 			if t, ok := txs[prev.Array()]; ok {
 				t.visited = true
 			}

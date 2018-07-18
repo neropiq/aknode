@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/AidosKuneen/aklib/db"
@@ -31,141 +32,23 @@ import (
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/setting"
-
 	"github.com/dgraph-io/badger"
 )
+
+var txno = struct {
+	TxNo uint64
+	sync.RWMutex
+}{}
 
 //TxStatus is a stutus for eeach tx(confirmed or not)
 type TxStatus byte
 
 //Status is a status for tx.
 const (
-	StatusPending     TxStatus = 0x00
-	StatusConfirmed            = 0x01
-	StatusDoubleSpend          = 0xf0
-	StatusRejected             = 0xff
+	StatusPending   TxStatus = 0x00
+	StatusConfirmed          = 0x01
+	StatusRejected           = 0xff
 )
-
-//InOutHashType is a type in InOutHash struct.
-type InOutHashType byte
-
-//Types for in/out txs.
-const (
-	TypeIn InOutHashType = iota
-	TypeMulin
-	TypeTicketin
-	TypeOut
-	TypeMulout
-	TypeTicketout
-)
-
-func (t InOutHashType) String() string {
-	switch t {
-	case TypeIn:
-		return "input"
-	case TypeMulin:
-		return "multisig_input"
-	case TypeTicketin:
-		return "ticket_input"
-	case TypeOut:
-		return "output"
-	case TypeMulout:
-		return "multisig_output"
-	case TypeTicketout:
-		return "ticket_output"
-	default:
-		return ""
-	}
-}
-
-//InoutHash represents in/out tx hashess.
-type InoutHash struct {
-	Hash  tx.Hash       `json:"hash"`
-	Type  InOutHashType `json:"type"`
-	Index byte          `json:"index"`
-}
-
-func newInoutHash(dat []byte) (*InoutHash, error) {
-	if len(dat) != 34 {
-		return nil, errors.New("invalid dat length")
-	}
-	ih := &InoutHash{
-		Hash:  make(tx.Hash, 32),
-		Type:  InOutHashType(dat[32]),
-		Index: dat[33],
-	}
-	copy(ih.Hash, dat[:32])
-	return ih, nil
-}
-func (ih *InoutHash) bytes() []byte {
-	ary := inout2key(ih.Hash, ih.Type, ih.Index)
-	return ary[:]
-}
-
-//Serialize returns serialized a 34 bytes array.
-func (ih *InoutHash) Serialize() [34]byte {
-	return inout2keyArray(ih.Hash, ih.Type, ih.Index)
-}
-
-func inout2keyArray(h tx.Hash, typ InOutHashType, no byte) [34]byte {
-	var r [34]byte
-	copy(r[:], h)
-	r[32] = byte(typ)
-	r[33] = no
-	return r
-}
-
-func inout2key(h tx.Hash, typ InOutHashType, no byte) []byte {
-	r := inout2keyArray(h, typ, no)
-	return r[:]
-}
-
-func inputHashes(tr *tx.Body) []*InoutHash {
-	prevs := make([]*InoutHash, 0, 1+
-		len(tr.Inputs)+len(tr.MultiSigIns))
-	if tr.TicketInput != nil {
-		prevs = append(prevs, &InoutHash{
-			Type: TypeTicketin,
-			Hash: tr.TicketInput,
-		})
-	}
-	for _, prev := range tr.Inputs {
-		prevs = append(prevs, &InoutHash{
-			Type: TypeIn,
-			Hash: prev.PreviousTX,
-		})
-	}
-	for _, prev := range tr.MultiSigIns {
-		prevs = append(prevs, &InoutHash{
-			Type: TypeMulin,
-			Hash: prev.PreviousTX,
-		})
-	}
-	return prevs
-}
-
-//GetOutput returns an output related to InOutHash ih.
-//If ih is output, returns the output specified by ih.
-//If ih is input, return output refered by the input.
-func (ih *InoutHash) GetOutput(s *setting.Setting) (*tx.Output, error) {
-	tr, err := GetTxInfo(s, ih.Hash)
-	if err != nil {
-		return nil, err
-	}
-	switch ih.Type {
-	case TypeOut:
-		return tr.Body.Outputs[ih.Index], nil
-	case TypeIn:
-		in := tr.Body.Inputs[ih.Index]
-		prev, err := GetTxInfo(s, in.PreviousTX)
-		if err != nil {
-			return nil, err
-		}
-		return prev.Body.Outputs[in.Index], nil
-	default:
-		return nil, errors.New("type must be Input or Output")
-	}
-}
 
 //OutputStatus is status of an output.
 type OutputStatus struct {
@@ -178,7 +61,7 @@ type OutputStatus struct {
 type TxInfo struct {
 	Hash         tx.Hash `msgpack:"-"`
 	Body         *tx.Body
-	SigNo        uint64
+	TxNo         uint64
 	Status       TxStatus
 	Received     time.Time
 	OutputStatus [3][]OutputStatus
@@ -186,25 +69,15 @@ type TxInfo struct {
 
 func (ti *TxInfo) sigKey() []byte {
 	key := make([]byte, 8)
-	binary.LittleEndian.PutUint64(key, ti.SigNo)
+	binary.LittleEndian.PutUint64(key, ti.TxNo)
 	return key[:5]
 }
 
-func (ti *TxInfo) nextSigKey(s *setting.Setting) error {
-	seq, err := s.DB.GetSequence([]byte("sequence"), (1<<40)-1)
-	if err != nil {
+func (ti *TxInfo) nextTxNo(s *setting.Setting, txn *badger.Txn) error {
+	if err := updateTxNo(s, txn); err != nil {
 		return err
 	}
-	defer func() {
-		if err2 := seq.Release(); err2 != nil {
-			log.Fatal(err2)
-		}
-	}()
-	no, err := seq.Next()
-	if err != nil {
-		return err
-	}
-	ti.SigNo = no
+	ti.TxNo = txno.TxNo
 	return nil
 }
 
@@ -294,9 +167,6 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 		Body:     tr.Body,
 		Received: time.Now(),
 	}
-	if err := ti.nextSigKey(s); err != nil {
-		return err
-	}
 	ti.OutputStatus[TypeIn] = make([]OutputStatus, len(tr.Outputs))
 	ti.OutputStatus[TypeMulin] = make([]OutputStatus, len(tr.MultiSigOuts))
 	if tr.TicketOutput != nil {
@@ -304,6 +174,9 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 	}
 
 	return s.DB.Update(func(txn *badger.Txn) error {
+		if err := ti.nextTxNo(s, txn); err != nil {
+			return err
+		}
 		if err2 := db.Put(txn, tr.Hash(), &ti, db.HeaderTxInfo); err2 != nil {
 			return err2
 		}
@@ -538,4 +411,29 @@ func isBrokenTx(s *setting.Setting, h []byte) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+//locked by mutex
+func updateTxNo(s *setting.Setting, txn *badger.Txn) error {
+	txno.Lock()
+	defer txno.Unlock()
+	txno.TxNo++
+	return db.Put(txn, nil, &txno.TxNo, db.HeaderTxNo)
+}
+
+func getTxNo(s *setting.Setting) error {
+	return s.DB.View(func(txn *badger.Txn) error {
+		err := db.Get(txn, nil, &txno.TxNo, db.HeaderTxNo)
+		if err == badger.ErrKeyNotFound {
+			return nil
+		}
+		return err
+	})
+}
+
+//GetTxNo returns a total number of txs in imesh.
+func GetTxNo() uint64 {
+	txno.RLock()
+	defer txno.RUnlock()
+	return txno.TxNo
 }

@@ -27,15 +27,33 @@ import (
 	"time"
 
 	"github.com/AidosKuneen/aknode/setting"
+	"github.com/alecthomas/template"
 )
+
+const wwwPath = "../cmd/aknode/"
+
+var tmpl = template.New("")
 
 //Run runs explorer server.
 func Run(setting *setting.Setting) {
+	if _, err := tmpl.ParseGlob(wwwPath + "www/*.tpl"); err != nil {
+		log.Fatal(err)
+	}
+
 	ipport := fmt.Sprintf("%s:%d", setting.ExplorerBind, setting.ExplorerPort)
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		handle(setting, w, r)
+		indexHandle(setting, w, r)
 	})
+	mux.HandleFunc("/search/", func(w http.ResponseWriter, r *http.Request) {
+		searchHandle(setting, w, r)
+	})
+	for _, stat := range []string{"img", "css", "js"} {
+		mux.HandleFunc("/"+stat+"/", func(w http.ResponseWriter, r *http.Request) {
+			http.StripPrefix("/"+stat+"/", http.FileServer(http.Dir(stat+"/")))
+		})
+	}
 
 	s := &http.Server{
 		Addr:              ipport,
@@ -52,5 +70,38 @@ func Run(setting *setting.Setting) {
 }
 
 //Handle handles api calls.
-func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+	// var ni *giota.GetNodeInfoResponse
+	// var txs *giota.GetTransactionsToApproveResponse
+	// var err1 error
+	// var err2 error
+	// var server string = "http://localhost:14266"
+	// for i := 0; i < 5; i++ {
+	// 	//		server = giota.RandomNode()
+	// 	api := giota.NewAPI(server, client)
+	// 	ni, err1 = api.GetNodeInfo()
+	// 	txs, err2 = api.GetTransactionsToApprove(27)
+	// 	if err1 == nil && err2 == nil {
+	// 		break
+	// 	}
+	// }
+	// if renderIfError(w, err1, err2) {
+	// 	return
+	// }
+
+	// err := tmpl.ExecuteTemplate(w, "index.tpl", struct {
+	// 	Server   string
+	// 	NodeInfo *giota.GetNodeInfoResponse
+	// 	Tx       *giota.GetTransactionsToApproveResponse
+	// }{
+	// 	server,
+	// 	ni,
+	// 	txs,
+	// })
+	// if err != nil {
+	// 	log.Print(err)
+	// }
+}
+
+func searchHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 }

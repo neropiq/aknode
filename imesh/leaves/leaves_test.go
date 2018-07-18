@@ -58,23 +58,23 @@ func TestLeaves(t *testing.T) {
 	for i := range trs {
 		trs[i] = &tx.Transaction{
 			Body: &tx.Body{
-				Message:  []byte{byte(i)}, //to change hash for each txs
-				Previous: make([]tx.Hash, 2),
+				Message: []byte{byte(i)}, //to change hash for each txs
+				Parent:  make([]tx.Hash, 2),
 			},
 		}
 	}
-	trs[0].Previous[0] = make(tx.Hash, 32)
-	trs[0].Previous[1] = make(tx.Hash, 32)
-	trs[1].Previous[0] = make(tx.Hash, 32)
-	trs[1].Previous[1] = make(tx.Hash, 32)
-	trs[2].Previous[0] = trs[0].Hash()
-	trs[2].Previous[1] = trs[0].Hash()
-	trs[3].Previous[0] = trs[2].Hash()
-	trs[3].Previous[1] = make(tx.Hash, 32)
-	trs[4].Previous[0] = trs[2].Hash()
-	trs[4].Previous[1] = trs[2].Hash()
-	trs[5].Previous[0] = trs[0].Hash()
-	trs[5].Previous[1] = trs[2].Hash()
+	trs[0].Parent[0] = make(tx.Hash, 32)
+	trs[0].Parent[1] = make(tx.Hash, 32)
+	trs[1].Parent[0] = make(tx.Hash, 32)
+	trs[1].Parent[1] = make(tx.Hash, 32)
+	trs[2].Parent[0] = trs[0].Hash()
+	trs[2].Parent[1] = trs[0].Hash()
+	trs[3].Parent[0] = trs[2].Hash()
+	trs[3].Parent[1] = make(tx.Hash, 32)
+	trs[4].Parent[0] = trs[2].Hash()
+	trs[4].Parent[1] = trs[2].Hash()
+	trs[5].Parent[0] = trs[0].Hash()
+	trs[5].Parent[1] = trs[2].Hash()
 
 	for _, tr := range trs {
 		t.Log(hex.EncodeToString(tr.Hash()))
@@ -118,8 +118,8 @@ func TestLeaves(t *testing.T) {
 		t.Error("invalid init")
 	}
 
-	trs[6].Previous[0] = trs[3].Hash()
-	trs[6].Previous[1] = trs[2].Hash()
+	trs[6].Parent[0] = trs[3].Hash()
+	trs[6].Parent[1] = trs[2].Hash()
 	if err := CheckAdd(&s, trs[6]); err != nil {
 		t.Error(err)
 	}

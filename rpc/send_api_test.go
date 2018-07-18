@@ -159,6 +159,9 @@ func testgetnodeinfo(t *testing.T) *nodeInfo {
 	if result.Leaves != leaves.Size() {
 		t.Error("invalid leave size")
 	}
+	if result.TxNo != 5 {
+		t.Error("invalid txno")
+	}
 	return result
 }
 

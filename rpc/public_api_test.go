@@ -69,6 +69,47 @@ func TestPublicAPI(t *testing.T) {
 	testgettickettx(t, tr.Hash())
 	testgetleaves(t, ti.Hash())
 	testgethist(t, ti.Hash())
+	testgettxsstatus(t, ti.Hash(), false)
+	confirmAll(t, nil, true)
+	testgettxsstatus(t, ti.Hash(), true)
+}
+
+func testgettxsstatus(t *testing.T, h tx.Hash, isConf bool) {
+	var zero [32]byte
+	var inva tx.Hash = zero[:]
+	req := &Request{
+		JSONRPC: "1.0",
+		ID:      "curltest",
+		Method:  "gettxsstatus",
+		Params:  []interface{}{genesis.String(), h.String(), inva.String()},
+	}
+	var resp Response
+	if err := gettxsstatus(&s, req, &resp); err != nil {
+		t.Error(err)
+	}
+	if resp.Error != nil {
+		t.Error(resp.Error)
+	}
+	t.Log(resp.Result)
+	is, ok := resp.Result.([]int)
+	if !ok {
+		t.Error("invalid return")
+	}
+	if len(is) != 3 {
+		t.Error("invalid return")
+	}
+	if is[0] != nConfirm {
+		t.Error("invalid genesis status")
+	}
+	if isConf && is[1] != nConfirm {
+		t.Error("invalid tx status")
+	}
+	if !isConf && is[1] != 0 {
+		t.Error("invalid tx status")
+	}
+	if is[2] != -1 {
+		t.Error("invalid invalid tx status")
+	}
 }
 
 func testgethist(t *testing.T, h tx.Hash) {

@@ -42,6 +42,7 @@ var publicRPCs = map[string]rpcfunc{
 	"getlasthistory": getlasthistory,
 	"getrawtx":       getrawtx,
 	"getminabletx":   getminabletx,
+	"gettxsstatus":   gettxsstatus,
 }
 
 var rpcs = map[string]rpcfunc{

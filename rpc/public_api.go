@@ -96,6 +96,7 @@ type nodeInfo struct {
 	KeyPoolSize     int     `json:"keypoolsize"`
 	Leaves          int     `json:"leaves"`
 	Time            int64   `json:"time"`
+	TxNo            uint64  `json:"txno"`
 	//TODO:some value for consensus
 }
 
@@ -125,6 +126,7 @@ func getnodeinfo(conf *setting.Setting, req *Request, res *Response) error {
 		KeyPoolSize:     len(wallet.Pool.Address),
 		Leaves:          leaves.Size(),
 		Time:            time.Now().Unix(),
+		TxNo:            imesh.GetTxNo(),
 	}
 	return nil
 }
@@ -266,5 +268,45 @@ func getminabletx(conf *setting.Setting, req *Request, res *Response) error {
 		}
 	}
 	res.Result = arypack.Marshal(tr)
+	return nil
+}
+
+func gettxsstatus(conf *setting.Setting, req *Request, res *Response) error {
+	data, ok := req.Params.([]interface{})
+	if !ok {
+		return errors.New("invalid params")
+	}
+	if len(data) > 50 {
+		return errors.New("array is too big")
+	}
+	r := make([]int, 0, len(data))
+	for _, dat := range data {
+		txid, ok := dat.(string)
+		if !ok {
+			return errors.New("invalid txid")
+		}
+		tid, err := hex.DecodeString(txid)
+		if !ok {
+			return errors.New("invalid txid")
+		}
+		ok, err = imesh.Has(conf, tid)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			r = append(r, -1)
+			continue
+		}
+		tr, err := imesh.GetTxInfo(conf, tid)
+		if err != nil {
+			return err
+		}
+		if tr.Status == imesh.StatusConfirmed {
+			r = append(r, nConfirm)
+		} else {
+			r = append(r, 0)
+		}
+	}
+	res.Result = r
 	return nil
 }
