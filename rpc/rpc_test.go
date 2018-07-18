@@ -109,6 +109,7 @@ func setup(t *testing.T) {
 	wallet.Pool.Address = nil
 	wallet.Pool.Index = 0
 	wallet.Accounts = make(map[string]*account)
+	t.Log(imesh.GetTxNo())
 }
 
 func teardown(t *testing.T) {

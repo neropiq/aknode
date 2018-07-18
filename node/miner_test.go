@@ -60,7 +60,7 @@ func TestMiner(t *testing.T) {
 	if !ok {
 		t.Error("invalid connection")
 	}
-	if err := tcpconn.SetDeadline(time.Now().Add(time.Minute)); err != nil {
+	if err := tcpconn.SetDeadline(time.Now().Add(10 * time.Minute)); err != nil {
 		t.Error(err)
 	}
 
