@@ -32,7 +32,7 @@ import (
 	"github.com/gobuffalo/packr"
 )
 
-const wwwPath = "../cmd/aknode/"
+const wwwPath = "../cmd/aknode/static"
 
 var tmpl = template.New("")
 

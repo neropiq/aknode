@@ -53,8 +53,9 @@ var tdir string
 
 func setup(t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	tdir = os.TempDir()
-	if err := os.Mkdir(tdir, 0755); err != nil {
+	var err error
+	tdir, err = ioutil.TempDir("", "gotest")
+	if err != nil {
 		t.Fatal(err)
 	}
 	var err2 error
@@ -100,7 +101,6 @@ func setup(t *testing.T) {
 	s1.Port = 2345
 	s1.MyHostPort = ":2345"
 
-	var err error
 	l, err = node.Start(&s, true)
 	if err != nil {
 		t.Error(err)
