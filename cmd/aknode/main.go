@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate statik -src=./www
+////go:generate go get github.com/rakyll/statik;statik -src=./www
 
 package main
 
