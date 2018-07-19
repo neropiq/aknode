@@ -102,6 +102,7 @@ func TestExploere(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 	log.Println(genesis)
+	time.Sleep(3 * time.Second)
 	cl := http.Client{
 		Timeout: 10 * time.Second,
 	}

@@ -165,7 +165,7 @@ func GetTx(s *setting.Setting, hash []byte) (*tx.Transaction, error) {
 func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 	ti := TxInfo{
 		Body:     tr.Body,
-		Received: time.Now().Round(time.Second),
+		Received: time.Now().Truncate(time.Second),
 	}
 	ti.OutputStatus[TypeIn] = make([]OutputStatus, len(tr.Outputs))
 	ti.OutputStatus[TypeMulin] = make([]OutputStatus, len(tr.MultiSigOuts))

@@ -149,7 +149,7 @@ func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		Net:     s.Config.Name,
 		Version: setting.Version,
 		Peers:   node.ConnSize(),
-		Time:    time.Now().Round(time.Second),
+		Time:    time.Now().Truncate(time.Second),
 		Txs:     imesh.GetTxNo(),
 		Leaves:  leaves.Size(),
 	}
