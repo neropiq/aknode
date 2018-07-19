@@ -25,25 +25,23 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/AidosKuneen/aklib"
-
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/node"
-
-	"github.com/AidosKuneen/aknode/imesh"
-
 	"github.com/AidosKuneen/aknode/setting"
 	"github.com/alecthomas/template"
+
 	"github.com/gobuffalo/packr"
 )
 
 const (
-	wwwPath  = "../cmd/aknode/static"
 	notFound = "we couldn't find what you are looking for."
 )
 
@@ -51,13 +49,33 @@ var tmpl = template.New("")
 
 //Run runs explorer server.
 func Run(setting *setting.Setting) {
+	p, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	wwwPath := filepath.Join(p, "static")
+	if _, err := os.Stat(wwwPath); err != nil {
+		wwwPath = filepath.Join(p, "../cmd/aknode/static")
+	}
+	funcMap := template.FuncMap{
+		"toADK": func(amount uint64) string {
+			return fmt.Sprintf("%.f", float64(amount)/aklib.ADK)
+		},
+		"tformat": func(t time.Time) string {
+			return t.Format("2006-01-02 15:04:05 MST")
+		},
+	}
+	tmpl.Funcs(funcMap)
 	box := packr.NewBox(filepath.Join(wwwPath, "templates"))
 	for _, t := range box.List() {
 		str, err := box.MustString(t)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal(t, err)
 		}
-		tmpl = template.Must(tmpl.Parse(str))
+		tmpl, err = tmpl.Parse(str)
+		if err != nil {
+			log.Fatal(t, " ", err)
+		}
 	}
 
 	ipport := fmt.Sprintf("%s:%d", setting.ExplorerBind, setting.ExplorerPort)
@@ -75,11 +93,9 @@ func Run(setting *setting.Setting) {
 	mux.HandleFunc("/address/", func(w http.ResponseWriter, r *http.Request) {
 		addressHandle(setting, w, r)
 	})
-	for _, stat := range []string{"img", "css", "js"} {
+	for _, stat := range []string{"image", "css", "js"} {
 		box := packr.NewBox(filepath.Join(wwwPath, stat))
-		mux.HandleFunc("/"+stat+"/", func(w http.ResponseWriter, r *http.Request) {
-			http.StripPrefix("/"+stat+"/", http.FileServer(box))
-		})
+		mux.Handle("/"+stat+"/", http.StripPrefix("/"+stat+"/", http.FileServer(box)))
 	}
 
 	s := &http.Server{
@@ -109,26 +125,14 @@ func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		Net:     s.Config.Name,
 		Version: setting.Version,
 		Peers:   node.ConnSize(),
-		Time:    time.Now(),
+		Time:    time.Now().Round(time.Second),
 		Txs:     imesh.GetTxNo(),
 		Leaves:  leaves.Size(),
 	}
 
-	err := tmpl.ExecuteTemplate(w, "index.tpl", &info)
+	err := tmpl.ExecuteTemplate(w, "index", &info)
 	if err != nil {
 		log.Print(err)
-	}
-}
-
-type addressAmount struct {
-	Address string
-	Amount  float64
-}
-type multisig struct {
-	N       int
-	Address struct {
-		HasSign bool
-		addressAmount
 	}
 }
 
@@ -138,27 +142,32 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	txid, err := hex.DecodeString(id)
 	if err != nil {
 		renderError(w, err.Error())
+		return
 	}
 	ok, err := imesh.Has(s, txid)
 	if err != nil {
 		renderError(w, err.Error())
+		return
 	}
 	if !ok {
 		renderError(w, notFound)
+		return
 	}
 	ti, err := imesh.GetTxInfo(s, txid)
 	if !ok {
 		renderError(w, err.Error())
+		return
 	}
 
 	info := struct {
+		TXID         string
 		Created      time.Time
 		Received     time.Time
 		Status       imesh.TxStatus
-		Inputs       []*addressAmount
-		MInputs      []*multisig
-		Outputs      []*addressAmount
-		MOutputs     []*multisig
+		Inputs       []*tx.Output
+		MInputs      []*tx.MultiSigOut
+		Outputs      []*tx.Output
+		MOutputs     []*tx.MultiSigOut
 		TicketInput  string
 		TicketOutput string
 		Message      string
@@ -168,13 +177,14 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		LockTime     time.Time
 		Parents      []tx.Hash
 	}{
+		TXID:       id,
 		Created:    ti.Body.Time,
 		Received:   ti.Received,
 		Status:     ti.Status,
-		Inputs:     make([]*addressAmount, len(ti.Body.Inputs)),
-		MInputs:    make([]*multisig, len(ti.Body.MultiSigIns)),
-		Outputs:    make([]*addressAmount, len(ti.Body.Outputs)),
-		MOutputs:   make([]*multisig, len(ti.Body.MultiSigOuts)),
+		Inputs:     make([]*tx.Output, len(ti.Body.Inputs)),
+		MInputs:    make([]*tx.MultiSigOut, len(ti.Body.MultiSigIns)),
+		Outputs:    ti.Body.Outputs,
+		MOutputs:   ti.Body.MultiSigOuts,
 		Message:    hex.EncodeToString(ti.Body.Message),
 		MessageStr: string(ti.Body.Message),
 		Nonce:      ti.Body.Nonce,
@@ -183,29 +193,84 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		Parents:    ti.Body.Parent,
 	}
 	for i, inp := range ti.Body.Inputs {
-		prev, err := imesh.PreviousOutput(s, inp)
+		info.Inputs[i], err = imesh.PreviousOutput(s, inp)
 		if err != nil {
 			renderError(w, err.Error())
+			return
 		}
-		info.Inputs[i].Address = prev.Address.String()
-		info.Inputs[i].Amount = float64(prev.Value) / aklib.ADK
 	}
-	for i, out := range ti.Body.Outputs {
-		info.Inputs[i].Address = out.Address.String()
-		info.Inputs[i].Amount = float64(out.Value) / aklib.ADK
+	for i, inp := range ti.Body.MultiSigIns {
+		ti, err := imesh.GetTxInfo(s, inp.PreviousTX)
+		if err != nil {
+			renderError(w, err.Error())
+			return
+		}
+		info.MInputs[i] = ti.Body.MultiSigOuts[inp.Index]
 	}
-	err = tmpl.ExecuteTemplate(w, "tx.tpl", &info)
+	err = tmpl.ExecuteTemplate(w, "tx", &info)
 	if err != nil {
 		log.Print(err)
 	}
 }
 
 func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	id := q.Get("id")
+	_, _, err := address.ParseAddress58(id, s.Config)
+	if err != nil {
+		renderError(w, err.Error())
+		return
+	}
+	hist, err := imesh.GetHisoty(s, id, true)
+	if err != nil {
+		renderError(w, notFound)
+		return
+	}
+	log.Println(len(hist))
+	info := struct {
+		Address    string
+		Balance    uint64
+		UTXOs      []tx.Hash
+		MUTXOs     []tx.Hash
+		Inputs     []tx.Hash
+		MInputs    []tx.Hash
+		Ticketins  []tx.Hash
+		Ticketouts []tx.Hash
+	}{
+		Address: id,
+	}
+	for _, h := range hist {
+		switch h.Type {
+		case imesh.TypeIn:
+			info.Inputs = append(info.Inputs, h.Hash)
+		case imesh.TypeMulin:
+			info.MInputs = append(info.MInputs, h.Hash)
+		case imesh.TypeOut:
+			ti, err := imesh.GetTxInfo(s, h.Hash)
+			if err != nil {
+				renderError(w, err.Error())
+				return
+			}
+			info.Balance += ti.Body.Outputs[h.Index].Value
+			info.UTXOs = append(info.UTXOs, h.Hash)
+		case imesh.TypeMulout:
+			info.MUTXOs = append(info.MUTXOs, h.Hash)
+		case imesh.TypeTicketin:
+			info.Ticketins = append(info.Ticketins, h.Hash)
+		case imesh.TypeTicketout:
+			info.Ticketouts = append(info.Ticketouts, h.Hash)
+		}
+	}
+	err = tmpl.ExecuteTemplate(w, "address", &info)
+	if err != nil {
+		log.Print(err)
+	}
 }
 
 func renderError(w http.ResponseWriter, str string) {
 	log.Println(str)
-	err := tmpl.ExecuteTemplate(w, "err.tpl", str)
+	w.WriteHeader(http.StatusNotFound)
+	err := tmpl.ExecuteTemplate(w, "err", str)
 	if err != nil {
 		log.Print(err)
 	}

@@ -3,6 +3,11 @@ language: go
 go:
 - "1.10.x"
 
+env:
+  global:
+  - REPO_NAME: AidosKuneen
+  - REPO_DIR: github.com/AidosKuneen/aknode
+
 before_install:
 - go get -u github.com/alecthomas/gometalinter
 - go get -u github.com/mattn/goveralls
@@ -16,3 +21,48 @@ script:
 after_success:
 - gometalinter -e bindata --deadline=1000s ./...
 - goveralls -coverprofile=coverage.out -service=travis-ci
+- cd cmd/aknode
+- go get -u github.com/gobuffalo/packr/...
+- packr
+- echo "Bootstrapping linux/amd64..."
+- go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_amd64 -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
+- echo "Bootstrapping linux/386..."
+- env GOOS=linux GOARCH=386 go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_386 -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
+- echo "Bootstrapping linux/arm..."
+- env GOOS=linux GOARCH=arm GOARM=6 go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_arm  -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
+- echo "Bootstrapping windows/amd64..."
+- env GOOS=windows GOARCH=amd64 go build -o ${REPO_NAME}_${TRAVIS_TAG}_win_amd64.exe  -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
+- echo "Bootstrapping windows/386..."
+- env GOOS=windows GOARCH=386 go build -o ${REPO_NAME}_${TRAVIS_TAG}_win_386.exe -ldflags  "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
+- echo "Bootstrapping darwin/amd64..."
+- env GOOS=darwin GOARCH=amd64 go build -o ${REPO_NAME}_${TRAVIS_TAG}_darwin_amd64  -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
+- echo "Bootstrapping darwin/386..."
+- env  GOOS=darwin GOARCH=386 go build -o ${REPO_NAME}_${TRAVIS_TAG}_darwin_386 -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
+- ls
+- gzip ${REPO_NAME}_${TRAVIS_TAG}_linux_386
+- gzip ${REPO_NAME}_${TRAVIS_TAG}_linux_amd64
+- gzip ${REPO_NAME}_${TRAVIS_TAG}_linux_arm
+- zip ${REPO_NAME}_${TRAVIS_TAG}_win_amd64.exe.zip  ${REPO_NAME}_${TRAVIS_TAG}_win_amd64.exe
+- zip ${REPO_NAME}_${TRAVIS_TAG}_win_386.exe.zip  ${REPO_NAME}_${TRAVIS_TAG}_win_386.exe
+- zip ${REPO_NAME}_${TRAVIS_TAG}_darwin_amd64.zip  ${REPO_NAME}_${TRAVIS_TAG}_darwin_amd64
+- zip ${REPO_NAME}_${TRAVIS_TAG}_darwin_386.zip  ${REPO_NAME}_${TRAVIS_TAG}_darwin_386
+- ls
+- cd ..
+
+deploy:
+  provider: releases
+  api_key:
+    secure: ExhplKsPjn1GYsBUJwbH41kkd/iadB3lbC5zphCt8jiH2POMwclJ6fnAzpM9c88ogx/bSWn07b98z2l8ENozyhgjJPa6dLv7YtaPo+o5siJU23R0mJWvb9o59nyAGWeu4SoDxUK/chxuXQMmPZWyefdSKcrnPuoYfQmqSx3w2WlmKpj5D2hgZH6yvfcAFyIUGre+6ywOZfRGZ5XJ5x+7WmwEpOTPuRmz3T0UNThI7jzGByVVd2aigaJgp/7RfiFStgR3qjtPyl+Qb3YOHJEbIN+lWFjWNEfr7p4M7iwTbIqzJkwgVikBiNJFtE8YPwjYFUoltJf/Pvk1NJUj5H1dvr/HqFJXHmaPKu5IfdDsSMaxVUIFU8oBh2HJtpwaeJH4VmMOWQKbdrZDMzHylP9qpdL/BkTgPIJrN7hegHGgsF8mTPf2JNbiX8KEFKepGMWHF0JCScBYk+oRd22iXmI0JSyqFZKtj7rlKrqD99BgDJeGsCPJit/bg30jamkWZD9lzBiVCDf911ZygRR8ZYQn5jtIJpOsmM1WJTNtia1nCUra1ipY76naupjFPlBcA8AvkmSjaf/CbE4ddE1MGEIl96wHLodLWln8sU4CFQMX+C7zlW4nsO/oJfR9S+bLfDUC+x4nChjZ7FTwM/WCrwQUovkfN3CAzdXEZMIDKrenNo0=
+  file:
+     -  "$GOPATH/src/$REPO_DIR/${REPO_NAME}_${TRAVIS_TAG}_linux_386.gz"
+     -  "$GOPATH/src/$REPO_DIR/${REPO_NAME}_${TRAVIS_TAG}_linux_amd64.gz"
+     -  "$GOPATH/src/$REPO_DIR/${REPO_NAME}_${TRAVIS_TAG}_linux_arm.gz"
+     -  "$GOPATH/src/$REPO_DIR/${REPO_NAME}_${TRAVIS_TAG}_win_386.exe.zip"
+     -  "$GOPATH/src/$REPO_DIR/${REPO_NAME}_${TRAVIS_TAG}_win_amd64.exe.zip"
+     -  "$GOPATH/src/$REPO_DIR/${REPO_NAME}_${TRAVIS_TAG}_darwin_386.zip"
+     -  "$GOPATH/src/$REPO_DIR/${REPO_NAME}_${TRAVIS_TAG}_darwin_amd64.zip"
+  skip_cleanup: true
+  on:
+    repo: $REPO_NAME/$REPO_NAME
+    tags: true
+    all_branches: true

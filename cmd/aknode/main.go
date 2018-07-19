@@ -21,6 +21,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -41,6 +42,8 @@ import (
 	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/rpc"
 	"github.com/AidosKuneen/aknode/setting"
+	"github.com/blang/semver"
+	"github.com/rhysd/go-github-selfupdate/selfupdate"
 
 	"golang.org/x/crypto/ssh/terminal"
 
@@ -90,11 +93,18 @@ func main() {
 		os.Exit(1)
 	}
 	defaultpath := filepath.Join(usr.HomeDir, ".aknode", "aknode.json")
-	var verbose bool
+	var verbose, update bool
 	var fname string
 	flag.BoolVar(&verbose, "verbose", false, "outputs logs to stdout.")
+	flag.BoolVar(&update, "update", false, "check for update")
 	flag.StringVar(&fname, "config", defaultpath, "setting file path")
 	flag.Parse()
+
+	if update {
+		if err := selfUpdate(); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	f, err2 := ioutil.ReadFile(fname)
 	if err2 != nil {
@@ -185,5 +195,40 @@ func initialize(setting *setting.Setting) error {
 	if setting.RunFeeMiner || setting.RunTicketMiner {
 		node.RunMiner(setting)
 	}
+	return nil
+}
+
+func selfUpdate() error {
+	latest, found, err := selfupdate.DetectLatest("AidosKuneen/aknode")
+	if err != nil {
+		return err
+	}
+
+	v := semver.MustParse(setting.Version)
+	if !found || latest.Version.Equals(v) {
+		log.Println("Current version is the latest")
+		return nil
+	}
+
+	for ok := false; !ok; {
+		fmt.Print("Do you want to update to", latest.Version, "? (y/n): ")
+		input, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err != nil {
+			return err
+		}
+		switch input {
+		case "y\n":
+			ok = true
+		case "n\n":
+			return nil
+		default:
+			fmt.Println("Invalid input")
+		}
+	}
+
+	if err := selfupdate.UpdateTo(latest.AssetURL, os.Args[0]); err != nil {
+		return err
+	}
+	log.Println("Successfully updated to version", latest.Version)
 	return nil
 }
