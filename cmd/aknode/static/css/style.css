@@ -31,41 +31,38 @@
 }
 
 .confirmed{
-	font-size: 50px;
+	font-size: 40px;
 	background-color: #008800;
 	color: white;
 	font-weight: bold;
 	font-style: italic;
-	max-width: 100%;
  	margin: 0 auto;
-	padding: 10px;
+	padding: 5px;
 	border-radius: 5px;
   margin-top: 10px;
 }
 
 .rejected{
-	font-size: 50px;
+	font-size: 40px;
 	background-color: #880000;
 	color: white;
 	font-weight: bold;
 	font-style: italic;
-	max-width: 100%;
  	margin: 0 auto;
-	padding: 10px;
+	padding: 5px;
 	border-radius: 5px;
   margin-top: 10px;
 }
 
 .pending{
 	border: 1px solid #000000;
-	font-size: 50px;
-	/* background-color: #000088; */
-	/* color: white; */
+	font-size: 40px;
+	background-color: #000000;
+	color: white;
 	font-weight: bold;
 	font-style: italic;
-	max-width: 100%;
  	margin: 0 auto;
-	padding: 10px;
+	padding: 5px;
 	border-radius: 5px;
   margin-top: 10px;
 }
@@ -82,7 +79,11 @@
   margin-top: 10px;
 }  
 
+#nav-input:focus {
+	border-bottom: 1px solid #ffffff;
+	box-shadow: 0 1px 0 0 #ffffff;
+}
 #nav-input {
-	border-bottom: 1px solid #88FF88;
-	box-shadow: 0 1px 0 0 #88FF88;
+	border-bottom: 1px solid #888888;
+	box-shadow: 0 1px 0 0 #888888;
 }

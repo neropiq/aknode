@@ -6,7 +6,7 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0" />
-  <title>Starter Template - Materialize</title>
+  <title>Aidos Explorer</title>
 
   <!-- CSS  -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -15,7 +15,7 @@
 </head>
 
 <body class="">
-  <nav class="green darken-4" role="navigation">
+  <nav class="black" role="navigation">
     <div class="nav-wrapper container">
       <div class="hide-on-med-and-down">
         <a href="/" class="brand-logo">Aidos Explorer</a>
@@ -26,7 +26,7 @@
 <form action="/search" method="GET">
             <div class="input-field black-text">
               <i class="white-text material-icons prefix">search</i>
-              <input type="text" name="id" class="white-text">
+              <input id="nav-input" type="text" name="id" class="white-text">
             </div>
 </form>
           </div>

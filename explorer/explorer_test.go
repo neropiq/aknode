@@ -128,13 +128,15 @@ func TestExploere(t *testing.T) {
 	}
 
 	adr2val := make(map[string]uint64)
+	addrs := make([]*address.Address, 3)
 	for i := 0; i < 3; i++ {
 		seed := address.GenerateSeed()
-		a2, err2 := address.New(address.Height10, seed, s.Config)
+		var err2 error
+		addrs[i], err2 = address.New(address.Height10, seed, s.Config)
 		if err2 != nil {
 			t.Error(err2)
 		}
-		adr2val[a2.Address58()] = uint64(rand.R.Int31())
+		adr2val[addrs[i].Address58()] = uint64(rand.R.Int31())
 	}
 	h := genesis
 	var remain uint64 = aklib.ADKSupply
@@ -167,6 +169,65 @@ func TestExploere(t *testing.T) {
 		h = tr.Hash()
 		log.Println(h)
 	}
+
+	tr = tx.New(s.Config, genesis, h)
+	tr.AddInput(h, 0)
+	remain -= 10
+	if err := tr.AddOutput(s.Config, a.Address58(), remain); err != nil {
+		t.Error(err)
+	}
+	if err := tr.AddOutput(s.Config, adrs, 1); err != nil {
+		t.Error(err)
+	}
+	if err := tr.AddMultisigOut(s.Config, 2, 9,
+		addrs[0].Address58(), addrs[1].Address58(), addrs[2].Address58()); err != nil {
+		t.Error(err)
+	}
+	if err := tr.Sign(a); err != nil {
+		t.Error(err)
+	}
+	if err := tr.PoW(); err != nil {
+		t.Error(err)
+	}
+	if err := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
+		t.Fatal(err)
+	}
+	h = tr.Hash()
+	log.Println(h)
+
+	tr = tx.New(s.Config, genesis, h)
+	tr.AddInput(h, 0)
+	tr.AddMultisigIn(h, 0)
+	remain += 9
+	remain -= 10
+	if err := tr.AddOutput(s.Config, a.Address58(), remain); err != nil {
+		t.Error(err)
+	}
+	if err := tr.AddOutput(s.Config, adrs, 1); err != nil {
+		t.Error(err)
+	}
+	if err := tr.AddMultisigOut(s.Config, 2, 9,
+		addrs[0].Address58(), addrs[1].Address58(), addrs[2].Address58()); err != nil {
+		t.Error(err)
+	}
+	if err := tr.Sign(a); err != nil {
+		t.Error(err)
+	}
+	if err := tr.Sign(addrs[0]); err != nil {
+		t.Error(err)
+	}
+	if err := tr.Sign(addrs[1]); err != nil {
+		t.Error(err)
+	}
+	if err := tr.PoW(); err != nil {
+		t.Error(err)
+	}
+	if err := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
+		t.Fatal(err)
+	}
+	h = tr.Hash()
+	log.Println(h)
+
 	node.Resolve()
 	time.Sleep(6 * time.Second)
 
@@ -191,5 +252,5 @@ func TestExploere(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatal("should be OK", tr.Hash())
 	}
-	time.Sleep(1000 * time.Hour)
+	// time.Sleep(1000 * time.Hour)
 }

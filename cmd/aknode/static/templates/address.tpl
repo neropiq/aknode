@@ -5,6 +5,7 @@
     <div class="section">
       <div class="center">
         <h4>Address</h4>
+        <img src="/qrcode?id={{.Address}}">
         <a class="truncate" href="/address?id={{.Address}}">{{.Address}}</a>
         <a class="balance">Balance: {{toADK .Balance}} ADK</a>
       </div>
@@ -37,7 +38,7 @@
             </li>
 
             <li>
-                <div class="collapsible-header">Remittance History</div>
+                <div class="collapsible-header">Spent Inputs</div>
                 <div class="collapsible-body">
 			{{range .Inputs}}
                 <div class="row">
@@ -49,7 +50,7 @@
                 </div>
               </li>
             <li>
-                <div class="collapsible-header">Remittance History(Multisig)</div>
+                <div class="collapsible-header">Spent Inputs(Multisig)</div>
                 <div class="collapsible-body">
 			{{range .MInputs}}
                 <div class="row">
@@ -74,7 +75,7 @@
               </li>
 
           <li>
-                <div class="collapsible-header">Ticketin</div>
+                <div class="collapsible-header">Spent Ticket Inputs</div>
                 <div class="collapsible-body">
 			{{range .Ticketins}}
                 <div class="row">

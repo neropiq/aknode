@@ -5,20 +5,22 @@
     <div class="section">
       <div class="center">
         <h4>Transaction</h4>
-        <a class="truncate" href="/tx?hash={{.TXID}}">{{.TXID}}</a>
-        <div>Created on {{.Created.UTC.String}}</div>
-        <div>Received on {{.Received.UTC.String}}</div>
+        <a class="truncate" href="/tx?id={{.TXID}}">{{.TXID}}</a>
+        <div>Created : {{tformat .Created.UTC}} / Received : {{tformat .Received.UTC}}</div>
+
+        <div class="row">
 {{if eq .Status 0xff}}
-        <div class="rejected">Rejected</div>
+        <div class="rejected col s12 m6 offset-m3">Rejected</div>
 {{end}}
 {{if eq .Status 0x01}}
-        <div class="confirmed">Confirmed</div>
+        <div class="confirmed col s12 m6 offset-m3">Confirmed</div>
 {{end}}
 {{if eq .Status 0x00}}
-        <div class="pending">Pending</div>
+        <div class="pending col s12 m6 offset-m3">Pending</div>
 {{end}}
+        </div>
         <div class="row">
-          <div class="col s12 m5">
+          <div class="col s12 m6">
 {{if ne (len .Inputs) 0}}
             <h5>Inputs</h5>
 {{range .Inputs}}
@@ -30,31 +32,32 @@
 {{end}}
 {{if ne (len .MInputs) 0}}
             <h5>Multisig Inputs</h5>
+{{$root:=.}}
 {{range .MInputs}}
             <div class="tx small-address truncate">
-              {{.N}} out of {{len .Address}}
+              {{.N}} out of {{len .Addresses}}
               <br>
-			{{range .Address}}
-			{{if .HasSign}}
+			{{range .Addresses}}
+			{{if (index $root.Signs .String)}}
               <i class="red-text text-lighten-2 material-icons prefix">check</i>
 			{{end}}
-              <a href="/address?id={{.Address.String}}">{{.Address.String}}</a>
+              <a href="/address?id={{.String}}">{{.String}}</a>
               <br>
 			{{end}}
-             <span class="right amount">{{.Value}} ADK</span>
+             <span class="right amount">{{toADK .Value}} ADK</span>
             </div>
 {{end}}
 {{end}}
           </div>
-
+<!--
           <div class="col s1">
             <h5></h5>
             <div class="">
               <i class="material-icons center-align valign-wrapper">arrow_forward</i>
             </div>
           </div>
-
-          <div class="col s12 m5">
+-->
+          <div class="col s12 m6">
 {{if ne (len .Outputs) 0}}
             <h5>Outputs</h5>
 {{range .Outputs}}
@@ -68,10 +71,11 @@
             <h5>Multisig Outputs</h5>
 {{range .MOutputs}}
             <div class="tx small-address truncate">
-              {{.N}} out of {{len .Address}}
+              {{.N}} out of {{len .Addresses}}
               <br>
-{{range .Address}}
-              <a href="/address?id={{.String}}">{{.Address.String}}</a>
+{{range .Addresses}}
+              <a href="/address?id={{.String}}">{{.String}}</a>
+               <br>
 {{end}}
              <span class="right amount">{{toADK .Value}} ADK</span>
             </div>
@@ -120,23 +124,6 @@
             <p class="truncate">("{{.MessageStr}}")</p>
           </div>
         </li>
-        <li>
-            <div class="collapsible-header">
-            Nonce
-          </div>
-          <div class="collapsible-body">
-{{range .Nonce}}
-            <div>{{.}}<br/></div>
-{{end}}
-          </div>
-        <li>
-          <div class="collapsible-header">
-            GNonce
-          </div>
-          <div class="collapsible-body">
-            <p class="truncate">{{.GNonce}}</p>
-          </div>
-          </li>
           <li>
           <div class="collapsible-header">
             Locktime

@@ -37,8 +37,11 @@ import (
 	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/setting"
 	"github.com/alecthomas/template"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 
 	"github.com/gobuffalo/packr"
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 const (
@@ -59,7 +62,8 @@ func Run(setting *setting.Setting) {
 	}
 	funcMap := template.FuncMap{
 		"toADK": func(amount uint64) string {
-			return fmt.Sprintf("%.f", float64(amount)/aklib.ADK)
+			p := message.NewPrinter(language.English)
+			return p.Sprintf("%.8f", float64(amount)/aklib.ADK)
 		},
 		"tformat": func(t time.Time) string {
 			return t.Format("2006-01-02 15:04:05 MST")
@@ -93,6 +97,9 @@ func Run(setting *setting.Setting) {
 	mux.HandleFunc("/address/", func(w http.ResponseWriter, r *http.Request) {
 		addressHandle(setting, w, r)
 	})
+	mux.HandleFunc("/qrcode/", func(w http.ResponseWriter, r *http.Request) {
+		qrHandle(setting, w, r)
+	})
 	for _, stat := range []string{"image", "css", "js"} {
 		box := packr.NewBox(filepath.Join(wwwPath, stat))
 		mux.Handle("/"+stat+"/", http.StripPrefix("/"+stat+"/", http.FileServer(box)))
@@ -110,6 +117,23 @@ func Run(setting *setting.Setting) {
 	go func() {
 		log.Println(s.ListenAndServe())
 	}()
+}
+
+func qrHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	id := q.Get("id")
+	_, _, err := address.ParseAddress58(id, s.Config)
+	if err != nil {
+		renderError(w, "invalid address")
+		return
+	}
+	qr, err := qrcode.New(id, qrcode.High)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := qr.Write(256, w); err != nil {
+		log.Fatal(err)
+	}
 }
 
 //Handle handles api calls.
@@ -132,7 +156,7 @@ func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 
 	err := tmpl.ExecuteTemplate(w, "index", &info)
 	if err != nil {
-		log.Print(err)
+		renderError(w, err.Error())
 	}
 }
 
@@ -166,6 +190,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		Status       imesh.TxStatus
 		Inputs       []*tx.Output
 		MInputs      []*tx.MultiSigOut
+		Signs        map[string]bool
 		Outputs      []*tx.Output
 		MOutputs     []*tx.MultiSigOut
 		TicketInput  string
@@ -183,6 +208,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		Status:     ti.Status,
 		Inputs:     make([]*tx.Output, len(ti.Body.Inputs)),
 		MInputs:    make([]*tx.MultiSigOut, len(ti.Body.MultiSigIns)),
+		Signs:      make(map[string]bool),
 		Outputs:    ti.Body.Outputs,
 		MOutputs:   ti.Body.MultiSigOuts,
 		Message:    hex.EncodeToString(ti.Body.Message),
@@ -207,9 +233,24 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		}
 		info.MInputs[i] = ti.Body.MultiSigOuts[inp.Index]
 	}
+	if len(ti.Body.MultiSigIns) != 0 {
+		tr, err := imesh.GetTx(s, txid)
+		if err != nil {
+			renderError(w, err.Error())
+			return
+		}
+		for _, sig := range tr.Signatures {
+			sigadr, err := sig.Address(s.Config)
+			if err != nil {
+				renderError(w, err.Error())
+				return
+			}
+			info.Signs[address.To58(sigadr)] = true
+		}
+	}
 	err = tmpl.ExecuteTemplate(w, "tx", &info)
 	if err != nil {
-		log.Print(err)
+		renderError(w, err.Error())
 	}
 }
 
@@ -226,7 +267,6 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		renderError(w, notFound)
 		return
 	}
-	log.Println(len(hist))
 	info := struct {
 		Address    string
 		Balance    uint64
@@ -263,7 +303,7 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	}
 	err = tmpl.ExecuteTemplate(w, "address", &info)
 	if err != nil {
-		log.Print(err)
+		renderError(w, err.Error())
 	}
 }
 
