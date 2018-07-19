@@ -11,7 +11,7 @@ including:
 
 * Messaging between nodes (Testing)
 * Consensus / Validator (Not Yet)
-* Aidos Explorer (Not Yet)
+* Aidos Explorer (Testing)
 * RPC APIs with Wallet Service (Testing)
 
 
