@@ -21,7 +21,6 @@
 package rpc
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -30,20 +29,14 @@ import (
 )
 
 func walletpassphrase(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
+	var pwd string
+	var sec uint
+	n, err := req.parseParam(&pwd, &sec)
+	if err != nil {
+		return err
 	}
-	if len(data) != 2 {
-		return errors.New("invalid param length")
-	}
-	pwd, ok := data[0].(string)
-	if !ok {
-		return errors.New("invalid password")
-	}
-	sec, ok := data[1].(uint)
-	if !ok {
-		return errors.New("invalid time")
+	if n != 2 {
+		return errors.New("invalid #params")
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -70,44 +63,22 @@ func walletlock(conf *setting.Setting, req *Request, res *Response) error {
 }
 
 func sendmany(conf *setting.Setting, req *Request, res *Response) error {
+	var acc string
+	target := map[string]float64{}
+	n, err := req.parseParam(&acc, &target)
+	if err != nil {
+		return err
+	}
+	if n < 2 || n > 5 {
+		return errors.New("invalid param length")
+	}
 	mutex.Lock()
 	defer mutex.Unlock()
 	if wallet.Secret.pwd == nil {
 		return errors.New("not priviledged")
 	}
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
-	}
-	if len(data) < 2 || len(data) > 5 {
-		return errors.New("invalid param length")
-	}
-	acc, ok := data[0].(string)
-	if !ok {
-		return errors.New("invalid account")
-	}
-	target := make(map[string]float64)
-	switch data[1].(type) {
-	case string:
-		t := data[1].(string)
-		if err := json.Unmarshal([]byte(t), &target); err != nil {
-			return err
-		}
-	case map[string]interface{}:
-		t := data[1].(map[string]interface{})
-		for k, v := range t {
-			f, ok := v.(float64)
-			if !ok {
-				return errors.New("param must be a  map string")
-			}
-			target[k] = f
-		}
-	default:
-		return errors.New("param must be a  map string")
-	}
 	trs := make([]output, len(target))
 	i := 0
-	var err error
 	for k, v := range target {
 		trs[i].address = k
 		trs[i].value = uint64(v * aklib.ADK)
@@ -118,30 +89,19 @@ func sendmany(conf *setting.Setting, req *Request, res *Response) error {
 }
 
 func sendfrom(conf *setting.Setting, req *Request, res *Response) error {
-	var err error
+	var acc, adrstr string
+	var value float64
+	n, err := req.parseParam(&acc, &adrstr, &value)
+	if err != nil {
+		return err
+	}
+	if n < 3 || n > 6 {
+		return errors.New("invalid param length")
+	}
 	mutex.Lock()
 	defer mutex.Unlock()
 	if wallet.Secret.pwd == nil {
 		return errors.New("not priviledged")
-	}
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
-	}
-	if len(data) < 3 || len(data) > 6 {
-		return errors.New("invalid params")
-	}
-	acc, ok := data[0].(string)
-	if !ok {
-		return errors.New("invalid account")
-	}
-	adrstr, ok := data[1].(string)
-	if !ok {
-		return errors.New("invalid address")
-	}
-	value, ok := data[2].(float64)
-	if !ok {
-		return errors.New("invalid value")
 	}
 	res.Result, err = Send(conf, acc, []byte(conf.RPCTxTag), output{
 		address: adrstr,
@@ -151,26 +111,20 @@ func sendfrom(conf *setting.Setting, req *Request, res *Response) error {
 }
 
 func sendtoaddress(conf *setting.Setting, req *Request, res *Response) error {
-	var err error
+	var adrstr string
+	var value float64
+	n, err := req.parseParam(&adrstr, &value)
+	if err != nil {
+		return err
+	}
+	if n > 5 || n < 2 {
+		return errors.New("invalid param length")
+	}
+
 	mutex.Lock()
 	defer mutex.Unlock()
 	if wallet.Secret.pwd == nil {
 		return errors.New("not priviledged")
-	}
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
-	}
-	if len(data) > 5 || len(data) < 2 {
-		return errors.New("invalid params")
-	}
-	adrstr, ok := data[0].(string)
-	if !ok {
-		return errors.New("invalid address")
-	}
-	value, ok := data[1].(float64)
-	if !ok {
-		return errors.New("invalid value")
 	}
 	res.Result, err = Send(conf, "*", []byte(conf.RPCTxTag), output{
 		address: adrstr,

@@ -22,6 +22,7 @@ package rpc
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -131,13 +132,13 @@ func TestWalletAPI(t *testing.T) {
 		}
 	}
 	h := genesis
-	var remain uint64 = aklib.ADKSupply
-	var tss []*transaction
+	var remain = aklib.ADKSupply
+	var tss []*Transaction
 	var tr *tx.Transaction
 	var preadr string
 	var prev uint64
 	var amount int64
-	ac2ts := make(map[string][]*transaction)
+	ac2ts := make(map[string][]*Transaction)
 	for adr, v := range adr2val {
 		amount = 0
 		ac := adr2ac[adr]
@@ -184,7 +185,7 @@ func TestWalletAPI(t *testing.T) {
 			t.Fatal(preadr, err)
 		}
 
-		ts := &transaction{
+		ts := &Transaction{
 			Account: &ac,
 			Address: adr,
 			Amount:  float64(v) / aklib.ADK,
@@ -197,7 +198,7 @@ func TestWalletAPI(t *testing.T) {
 		ac2ts[ac] = append(ac2ts[ac], ts)
 		if preadr != "" {
 			preac := adr2ac[preadr]
-			ts := &transaction{
+			ts := &Transaction{
 				Account: &preac,
 				Address: preadr,
 				Amount:  float64(prev/2) / aklib.ADK,
@@ -209,7 +210,7 @@ func TestWalletAPI(t *testing.T) {
 			amount += int64(prev / 2)
 			t.Log(tr.Hash(), prev/2)
 
-			ts = &transaction{
+			ts = &Transaction{
 				Account: &preac,
 				Address: preadr,
 				Amount:  -float64(prev) / aklib.ADK,
@@ -264,7 +265,12 @@ func testgetaccount(t *testing.T, adr, ac string) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getaccount",
-		Params:  []interface{}{adr},
+	}
+	params := []interface{}{adr}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	if err := getaccount(&s, req, &resp); err != nil {
@@ -287,7 +293,6 @@ func testlistaddressgroupings(t *testing.T, adr2ac map[string]string, adr2val ma
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listaddressgroupings",
-		Params:  []interface{}{},
 	}
 	var resp Response
 	if err := listaddressgroupings(&s, req, &resp); err != nil {
@@ -340,7 +345,12 @@ func testvalidateaddress2(t *testing.T, adr, ac string) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "validateaddress",
-		Params:  []interface{}{adr},
+	}
+	params := []interface{}{adr}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	if err := validateaddress(&s, req, &resp); err != nil {
@@ -349,7 +359,7 @@ func testvalidateaddress2(t *testing.T, adr, ac string) {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	result, ok := resp.Result.(*info)
+	result, ok := resp.Result.(*Info)
 	if !ok {
 		t.Error("result must be info struct")
 	}
@@ -377,7 +387,12 @@ func testvalidateaddress1(t *testing.T, adr string, isValid bool) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "validateaddress",
-		Params:  []interface{}{adr},
+	}
+	params := []interface{}{adr}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	if err := validateaddress(&s, req, &resp); err != nil {
@@ -386,7 +401,7 @@ func testvalidateaddress1(t *testing.T, adr string, isValid bool) {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	result, ok := resp.Result.(*info)
+	result, ok := resp.Result.(*Info)
 	if !ok {
 		t.Error("result must be info struct")
 	}
@@ -414,7 +429,12 @@ func testgettransaction(t *testing.T, adr2ac map[string]string, tr *tx.Transacti
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "gettransaction",
-		Params:  []interface{}{tr.Hash().String()},
+	}
+	params := []interface{}{tr.Hash().String()}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	if err := gettransaction(&s, req, &resp); err != nil {
@@ -423,7 +443,7 @@ func testgettransaction(t *testing.T, adr2ac map[string]string, tr *tx.Transacti
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	tx, ok := resp.Result.(*gettx)
+	tx, ok := resp.Result.(*Gettx)
 	if !ok {
 		t.Error("result must be tx")
 	}
@@ -533,7 +553,12 @@ func testgetbalance(t *testing.T, ac string, ac2val map[string]uint64) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getbalance",
-		Params:  []interface{}{ac},
+	}
+	params := []interface{}{ac}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 
 	var resp Response
@@ -557,7 +582,6 @@ func testgetbalance2(t *testing.T, ac2val map[string]uint64) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getbalance",
-		Params:  []interface{}{},
 	}
 
 	var resp Response
@@ -580,7 +604,7 @@ func testgetbalance2(t *testing.T, ac2val map[string]uint64) {
 	}
 }
 
-func testlisttransactions(t *testing.T, ac string, hashes []*transaction, isConf bool) {
+func testlisttransactions(t *testing.T, ac string, hashes []*Transaction, isConf bool) {
 	skip := 1
 	count := 2
 
@@ -588,7 +612,12 @@ func testlisttransactions(t *testing.T, ac string, hashes []*transaction, isConf
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listtransactions",
-		Params:  []interface{}{ac, float64(count), float64(skip)},
+	}
+	params := []interface{}{ac, float64(count), float64(skip)}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 
 	var resp Response
@@ -598,7 +627,7 @@ func testlisttransactions(t *testing.T, ac string, hashes []*transaction, isConf
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	result, ok := resp.Result.([]*transaction)
+	result, ok := resp.Result.([]*Transaction)
 	if !ok {
 		t.Error("result must be transaction struct")
 	}
@@ -672,12 +701,17 @@ func testlisttransactions(t *testing.T, ac string, hashes []*transaction, isConf
 	}
 }
 
-func testlisttransactions2(t *testing.T, isConf bool, adr2ac map[string]string, txs []*transaction) {
+func testlisttransactions2(t *testing.T, isConf bool, adr2ac map[string]string, txs []*Transaction) {
 	req := &Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listtransactions",
-		Params:  []interface{}{"*", 100.0},
+	}
+	params := []interface{}{"*", 100.0}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 
 	var resp Response
@@ -687,7 +721,7 @@ func testlisttransactions2(t *testing.T, isConf bool, adr2ac map[string]string, 
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	result, ok := resp.Result.([]*transaction)
+	result, ok := resp.Result.([]*Transaction)
 	if !ok {
 		t.Error("result must be transaction struct")
 	}
@@ -769,7 +803,6 @@ func testListAccounts(t *testing.T, ac2val map[string]uint64, acc ...string) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listaccounts",
-		Params:  []interface{}{},
 	}
 	var resp Response
 	if err := listaccounts(&s, req, &resp); err != nil {
@@ -798,11 +831,16 @@ func newAddress(t *testing.T, ac string) []string {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getnewaddress",
-		Params:  []interface{}{ac},
+		Params:  json.RawMessage{},
 	}
 	//test for default
-	if ac == "" {
-		req.Params = []interface{}{}
+	if ac != "" {
+		params := []interface{}{ac}
+		var err error
+		req.Params, err = json.Marshal(params)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 	var resp Response
 	for i := range adrs {

@@ -22,6 +22,7 @@ package rpc
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -89,11 +90,17 @@ func TestSendAPI(t *testing.T) {
 	}
 	node.Resolve()
 	time.Sleep(6 * time.Second)
-	err := sendmany(&s, &Request{
-		Params: []interface{}{
-			"ac1", `{"` + ac2adr[""][0] + `": 0.1}`},
-	}, nil)
-
+	params := []interface{}{
+		"ac1",
+		map[string]float64{
+			ac2adr[""][0]: 0.1,
+		},
+	}
+	reqParams, err := json.Marshal(params)
+	if err != nil {
+		t.Error(err)
+	}
+	err = sendmany(&s, &Request{Params: reqParams}, nil)
 	if err.Error() != "not priviledged" {
 		t.Error("should be error", err)
 	}
@@ -123,12 +130,11 @@ func TestSendAPI(t *testing.T) {
 	time.Sleep(5 * time.Second) //wait for finishing walletnotify
 }
 
-func testgetnodeinfo(t *testing.T) *nodeInfo {
+func testgetnodeinfo(t *testing.T) *NodeInfo {
 	req := &Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getrawtx",
-		Params:  []interface{}{},
 	}
 	var resp Response
 	if err := getnodeinfo(&s, req, &resp); err != nil {
@@ -137,8 +143,7 @@ func testgetnodeinfo(t *testing.T) *nodeInfo {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	t.Log(resp.Result)
-	result, ok := resp.Result.(*nodeInfo)
+	result, ok := resp.Result.(*NodeInfo)
 	if !ok {
 		t.Error("result must be slice")
 	}
@@ -273,7 +278,12 @@ func testwalletpassphrase1(pwd string, t float64) error {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "walletpassphrase",
-		Params:  []interface{}{pwd, t},
+	}
+	params := []interface{}{pwd, t}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		return err
 	}
 	var resp Response
 	return walletpassphrase(&s, req, &resp)
@@ -284,7 +294,12 @@ func testwalletpassphrase2(t *testing.T, pwd string) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "walletpassphrase",
-		Params:  []interface{}{pwd, uint(6000)},
+	}
+	params := []interface{}{pwd, uint(6000)}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	if err := walletpassphrase(&s, req, &resp); err != nil {
@@ -303,10 +318,17 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "sendmany",
-		Params: []interface{}{"ac1",
-			`{"` + adr1 + `": 0.2,` +
-				`"` + adr2 + `": 0.3}`,
+	}
+	params := []interface{}{"ac1",
+		map[string]float64{
+			adr1: 0.2,
+			adr2: 0.3,
 		},
+	}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	utxo0, _, err := getAllUTXOs(&s, false)
@@ -350,7 +372,12 @@ func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "sendtoaddress",
-		Params:  []interface{}{adr1, v},
+	}
+	params := []interface{}{adr1, v}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	utxo0, _, err := getAllUTXOs(&s, false)
@@ -386,7 +413,12 @@ func testsendfrom(t *testing.T, adr1 string, adr2ac map[string]string) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "sendfrom",
-		Params:  []interface{}{"ac1", adr1, 0.2},
+	}
+	params := []interface{}{"ac1", adr1, 0.2}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	utxo0, _, err := getAllUTXOs(&s, false)

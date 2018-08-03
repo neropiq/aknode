@@ -23,6 +23,7 @@ package rpc
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -81,7 +82,13 @@ func testgettxsstatus(t *testing.T, h tx.Hash, isConf bool) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "gettxsstatus",
-		Params:  []interface{}{genesis.String(), h.String(), inva.String()},
+		Params:  json.RawMessage{},
+	}
+	params := []interface{}{genesis.String(), h.String(), inva.String()}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	if err := gettxsstatus(&s, req, &resp); err != nil {
@@ -117,7 +124,12 @@ func testgethist(t *testing.T, h tx.Hash) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getlasthistory",
-		Params:  []interface{}{a.Address58()},
+	}
+	params := []interface{}{a.Address58()}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	if err := getlasthistory(&s, req, &resp); err != nil {
@@ -127,7 +139,7 @@ func testgethist(t *testing.T, h tx.Hash) {
 		t.Error(resp.Error)
 	}
 	t.Log(resp.Result)
-	is, ok := resp.Result.([]*inoutHash)
+	is, ok := resp.Result.([]*InoutHash)
 	if !ok {
 		t.Error("invalid return")
 	}
@@ -161,7 +173,6 @@ func testgetleaves(t *testing.T, l tx.Hash) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getleaves",
-		Params:  []interface{}{},
 	}
 	var resp Response
 	if err := getleaves(&s, req, &resp); err != nil {
@@ -193,8 +204,14 @@ func testsendrawtx(t *testing.T, tr *tx.Transaction, typ tx.Type) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "sendrawtx",
-		Params:  []interface{}{dat, typ},
 	}
+	params := []interface{}{dat, typ}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
+	}
+
 	var resp Response
 	if err := sendrawtx(&s, req, &resp); err != nil {
 		t.Error(err, typ)
@@ -221,7 +238,12 @@ func testgetrawtx(t *testing.T, format bool) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getrawtx",
-		Params:  []interface{}{hex.EncodeToString(genesis), format},
+	}
+	params := []interface{}{hex.EncodeToString(genesis), format}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	if err := getrawtx(&s, req, &resp); err != nil {
@@ -230,7 +252,6 @@ func testgetrawtx(t *testing.T, format bool) {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	t.Log(resp.Result)
 	var tr tx.Transaction
 	if !format {
 		dat, ok := resp.Result.([]byte)
@@ -257,7 +278,12 @@ func testgetfeetx(t *testing.T, min float64, h tx.Hash) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getminabletx",
-		Params:  []interface{}{min},
+	}
+	params := []interface{}{min}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	if err := getminabletx(&s, req, &resp); err != nil {
@@ -290,7 +316,12 @@ func testgettickettx(t *testing.T, h tx.Hash) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getminabletx",
-		Params:  []interface{}{"ticket"},
+	}
+	params := []interface{}{"ticket"}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	if err := getminabletx(&s, req, &resp); err != nil {

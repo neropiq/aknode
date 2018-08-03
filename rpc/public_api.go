@@ -22,6 +22,7 @@ package rpc
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"log"
 	"time"
@@ -39,26 +40,14 @@ import (
 )
 
 func sendrawtx(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
-	}
 	var txent []byte
 	typ := tx.TypeNormal
-	switch len(data) {
-	case 2:
-		typ, ok = data[1].(tx.Type)
-		if !ok {
-			return errors.New("invalid type")
-		}
-		fallthrough
-	case 1:
-		txent, ok = data[0].([]byte)
-		if !ok {
-			return errors.New("invalid txid")
-		}
-	default:
-		return errors.New("invalid params")
+	n, err := req.parseParam(&txent, &typ)
+	if err != nil {
+		return err
+	}
+	if n != 1 && n != 2 {
+		return errors.New("invalid #params")
 	}
 	if typ == tx.TypeNotPoWed && !conf.RPCAllowPublicPoW {
 		return errors.New("PoW is not allowed")
@@ -85,7 +74,8 @@ func sendrawtx(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-type nodeInfo struct {
+//NodeInfo is a struct for getnodeinfo RPC.
+type NodeInfo struct {
 	Version         string  `json:"version"`
 	ProtocolVersion int     `json:"protocolversion"`
 	WalletVersion   int     `json:"walletversion"`
@@ -115,7 +105,7 @@ func getnodeinfo(conf *setting.Setting, req *Request, res *Response) error {
 		}
 		bal = &total
 	}
-	res.Result = &nodeInfo{
+	res.Result = &NodeInfo{
 		Version:         setting.Version,
 		ProtocolVersion: msg.MessageVersion,
 		WalletVersion:   walletVersion,
@@ -132,21 +122,13 @@ func getnodeinfo(conf *setting.Setting, req *Request, res *Response) error {
 }
 
 func getleaves(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
+	num := tx.DefaultPreviousSize
+	n, err := req.parseParam(&num)
+	if err != nil {
+		return err
 	}
-	num := 0
-	switch len(data) {
-	case 1:
-		num, ok = data[0].(int)
-		if !ok {
-			return errors.New("invalid txid")
-		}
-	case 0:
-		num = tx.DefaultPreviousSize
-	default:
-		return errors.New("invalid params")
+	if n != 1 && n != 0 {
+		return errors.New("invalid #params")
 	}
 	ls := leaves.Get(num)
 	hls := make([]string, len(ls))
@@ -157,34 +139,29 @@ func getleaves(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-type inoutHash struct {
+//InoutHash is a struct for getlasthistory RPC.
+type InoutHash struct {
 	Hash  string              `json:"hash"`
 	Type  imesh.InOutHashType `json:"type"`
 	Index byte                `json:"index"`
 }
 
 func getlasthistory(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
-	}
 	adr := ""
-	switch len(data) {
-	case 1:
-		adr, ok = data[0].(string)
-		if !ok {
-			return errors.New("invalid txid")
-		}
-	default:
-		return errors.New("invalid params")
+	n, err := req.parseParam(&adr)
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return errors.New("invalid #params")
 	}
 	ihs, err := imesh.GetHisoty(conf, adr, true)
 	if err != nil {
 		return err
 	}
-	r := make([]*inoutHash, len(ihs))
+	r := make([]*InoutHash, len(ihs))
 	for i, ih := range ihs {
-		r[i] = &inoutHash{
+		r[i] = &InoutHash{
 			Hash:  ih.Hash.String(),
 			Type:  ih.Type,
 			Index: ih.Index,
@@ -194,26 +171,14 @@ func getlasthistory(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 func getrawtx(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
-	}
 	txid := ""
-	format := false
-	switch len(data) {
-	case 2:
-		format, ok = data[1].(bool)
-		if !ok {
-			return errors.New("invalid format")
-		}
-		fallthrough
-	case 1:
-		txid, ok = data[0].(string)
-		if !ok {
-			return errors.New("invalid txid")
-		}
-	default:
-		return errors.New("invalid params")
+	jsonformat := false
+	n, err := req.parseParam(&txid, &jsonformat)
+	if err != nil {
+		return err
+	}
+	if n != 1 && n != 2 {
+		return errors.New("invalid #params")
 	}
 	id, err := hex.DecodeString(txid)
 	if err != nil {
@@ -223,7 +188,7 @@ func getrawtx(conf *setting.Setting, req *Request, res *Response) error {
 	if err != nil {
 		return err
 	}
-	if !format {
+	if !jsonformat {
 		res.Result = arypack.Marshal(tr)
 		return nil
 	}
@@ -232,29 +197,29 @@ func getrawtx(conf *setting.Setting, req *Request, res *Response) error {
 }
 
 func getminabletx(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
+	var v interface{}
+	n, err := req.parseParam(&v)
+	if err != nil {
+		return err
 	}
+	if n != 1 {
+		return errors.New("invalid #params")
+	}
+
 	typ := tx.TypeRewardFee
+	jsonformat := false
 	min := 0.0
-	switch len(data) {
-	case 1:
-		switch v := data[0].(type) {
-		case string:
-			if v != "ticket" {
-				return errors.New("invalid type")
-			}
-			typ = tx.TypeRewardTicket
-		case float64:
-			min = v
-		default:
+	switch v := v.(type) {
+	case string:
+		if v != "ticket" {
 			return errors.New("invalid type")
 		}
+		typ = tx.TypeRewardTicket
+	case float64:
+		min = v
 	default:
-		return errors.New("invalid params")
+		return errors.New("invalid type")
 	}
-	var err error
 	var tr *tx.Transaction
 	if typ == tx.TypeRewardTicket {
 		tr, err = imesh.GetRandomTicketTx(conf)
@@ -267,29 +232,32 @@ func getminabletx(conf *setting.Setting, req *Request, res *Response) error {
 			return err
 		}
 	}
-	res.Result = arypack.Marshal(tr)
+	if !jsonformat {
+		res.Result = arypack.Marshal(tr)
+	} else {
+		res.Result = tr
+	}
 	return nil
 }
 
 func gettxsstatus(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
+	if len(req.Params) == 0 {
+		return errors.New("must specify txid")
+	}
+	var data []string
+	if err := json.Unmarshal(req.Params, &data); err != nil {
+		return err
+	}
+	if len(data) == 0 {
+		return errors.New("need txids")
 	}
 	if len(data) > 50 {
 		return errors.New("array is too big")
 	}
 	r := make([]int, 0, len(data))
-	for _, dat := range data {
-		txid, ok := dat.(string)
-		if !ok {
-			return errors.New("invalid txid")
-		}
+	for _, txid := range data {
 		tid, err := hex.DecodeString(txid)
-		if !ok {
-			return errors.New("invalid txid")
-		}
-		ok, err = imesh.Has(conf, tid)
+		ok, err := imesh.Has(conf, tid)
 		if err != nil {
 			return err
 		}

@@ -39,22 +39,14 @@ var mutex sync.RWMutex
 const nConfirm = 100000
 
 func getnewaddress(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
+	var acc string
+	n, err := req.parseParam(&acc)
+	if err != nil {
+		return err
 	}
-	acc := ""
-	switch len(data) {
-	case 1:
-		acc, ok = data[0].(string)
-		if !ok {
-			return errors.New("invalid txid")
-		}
-	case 0:
-	default:
-		return errors.New("invalid params")
+	if n != 0 && n != 1 {
+		return errors.New("invalid param length")
 	}
-	var err error
 	mutex.Lock()
 	res.Result, err = newAddress10(conf, acc)
 	mutex.Unlock()
@@ -66,16 +58,26 @@ func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) er
 	defer mutex.RUnlock()
 	var result [][][]interface{}
 	var r0 [][]interface{}
-	for acc := range wallet.Accounts {
+	for acc, ac := range wallet.Accounts {
+		us := make(map[string]uint64)
 		utxos, _, err := getUTXO(conf, acc, false)
 		if err != nil {
 			return err
 		}
 		for _, utxo := range utxos {
-			r1 := make([]interface{}, 3)
-			r1[0] = utxo.addressName
-			r1[1] = float64(utxo.value) / aklib.ADK
-			r1[2] = acc
+			us[utxo.addressName] = utxo.value
+		}
+		for adr := range ac.Address {
+			r1 := make([]interface{}, 0, 3)
+			r1 = append(r1, adr)
+			r1 = append(r1, float64(us[adr])/aklib.ADK)
+			_, h, err := address.ParseAddress58(adr, conf.Config)
+			if err != nil {
+				return err
+			}
+			if h == address.Height10 {
+				r1 = append(r1, acc)
+			}
 			r0 = append(r0, r1)
 		}
 	}
@@ -85,36 +87,17 @@ func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) er
 }
 
 func getbalance(conf *setting.Setting, req *Request, res *Response) error {
+	accstr := "*"
+	n, err := req.parseParam(&accstr)
+	if err != nil {
+		return err
+	}
+	if n > 3 {
+		return errors.New("invalid param length")
+	}
 	mutex.RLock()
 	defer mutex.RUnlock()
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("param must be slice")
-	}
-	accstr := "*"
-	switch len(data) {
-	case 3:
-		fallthrough
-	case 2:
-		n, okk := data[1].(float64)
-		if !okk {
-			return errors.New("invalid number")
-		}
-		if n == 0 {
-			return errors.New("not support unconfirmed transactions")
-		}
-		fallthrough
-	case 1:
-		accstr, ok = data[0].(string)
-		if !ok {
-			return errors.New("invalid address")
-		}
-	case 0:
-	default:
-		return errors.New("invalid params")
-	}
 	var bal uint64
-	var err error
 	if accstr != "*" {
 		_, bal, err = getUTXO(conf, accstr, false)
 		if err != nil {
@@ -136,19 +119,6 @@ func getbalance(conf *setting.Setting, req *Request, res *Response) error {
 func listaccounts(conf *setting.Setting, req *Request, res *Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
-	ary, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid param")
-	}
-	if len(ary) > 0 {
-		conf, ok := ary[0].(float64)
-		if !ok {
-			return errors.New("invalid param")
-		}
-		if conf == 0 {
-			return errors.New("not support unconfirmed transacton")
-		}
-	}
 	result := make(map[string]float64)
 	for acc := range wallet.Accounts {
 		_, ba, err := getUTXO(conf, acc, false)
@@ -161,7 +131,8 @@ func listaccounts(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-type info struct {
+//Info is a struct for validateaddress RPC.
+type Info struct {
 	IsValid      bool    `json:"isvalid"`
 	Address      string  `json:"address"`
 	ScriptPubKey string  `json:"scriptPubkey"`
@@ -175,26 +146,23 @@ type info struct {
 
 //only 'isvalid' params is valid, others may be incorrect.
 func validateaddress(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
+	var adrstr string
+	n, err := req.parseParam(&adrstr)
+	if err != nil {
+		return err
 	}
-	if len(data) != 1 {
-		return errors.New("length of param must be 1")
-	}
-	adrstr, ok := data[0].(string)
-	if !ok {
-		return errors.New("invalid address")
+	if n != 1 {
+		return errors.New("invalid param length")
 	}
 	valid := false
-	_, _, err := address.ParseAddress58(adrstr, conf.Config)
+	_, _, err = address.ParseAddress58(adrstr, conf.Config)
 	if err == nil {
 		valid = true
 	}
 	mutex.RLock()
 	defer mutex.RUnlock()
 	ac, isMine := findAddress(adrstr)
-	infoi := info{
+	infoi := Info{
 		IsValid: valid,
 		Address: adrstr,
 		IsMine:  isMine,
@@ -217,7 +185,8 @@ func settxfee(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-type details struct {
+//Details is a struct for gettransaction RPC.
+type Details struct {
 	Account   string  `json:"account"`
 	Address   string  `json:"address"`
 	Category  string  `json:"category"`
@@ -227,7 +196,8 @@ type details struct {
 	Abandoned *bool   `json:"abandoned,omitempty"`
 }
 
-type gettx struct {
+//Gettx is a struct for gettransaction RPC.
+type Gettx struct {
 	Amount            float64    `json:"amount"`
 	Fee               float64    `json:"fee"`
 	Confirmations     int        `json:"confirmations"`
@@ -239,42 +209,34 @@ type gettx struct {
 	Time              int64      `json:"time"`
 	TimeReceived      int64      `json:"timereceived"`
 	BIP125Replaceable string     `json:"bip125-replaceable"`
-	Details           []*details `json:"details"`
+	Details           []*Details `json:"details"`
 	Hex               string     `json:"hex"`
 }
 
 func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
+	var str string
+	n, err := req.parseParam(&str)
+	if err != nil {
+		return err
 	}
-	var txid tx.Hash
-	var err error
-	switch len(data) {
-	case 2:
-	case 1:
-		str, ok := data[0].(string)
-		if !ok {
-			return errors.New("invalid txid")
-		}
-		txid, err = hex.DecodeString(str)
-		if err != nil {
-			return err
-		}
-	default:
-		return errors.New("invalid params")
+	if n != 1 && n != 2 {
+		return errors.New("invalid param length")
+	}
+	txid, err := hex.DecodeString(str)
+	if err != nil {
+		return err
 	}
 	var amount int64
-	var detailss []*details
+	var detailss []*Details
 	tr, err := imesh.GetTxInfo(conf, txid)
 	if err != nil {
 		return err
 	}
 	mutex.RLock()
 	defer mutex.RUnlock()
-	detailss = make([]*details, 0, len(tr.Body.Inputs)+len(tr.Body.Outputs))
-	for _, out := range tr.Body.Outputs {
-		dt, errr := newTransaction(tr, txid, out, false)
+	detailss = make([]*Details, 0, len(tr.Body.Inputs)+len(tr.Body.Outputs))
+	for vout, out := range tr.Body.Outputs {
+		dt, errr := newTransaction(tr, out, int64(vout), false)
 		if errr != nil {
 			return errr
 		}
@@ -293,7 +255,7 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 		if err != nil {
 			return err
 		}
-		dt, errr := newTransaction(tr, txid, out, true)
+		dt, errr := newTransaction(tr, out, int64(in.Index), true)
 		if errr != nil {
 			return errr
 		}
@@ -320,7 +282,7 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 		bi = &zero
 		bh = &emp
 	}
-	res.Result = &gettx{
+	res.Result = &Gettx{
 		Amount:            float64(amount) / aklib.ADK,
 		Confirmations:     nconf,
 		Blocktime:         bt,
@@ -336,7 +298,8 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-type transaction struct {
+//Transaction is a struct for listtransactions RPC.
+type Transaction struct {
 	Account  *string `json:"account"`
 	Address  string  `json:"address"`
 	Category string  `json:"category"`
@@ -361,53 +324,31 @@ type transaction struct {
 	Abandoned         *bool  `json:"abandoned,omitempty"`
 }
 
-func (dt *transaction) toDetail() (*details, error) {
+func (dt *Transaction) toDetail() (*Details, error) {
 	if dt.Account == nil {
 		return nil, errors.New("Account is nil")
 	}
-	return &details{
+	return &Details{
 		Account:   *dt.Account,
 		Address:   dt.Address,
 		Category:  dt.Category,
 		Amount:    dt.Amount,
+		Vout:      dt.Vout,
 		Abandoned: dt.Abandoned,
 	}, nil
 }
 
 //dont supprt over 1000 txs.
 func listtransactions(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
-	}
 	acc := "*"
 	num := 10
 	skip := 0
-	switch len(data) {
-	case 4:
-		fallthrough
-	case 3:
-		n, okk := data[2].(float64)
-		if !okk {
-			return errors.New("invalid number")
-		}
-		skip = int(n)
-		fallthrough
-	case 2:
-		n, okk := data[1].(float64)
-		if !okk {
-			return errors.New("invalid number")
-		}
-		num = int(n)
-		fallthrough
-	case 1:
-		acc, ok = data[0].(string)
-		if !ok {
-			return errors.New("invalid account")
-		}
-	case 0:
-	default:
-		return errors.New("invalid params")
+	n, err := req.parseParam(&acc, &num, &skip)
+	if err != nil {
+		return err
+	}
+	if n > 4 {
+		return errors.New("invalid param length")
 	}
 	mutex.RLock()
 	defer mutex.RUnlock()
@@ -415,7 +356,7 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 	if err != nil {
 		return err
 	}
-	var ltx []*transaction
+	var ltx []*Transaction
 	for skipped, i := 0, 0; i < len(hist) && len(ltx) < num; i++ {
 		h := hist[len(hist)-i-1]
 		if acc != "*" && h.Account != acc {
@@ -432,7 +373,11 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 		if err != nil {
 			return err
 		}
-		dt, err := newTransaction(tr, h.Hash, out, h.Type == imesh.TypeIn)
+		vout := h.Index
+		if h.Type == imesh.TypeIn {
+			vout = tr.Body.Inputs[h.Index].Index
+		}
+		dt, err := newTransaction(tr, out, int64(vout), h.Type == imesh.TypeIn)
 		if err != nil {
 			return err
 		}
@@ -442,7 +387,7 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 	return nil
 }
 
-func newTransaction(tr *imesh.TxInfo, hash tx.Hash, out *tx.Output, isInput bool) (*transaction, error) {
+func newTransaction(tr *imesh.TxInfo, out *tx.Output, vout int64, isInput bool) (*Transaction, error) {
 	adr := address.To58(out.Address)
 	ac, ok := findAddress(adr)
 	f := false
@@ -452,11 +397,12 @@ func newTransaction(tr *imesh.TxInfo, hash tx.Hash, out *tx.Output, isInput bool
 	if isInput {
 		value = -value
 	}
-	dt := &transaction{
+	dt := &Transaction{
 		Address:           adr,
 		Category:          "send",
 		Amount:            float64(value) / aklib.ADK,
-		Txid:              hex.EncodeToString(hash),
+		Vout:              vout,
+		Txid:              tr.Hash.String(),
 		Walletconflicts:   []string{},
 		Time:              tr.Body.Time.Unix(),
 		TimeReceived:      tr.Received.Unix(),
@@ -482,22 +428,17 @@ func newTransaction(tr *imesh.TxInfo, hash tx.Hash, out *tx.Output, isInput bool
 }
 
 func getaccount(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
-	}
 	adr := ""
-	switch len(data) {
-	case 1:
-		adr, ok = data[0].(string)
-		if !ok {
-			return errors.New("invalid account")
-		}
-	default:
-		return errors.New("invalid params")
+	n, err := req.parseParam(&adr)
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return errors.New("invalid param length")
 	}
 	mutex.RLock()
 	defer mutex.RUnlock()
+	var ok bool
 	res.Result, ok = findAddress(adr)
 	if !ok {
 		return errors.New("address not found")

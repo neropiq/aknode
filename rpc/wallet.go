@@ -51,30 +51,32 @@ type Address struct {
 	address    *address.Address
 }
 
-type account struct {
+//Account represents an account with addresses.
+type Account struct {
 	Index         uint32              `json:"index"`
 	CountAddress2 uint32              `json:"count_accress2"`
 	Address       map[string]struct{} `json:"address"`
 }
 
-type twallet struct {
+//Wallet represents a wallet in RPC..
+type Wallet struct {
 	Secret struct {
 		seed    []byte
 		EncSeed []byte `json:"seed"`
 		pwd     []byte
 	}
-	Accounts map[string]*account `json:"accounts"`
+	Accounts map[string]*Account `json:"accounts"`
 	Pool     struct {
 		Index   uint32   `json:"index"`
 		Address []string `json:"address"`
 	} `json:"pool"`
 }
 
-var wallet = twallet{
-	Accounts: make(map[string]*account),
+var wallet = Wallet{
+	Accounts: make(map[string]*Account),
 }
 
-const poolSize = 100
+const poolSize = 20 //FIXME
 
 //Init initialize wallet struct.
 func Init(s *setting.Setting) error {
@@ -88,15 +90,15 @@ func Init(s *setting.Setting) error {
 }
 
 //locked by mutex
-func putHistory(s *setting.Setting, hist []*history) error {
+func putHistory(s *setting.Setting, hist []*History) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, nil, hist, db.HeaderWalletHistory)
 	})
 }
 
 //locked by mutex
-func getHistory(s *setting.Setting) ([]*history, error) {
-	var hist []*history
+func getHistory(s *setting.Setting) ([]*History, error) {
+	var hist []*History
 	return hist, s.DB.View(func(txn *badger.Txn) error {
 		err := db.Get(txn, nil, &hist, db.HeaderWalletHistory)
 		if err == badger.ErrKeyNotFound {
@@ -192,6 +194,13 @@ func InitSecret(s *setting.Setting, pwd []byte) error {
 		panic(err)
 	}
 	wallet.Secret.EncSeed = encrypt(seed, pwd)
+	wallet.Secret.seed = seed
+	wallet.Secret.pwd = pwd
+	if err := fillPool(s); err != nil {
+		return err
+	}
+	wallet.Secret.seed = nil
+	wallet.Secret.pwd = nil
 	return putWallet(s)
 }
 
@@ -202,11 +211,11 @@ func clearSecret() {
 
 func decryptSecret(s *setting.Setting, pwd []byte) error {
 	var err error
-	wallet.Secret.pwd = pwd
 	wallet.Secret.seed, err = decrypt(wallet.Secret.EncSeed, pwd)
 	if err != nil {
 		return err
 	}
+	wallet.Secret.pwd = pwd
 	return fillPool(s)
 }
 
@@ -248,7 +257,6 @@ func updateLeaf(s *setting.Setting, sig *address.Signature, adr *Address, adrnam
 	if err != nil {
 		return err
 	}
-	log.Println(signo, address.To58(sigadr))
 
 	if address.To58(sigadr) == adrname && adr.address.LeafNo() <= uint64(signo) {
 		if err := adr.address.SetLeafNo(uint64(signo) + 1); err != nil {
@@ -353,7 +361,7 @@ func (adr *Address) sign(s *setting.Setting, tr *tx.Transaction) error {
 func newAddress10(s *setting.Setting, aname string) (string, error) {
 	ac, ok := wallet.Accounts[aname]
 	if !ok {
-		ac = &account{
+		ac = &Account{
 			Index:   uint32(len(wallet.Accounts)),
 			Address: make(map[string]struct{}),
 		}
@@ -368,7 +376,7 @@ func newAddress10(s *setting.Setting, aname string) (string, error) {
 	return a, putWallet(s)
 }
 
-func newAddress2(s *setting.Setting, ac *account) (*address.Address, error) {
+func newAddress2(s *setting.Setting, ac *Account) (*address.Address, error) {
 	if wallet.Secret.pwd == nil {
 		return nil, errors.New("call walletpassphrase first")
 	}
@@ -397,7 +405,8 @@ func findAddress(adrstr string) (string, bool) {
 	return "", false
 }
 
-type history struct {
+//History is a tx history for an account.
+type History struct {
 	Account string `json:"account"`
 	imesh.InoutHash
 }
@@ -462,7 +471,6 @@ start:
 			return err
 		}
 		for _, out := range tr.Body.Outputs {
-			log.Println(out.Address)
 			_, ok := findAddress(out.Address.String())
 			if !ok {
 				continue
@@ -481,7 +489,6 @@ start:
 			if err != nil {
 				return err
 			}
-			log.Println(out.Address)
 			_, ok := findAddress(out.Address.String())
 			if !ok {
 				continue
@@ -512,7 +519,7 @@ func walletnotifyUpdate(s *setting.Setting, trs []*imesh.TxInfo) error {
 			if !ok {
 				continue
 			}
-			hist = append(hist, &history{
+			hist = append(hist, &History{
 				Account: ac,
 				InoutHash: imesh.InoutHash{
 					Type:  imesh.TypeOut,
@@ -530,7 +537,7 @@ func walletnotifyUpdate(s *setting.Setting, trs []*imesh.TxInfo) error {
 			if !ok {
 				continue
 			}
-			hist = append(hist, &history{
+			hist = append(hist, &History{
 				Account: ac,
 				InoutHash: imesh.InoutHash{
 					Type:  imesh.TypeIn,

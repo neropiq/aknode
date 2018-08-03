@@ -108,7 +108,7 @@ func setup(t *testing.T) {
 	wallet.Secret.EncSeed = nil
 	wallet.Pool.Address = nil
 	wallet.Pool.Index = 0
-	wallet.Accounts = make(map[string]*account)
+	wallet.Accounts = make(map[string]*Account)
 	t.Log(imesh.GetTxNo())
 }
 
@@ -280,10 +280,15 @@ func testsendtoaddress2(t *testing.T, adr1 string, v float64) tx.Hash {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "sendtoaddress",
-		Params:  []interface{}{adr1, v},
+	}
+	var err error
+	params := []interface{}{adr1, v}
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
-	err := sendtoaddress(&s, req, &resp)
+	err = sendtoaddress(&s, req, &resp)
 	if err != nil {
 		t.Error(err)
 	}

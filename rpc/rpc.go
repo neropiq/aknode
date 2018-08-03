@@ -52,7 +52,7 @@ var rpcs = map[string]rpcfunc{
 	"stop":         stop,
 	"dumpwallet":   dumpwallet,
 	"importwallet": importwallet,
-	"dumpseed":     dumpseed,
+	"dumpprivkey":  dumpprivkey,
 
 	//wallet
 	"gettransaction":       gettransaction,
@@ -107,10 +107,20 @@ func Run(setting *setting.Setting) {
 
 //Request is for parsing request from client.
 type Request struct {
-	JSONRPC string      `json:"jsonrpc"`
-	ID      interface{} `json:"id"`
-	Method  string      `json:"method"`
-	Params  interface{} `json:"params"`
+	JSONRPC string          `json:"jsonrpc"`
+	ID      interface{}     `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params"`
+}
+
+func (req *Request) parseParam(data ...interface{}) (int, error) {
+	if len(req.Params) == 0 {
+		return 0, nil
+	}
+	if err := json.Unmarshal(req.Params, &data); err != nil {
+		return 0, err
+	}
+	return len(data), nil
 }
 
 //Err represents error struct for response.

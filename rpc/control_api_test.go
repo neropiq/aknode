@@ -22,6 +22,7 @@ package rpc
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"net"
 	"os"
@@ -156,7 +157,7 @@ func testlistbanned(t *testing.T) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listbanned",
-		Params:  []interface{}{},
+		Params:  json.RawMessage{},
 	}
 	var resp Response
 	if err := listbanned(&s, req, &resp); err != nil {
@@ -166,7 +167,7 @@ func testlistbanned(t *testing.T) {
 		t.Error(resp.Error)
 	}
 	t.Log(resp.Result)
-	bs, ok := resp.Result.([]*bans)
+	bs, ok := resp.Result.([]*Bans)
 	if !ok {
 		t.Error("invalid return")
 	}
@@ -190,7 +191,7 @@ func testlistpeer(t *testing.T, n int) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listpeer",
-		Params:  []interface{}{},
+		Params:  json.RawMessage{},
 	}
 	var resp Response
 	if err := listpeer(&s, req, &resp); err != nil {
@@ -224,10 +225,10 @@ func testdumpseed(t *testing.T) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "dumpseed",
-		Params:  []interface{}{},
+		Params:  json.RawMessage{},
 	}
 	var resp Response
-	if err := dumpseed(&s, req, &resp); err != nil {
+	if err := dumpprivkey(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
 	if resp.Error != nil {
@@ -253,7 +254,7 @@ func teststop(t *testing.T) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "stop",
-		Params:  []interface{}{},
+		Params:  json.RawMessage{},
 	}
 	var resp Response
 	if err := stop(&s, req, &resp); err != nil {
@@ -275,8 +276,13 @@ func testdumpwallet(t *testing.T) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "dumpwallet",
-		Params:  []interface{}{wdat},
 	}
+	var err error
+	req.Params, err = json.Marshal([]interface{}{wdat})
+	if err != nil {
+		t.Error(err)
+	}
+	t.Log(wdat, string(req.Params))
 	var resp Response
 	if err := dumpwallet(&s, req, &resp); err != nil {
 		t.Error(err)
@@ -292,8 +298,8 @@ func testdumpwallet(t *testing.T) {
 func testimportwallet(t *testing.T, pwd []byte) {
 	wdat := filepath.Join(tdir, "tmp.dat")
 	bu := wallet
-	wallet = twallet{
-		Accounts: make(map[string]*account),
+	wallet = Wallet{
+		Accounts: make(map[string]*Account),
 	}
 	wallet.Secret.pwd = pwd
 	hist, err := getHistory(&s)
@@ -326,7 +332,11 @@ func testimportwallet(t *testing.T, pwd []byte) {
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "importwallet",
-		Params:  []interface{}{wdat},
+		Params:  json.RawMessage{},
+	}
+	req.Params, err = json.Marshal([]interface{}{wdat})
+	if err != nil {
+		t.Error(err)
 	}
 	var resp Response
 	if err2 := importwallet(&s, req, &resp); err2 != nil {

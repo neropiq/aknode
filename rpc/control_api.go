@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"log"
 
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aknode/node"
@@ -34,7 +35,7 @@ func listpeer(conf *setting.Setting, req *Request, res *Response) error {
 	res.Result = node.GetPeerlist()
 	return nil
 }
-func dumpseed(conf *setting.Setting, req *Request, res *Response) error {
+func dumpprivkey(conf *setting.Setting, req *Request, res *Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 	if wallet.Secret.seed == nil || wallet.Secret.pwd == nil {
@@ -44,7 +45,8 @@ func dumpseed(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-type bans struct {
+//Bans is a struct for listbanned RPC.
+type Bans struct {
 	Address string `json:"address"`
 	Created int64  `json:"ban_created"`
 	Until   int64  `json:"banned_until"`
@@ -53,9 +55,9 @@ type bans struct {
 
 func listbanned(conf *setting.Setting, req *Request, res *Response) error {
 	bs := node.GetBanned()
-	banned := make([]*bans, 0, len(bs))
+	banned := make([]*Bans, 0, len(bs))
 	for k, v := range bs {
-		banned = append(banned, &bans{
+		banned = append(banned, &Bans{
 			Address: k,
 			Created: v.Unix(),
 			Until:   v.Add(node.BanTime).Unix(),
@@ -72,27 +74,24 @@ func stop(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-type dump struct {
-	Wallet  *twallet            `json:"wallet"`
-	Hist    []*history          `json:"history"`
+//Dump is a struct for dumpwallet RPC.
+type Dump struct {
+	Wallet  *Wallet             `json:"wallet"`
+	Hist    []*History          `json:"history"`
 	Address map[string]*Address `json:"address"`
 }
 
 func dumpwallet(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
-	}
+	log.Println(req.Params)
 	fname := ""
-	switch len(data) {
-	case 1:
-		fname, ok = data[0].(string)
-		if !ok {
-			return errors.New("invalid txid")
-		}
-	default:
-		return errors.New("invalid params")
+	n, err := req.parseParam(&fname)
+	if err != nil {
+		return err
 	}
+	if n != 1 {
+		return errors.New("invalid #params")
+	}
+	log.Println(fname)
 	mutex.RLock()
 	defer mutex.RUnlock()
 	h, err := getHistory(conf)
@@ -103,7 +102,7 @@ func dumpwallet(conf *setting.Setting, req *Request, res *Response) error {
 	if err != nil {
 		return err
 	}
-	d := &dump{
+	d := &Dump{
 		Wallet:  &wallet,
 		Hist:    h,
 		Address: adrs,
@@ -116,25 +115,19 @@ func dumpwallet(conf *setting.Setting, req *Request, res *Response) error {
 }
 
 func importwallet(conf *setting.Setting, req *Request, res *Response) error {
-	data, ok := req.Params.([]interface{})
-	if !ok {
-		return errors.New("invalid params")
-	}
 	fname := ""
-	switch len(data) {
-	case 1:
-		fname, ok = data[0].(string)
-		if !ok {
-			return errors.New("invalid txid")
-		}
-	default:
-		return errors.New("invalid params")
+	n, err := req.parseParam(&fname)
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return errors.New("invalid #params")
 	}
 	dat, err := ioutil.ReadFile(fname)
 	if err != nil {
 		return err
 	}
-	var d dump
+	var d Dump
 	if err := json.Unmarshal(dat, &d); err != nil {
 		return err
 	}

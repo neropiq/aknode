@@ -49,7 +49,7 @@ func buildTx(conf *setting.Setting, ac string, tag []byte, outputs ...output) (*
 
 	var utxos []*utxo
 	var total uint64
-	var account *account
+	var account *Account
 	if ac == "*" {
 		for acname, acc := range wallet.Accounts {
 			account = acc
