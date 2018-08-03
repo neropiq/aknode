@@ -191,6 +191,7 @@ func TestWalletAPI(t *testing.T) {
 			Amount:  float64(v) / aklib.ADK,
 			Txid:    tr.Hash().String(),
 			Time:    tr.Time.Unix(),
+			Vout:    1,
 		}
 		amount += int64(v)
 		t.Log(tr.Hash(), v)
@@ -204,6 +205,7 @@ func TestWalletAPI(t *testing.T) {
 				Amount:  float64(prev/2) / aklib.ADK,
 				Txid:    tr.Hash().String(),
 				Time:    tr.Time.Unix(),
+				Vout:    2,
 			}
 			tss = append(tss, ts)
 			ac2ts[preac] = append(ac2ts[preac], ts)
@@ -216,6 +218,7 @@ func TestWalletAPI(t *testing.T) {
 				Amount:  -float64(prev) / aklib.ADK,
 				Txid:    tr.Hash().String(),
 				Time:    tr.Time.Unix(),
+				Vout:    1,
 			}
 			tss = append(tss, ts)
 			ac2ts[preac] = append(ac2ts[preac], ts)
@@ -673,7 +676,10 @@ func testlisttransactions(t *testing.T, ac string, hashes []*Transaction, isConf
 		if tx.Confirmations != conf {
 			t.Error("invalid confirmations", tx.Confirmations, "should be", conf)
 		}
-		if tx.Vout != 0 || tx.Fee != 0 ||
+		if tx.Vout != otx.Vout {
+			t.Error("invalid vout")
+		}
+		if tx.Fee != 0 ||
 			len(tx.Walletconflicts) != 0 || tx.BIP125Replaceable != "no" {
 			t.Error("invalid dummy params")
 		}
@@ -770,9 +776,12 @@ func testlisttransactions2(t *testing.T, isConf bool, adr2ac map[string]string, 
 		if tx.Confirmations != conf {
 			t.Error("invalid confirmations")
 		}
-		if tx.Vout != 0 || tx.Fee != 0 ||
+		if tx.Fee != 0 ||
 			len(tx.Walletconflicts) != 0 || tx.BIP125Replaceable != "no" {
 			t.Error("invalid dummy params")
+		}
+		if tx.Vout != otx.Vout {
+			t.Error("invalid vout")
 		}
 		if isConf {
 			if *tx.Blockhash != "" || *tx.Blockindex != 0 || *tx.Blocktime != tx.Time {
