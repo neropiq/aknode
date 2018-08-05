@@ -44,15 +44,16 @@ are required to compile this.
 ## How to Run
 
 
-# Contribution
+## Contribution
 Improvements to the codebase and pull requests are encouraged.
 
 
 
-# Dependencies and Licenses
+## Dependencies and Licenses
 
 This software includes the work that is distributed in the Apache License 2.0.
 
+```
 github.com/AidosKuneen/aknode                             MIT License
 github.com/AidosKuneen/aklib                              MIT License
 github.com/AidosKuneen/cuckoo                             MIT License
@@ -85,3 +86,4 @@ golang.org/x/oauth2/internal                              BSD 3-clause "New" or 
 golang.org/x/sys/unix                                     BSD 3-clause "New" or "Revised" License
 golang.org/x/text                                         BSD 3-clause "New" or "Revised" License
 Golang Standard Library                                   BSD 3-clause License
+```
