@@ -30,7 +30,6 @@ import (
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/arypack"
 	"github.com/AidosKuneen/aklib/tx"
-	"github.com/AidosKuneen/aknode/imesh"
 )
 
 func TestPublicAPI(t *testing.T) {
@@ -148,14 +147,14 @@ func testgethist(t *testing.T, h tx.Hash) {
 	}
 	for _, s := range is {
 		switch s.Type {
-		case imesh.TypeOut:
+		case tx.TypeOut:
 			if s.Hash != genesis.String() {
 				t.Error("invalid hash")
 			}
 			if s.Index != 0 {
 				t.Error("invalid index")
 			}
-		case imesh.TypeTicketout:
+		case tx.TypeTicketout:
 			if s.Hash != h.String() {
 				t.Error("invalid hash")
 			}

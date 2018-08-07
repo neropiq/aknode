@@ -374,10 +374,10 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 			return err
 		}
 		vout := h.Index
-		if h.Type == imesh.TypeIn {
+		if h.Type == tx.TypeIn {
 			vout = tr.Body.Inputs[h.Index].Index
 		}
-		dt, err := newTransaction(tr, out, int64(vout), h.Type == imesh.TypeIn)
+		dt, err := newTransaction(tr, out, int64(vout), h.Type == tx.TypeIn)
 		if err != nil {
 			return err
 		}

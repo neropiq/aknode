@@ -167,10 +167,10 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 		Body:     tr.Body,
 		Received: time.Now().Truncate(time.Second),
 	}
-	ti.OutputStatus[TypeIn] = make([]OutputStatus, len(tr.Outputs))
-	ti.OutputStatus[TypeMulin] = make([]OutputStatus, len(tr.MultiSigOuts))
+	ti.OutputStatus[tx.TypeIn] = make([]OutputStatus, len(tr.Outputs))
+	ti.OutputStatus[tx.TypeMulin] = make([]OutputStatus, len(tr.MultiSigOuts))
 	if tr.TicketOutput != nil {
-		ti.OutputStatus[TypeTicketin] = make([]OutputStatus, 1)
+		ti.OutputStatus[tx.TypeTicketin] = make([]OutputStatus, 1)
 	}
 
 	return s.DB.Update(func(txn *badger.Txn) error {
@@ -180,7 +180,7 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 		if err2 := db.Put(txn, tr.Hash(), &ti, db.HeaderTxInfo); err2 != nil {
 			return err2
 		}
-		for _, prev := range inputHashes(tr.Body) {
+		for _, prev := range tx.InputHashes(tr.Body) {
 			var ti2 TxInfo
 			if err := db.Get(txn, prev.Hash, &ti2, db.HeaderTxInfo); err != nil {
 				return err
@@ -242,7 +242,7 @@ func deleteMinableTx(txn *badger.Txn, h tx.Hash, header db.Header) error {
 	if err := db.Del(txn, h, header); err != nil {
 		return err
 	}
-	for _, prev := range inputHashes(minTx.Body) {
+	for _, prev := range tx.InputHashes(minTx.Body) {
 		var ti TxInfo
 		if err := db.Get(txn, prev.Hash, &ti, db.HeaderTxInfo); err != nil {
 			return err
@@ -270,7 +270,7 @@ func putMinableTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 	}
 	return s.DB.Update(func(txn *badger.Txn) error {
 		var ti TxInfo
-		for _, h := range inputHashes(tr.Body) {
+		for _, h := range tx.InputHashes(tr.Body) {
 			if err := db.Get(txn, h.Hash, &ti, db.HeaderTxInfo); err != nil {
 				return err
 			}
@@ -294,7 +294,7 @@ func putMinableTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 
 //IsMinableTxValid returns true if all inputs are not used in imesh.
 func IsMinableTxValid(s *setting.Setting, tr *tx.Transaction) (bool, error) {
-	for _, prev := range inputHashes(tr.Body) {
+	for _, prev := range tx.InputHashes(tr.Body) {
 		ti, err := GetTxInfo(s, prev.Hash)
 		if err != nil {
 			return false, err

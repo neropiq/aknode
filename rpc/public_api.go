@@ -141,9 +141,9 @@ func getleaves(conf *setting.Setting, req *Request, res *Response) error {
 
 //InoutHash is a struct for getlasthistory RPC.
 type InoutHash struct {
-	Hash  string              `json:"hash"`
-	Type  imesh.InOutHashType `json:"type"`
-	Index byte                `json:"index"`
+	Hash  string           `json:"hash"`
+	Type  tx.InOutHashType `json:"type"`
+	Index byte             `json:"index"`
 }
 
 func getlasthistory(conf *setting.Setting, req *Request, res *Response) error {

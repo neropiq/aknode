@@ -244,7 +244,7 @@ func fillPool(s *setting.Setting) error {
 type utxo struct {
 	address     *Address
 	addressName string
-	*imesh.InoutHash
+	*tx.InoutHash
 	value uint64
 }
 
@@ -300,11 +300,11 @@ func getUTXO(s *setting.Setting, acname string, checkSig bool) ([]*utxo, uint64,
 		}
 		for _, h := range hs {
 			switch h.Type {
-			case imesh.TypeIn:
+			case tx.TypeIn:
 				fallthrough
-			case imesh.TypeMulin:
+			case tx.TypeMulin:
 				fallthrough
-			case imesh.TypeTicketin:
+			case tx.TypeTicketin:
 				if !checkSig {
 					continue
 				}
@@ -317,7 +317,7 @@ func getUTXO(s *setting.Setting, acname string, checkSig bool) ([]*utxo, uint64,
 						return nil, 0, err
 					}
 				}
-			case imesh.TypeOut:
+			case tx.TypeOut:
 				tr, err := imesh.GetTxInfo(s, h.Hash)
 				if err != nil {
 					return nil, 0, err
@@ -408,7 +408,14 @@ func findAddress(adrstr string) (string, bool) {
 //History is a tx history for an account.
 type History struct {
 	Account string `json:"account"`
-	imesh.InoutHash
+	tx.InoutHash
+}
+
+//GetOutput returns an output related to InOutHash ih.
+//If ih is output, returns the output specified by ih.
+//If ih is input, return output refered by the input.
+func (h *History) GetOutput(s *setting.Setting) (*tx.Output, error) {
+	return imesh.GetOutput(s, &h.InoutHash)
 }
 
 //GoNotify runs gorouitine to get history of addresses in wallet.
@@ -521,8 +528,8 @@ func walletnotifyUpdate(s *setting.Setting, trs []*imesh.TxInfo) error {
 			}
 			hist = append(hist, &History{
 				Account: ac,
-				InoutHash: imesh.InoutHash{
-					Type:  imesh.TypeOut,
+				InoutHash: tx.InoutHash{
+					Type:  tx.TypeOut,
 					Hash:  tr.Hash,
 					Index: byte(i),
 				},
@@ -539,8 +546,8 @@ func walletnotifyUpdate(s *setting.Setting, trs []*imesh.TxInfo) error {
 			}
 			hist = append(hist, &History{
 				Account: ac,
-				InoutHash: imesh.InoutHash{
-					Type:  imesh.TypeIn,
+				InoutHash: tx.InoutHash{
+					Type:  tx.TypeIn,
 					Hash:  tr.Hash,
 					Index: byte(i),
 				},

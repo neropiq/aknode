@@ -140,7 +140,7 @@ func TestExploere(t *testing.T) {
 		adr2val[addrs[i].Address58()] = uint64(rand.R.Int31())
 	}
 	h := genesis
-	var remain uint64 = aklib.ADKSupply
+	var remain = aklib.ADKSupply
 	var tr *tx.Transaction
 	var adrs string
 	for adr, v := range adr2val {

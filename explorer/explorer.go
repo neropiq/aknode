@@ -281,11 +281,11 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	}
 	for _, h := range hist {
 		switch h.Type {
-		case imesh.TypeIn:
+		case tx.TypeIn:
 			info.Inputs = append(info.Inputs, h.Hash)
-		case imesh.TypeMulin:
+		case tx.TypeMulin:
 			info.MInputs = append(info.MInputs, h.Hash)
-		case imesh.TypeOut:
+		case tx.TypeOut:
 			ti, err := imesh.GetTxInfo(s, h.Hash)
 			if err != nil {
 				renderError(w, err.Error())
@@ -293,11 +293,11 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 			}
 			info.Balance += ti.Body.Outputs[h.Index].Value
 			info.UTXOs = append(info.UTXOs, h.Hash)
-		case imesh.TypeMulout:
+		case tx.TypeMulout:
 			info.MUTXOs = append(info.MUTXOs, h.Hash)
-		case imesh.TypeTicketin:
+		case tx.TypeTicketin:
 			info.Ticketins = append(info.Ticketins, h.Hash)
-		case imesh.TypeTicketout:
+		case tx.TypeTicketout:
 			info.Ticketouts = append(info.Ticketouts, h.Hash)
 		}
 	}

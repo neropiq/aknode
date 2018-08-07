@@ -423,7 +423,7 @@ func TestImesh4(t *testing.T) {
 	if len(hs) != 1 {
 		t.Error("length should be 1")
 	}
-	if !bytes.Equal(hs[0].Hash, genesis[0]) || hs[0].Type != TypeOut {
+	if !bytes.Equal(hs[0].Hash, genesis[0]) || hs[0].Type != tx.TypeOut {
 		t.Error("should be equal")
 	}
 	seed := address.GenerateSeed()
@@ -481,7 +481,7 @@ func TestImesh4(t *testing.T) {
 	if len(hs) != 1 {
 		t.Error("length should be 1", len(hs))
 	}
-	if !bytes.Equal(hs[0].Hash, tr.Hash()) || hs[0].Type != TypeIn {
+	if !bytes.Equal(hs[0].Hash, tr.Hash()) || hs[0].Type != tx.TypeIn {
 		t.Error("should be equal")
 	}
 	hs, err2 = GetHisoty(&s, a.Address58(), false)
@@ -493,10 +493,10 @@ func TestImesh4(t *testing.T) {
 	}
 
 	switch {
-	case (bytes.Equal(hs[0].Hash, tr.Hash()) && hs[0].Type == TypeIn) &&
-		(bytes.Equal(hs[1].Hash, genesis[0]) && hs[1].Type == TypeOut):
-	case (bytes.Equal(hs[0].Hash, genesis[0]) && hs[0].Type == TypeOut) &&
-		(bytes.Equal(hs[1].Hash, tr.Hash()) && hs[1].Type == TypeIn):
+	case (bytes.Equal(hs[0].Hash, tr.Hash()) && hs[0].Type == tx.TypeIn) &&
+		(bytes.Equal(hs[1].Hash, genesis[0]) && hs[1].Type == tx.TypeOut):
+	case (bytes.Equal(hs[0].Hash, genesis[0]) && hs[0].Type == tx.TypeOut) &&
+		(bytes.Equal(hs[1].Hash, tr.Hash()) && hs[1].Type == tx.TypeIn):
 	default:
 		t.Error("should be equal")
 	}
@@ -507,7 +507,7 @@ func TestImesh4(t *testing.T) {
 	if len(hs) != 1 {
 		t.Error("length should be 1")
 	}
-	if !bytes.Equal(hs[0].Hash, tr2.Hash()) || hs[0].Type != TypeIn {
+	if !bytes.Equal(hs[0].Hash, tr2.Hash()) || hs[0].Type != tx.TypeIn {
 		t.Error("should be equal")
 	}
 	hs, err2 = GetHisoty(&s, a2.Address58(), true)
@@ -517,7 +517,7 @@ func TestImesh4(t *testing.T) {
 	if len(hs) != 1 {
 		t.Error("length should be 1")
 	}
-	if !bytes.Equal(hs[0].Hash, tr2.Hash()) || hs[0].Type != TypeOut {
+	if !bytes.Equal(hs[0].Hash, tr2.Hash()) || hs[0].Type != tx.TypeOut {
 		t.Error("should be equal")
 	}
 }

@@ -70,8 +70,8 @@ func putInputAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction
 		if err := db.Get(txn, tr.TicketInput, &ti, db.HeaderTxInfo); err != nil {
 			return err
 		}
-		addH := inout2key(tr.Hash(), TypeTicketin, 0)
-		delH := inout2key(tr.TicketInput, TypeTicketout, 0)
+		addH := tx.Inout2key(tr.Hash(), tx.TypeTicketin, 0)
+		delH := tx.Inout2key(tr.TicketInput, tx.TypeTicketout, 0)
 		if err := updateAddressToTx(s, txn, ti.Body.TicketOutput, addH, delH); err != nil {
 			return err
 		}
@@ -82,8 +82,8 @@ func putInputAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction
 			return err
 		}
 		adr := ti.Body.Outputs[inp.Index].Address
-		addH := inout2key(tr.Hash(), TypeIn, byte(i))
-		delH := inout2key(inp.PreviousTX, TypeOut, inp.Index)
+		addH := tx.Inout2key(tr.Hash(), tx.TypeIn, byte(i))
+		delH := tx.Inout2key(inp.PreviousTX, tx.TypeOut, inp.Index)
 		if err := updateAddressToTx(s, txn, adr, addH, delH); err != nil {
 			return err
 		}
@@ -98,8 +98,8 @@ func putMultisigInAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transa
 			return err
 		}
 		for _, adr := range ti.Body.MultiSigOuts[inp.Index].Addresses {
-			addH := inout2key(tr.Hash(), TypeMulin, byte(i))
-			delH := inout2key(inp.PreviousTX, TypeMulout, inp.Index)
+			addH := tx.Inout2key(tr.Hash(), tx.TypeMulin, byte(i))
+			delH := tx.Inout2key(inp.PreviousTX, tx.TypeMulout, inp.Index)
 			if err := updateAddressToTx(s, txn, adr, addH, delH); err != nil {
 				return err
 			}
@@ -110,13 +110,13 @@ func putMultisigInAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transa
 
 func putOutputAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction) error {
 	if tr.TicketOutput != nil {
-		addH := inout2key(tr.Hash(), TypeTicketout, 0)
+		addH := tx.Inout2key(tr.Hash(), tx.TypeTicketout, 0)
 		if err := updateAddressToTx(s, txn, tr.TicketOutput, addH, nil); err != nil {
 			return err
 		}
 	}
 	for i, inp := range tr.Outputs {
-		addH := inout2key(tr.Hash(), TypeOut, byte(i))
+		addH := tx.Inout2key(tr.Hash(), tx.TypeOut, byte(i))
 		if err := updateAddressToTx(s, txn, inp.Address, addH, nil); err != nil {
 			return err
 		}
@@ -127,7 +127,7 @@ func putOutputAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transactio
 func putMultisigOutAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction) error {
 	for i, out := range tr.MultiSigOuts {
 		for _, adr := range out.Addresses {
-			addH := inout2key(tr.Hash(), TypeMulout, byte(i))
+			addH := tx.Inout2key(tr.Hash(), tx.TypeMulout, byte(i))
 			if err := updateAddressToTx(s, txn, adr, addH, nil); err != nil {
 				return err
 			}
@@ -151,7 +151,7 @@ func putAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction) err
 }
 
 //GetHisoty returns utxo (or all outputs) and input hashes associated with  address adr.
-func GetHisoty(s *setting.Setting, adrstr string, utxoOnly bool) ([]*InoutHash, error) {
+func GetHisoty(s *setting.Setting, adrstr string, utxoOnly bool) ([]*tx.InoutHash, error) {
 	adrbyte, _, err := address.ParseAddress58(adrstr, s.Config)
 	if err != nil {
 		return nil, err
@@ -167,42 +167,42 @@ func GetHisoty(s *setting.Setting, adrstr string, utxoOnly bool) ([]*InoutHash, 
 	if err != nil {
 		return nil, err
 	}
-	ihs := make([]*InoutHash, len(hashes))
+	ihs := make([]*tx.InoutHash, len(hashes))
 	for i, h := range hashes {
-		ih, err := newInoutHash(h)
+		ih, err := tx.NewInoutHash(h)
 		if err != nil {
 			return nil, err
 		}
 		ihs[i] = ih
 	}
 	if !utxoOnly {
-		ihs2 := make([]*InoutHash, len(ihs))
+		ihs2 := make([]*tx.InoutHash, len(ihs))
 		copy(ihs2, ihs)
 		for _, ih := range ihs2 {
-			if ih.Type == TypeOut || ih.Type == TypeMulout || ih.Type == TypeTicketout {
+			if ih.Type == tx.TypeOut || ih.Type == tx.TypeMulout || ih.Type == tx.TypeTicketout {
 				continue
 			}
 			tr, err := GetTxInfo(s, ih.Hash)
 			if err != nil {
 				return nil, err
 			}
-			var ih2 *InoutHash
+			var ih2 *tx.InoutHash
 			switch ih.Type {
-			case TypeIn:
-				ih2 = &InoutHash{
-					Type:  TypeOut,
+			case tx.TypeIn:
+				ih2 = &tx.InoutHash{
+					Type:  tx.TypeOut,
 					Hash:  tr.Body.Inputs[ih.Index].PreviousTX,
 					Index: tr.Body.Inputs[ih.Index].Index,
 				}
-			case TypeMulin:
-				ih2 = &InoutHash{
-					Type:  TypeMulout,
+			case tx.TypeMulin:
+				ih2 = &tx.InoutHash{
+					Type:  tx.TypeMulout,
 					Hash:  tr.Body.MultiSigIns[ih.Index].PreviousTX,
 					Index: tr.Body.MultiSigIns[ih.Index].Index,
 				}
-			case TypeTicketin:
-				ih2 = &InoutHash{
-					Type:  TypeTicketout,
+			case tx.TypeTicketin:
+				ih2 = &tx.InoutHash{
+					Type:  tx.TypeTicketout,
 					Hash:  tr.Body.TicketInput,
 					Index: 0,
 				}
@@ -210,10 +210,10 @@ func GetHisoty(s *setting.Setting, adrstr string, utxoOnly bool) ([]*InoutHash, 
 				return nil, errors.New("invalid type")
 			}
 			i := sort.Search(len(ihs), func(i int) bool {
-				return bytes.Compare(ihs[i].bytes(), ih2.bytes()) >= 0
+				return bytes.Compare(ihs[i].Bytes(), ih2.Bytes()) >= 0
 			})
-			if i >= len(hashes) || !bytes.Equal(ihs[i].bytes(), ih2.bytes()) {
-				ihs = append(ihs[:i], append([]*InoutHash{ih2}, ihs[i:]...)...)
+			if i >= len(hashes) || !bytes.Equal(ihs[i].Bytes(), ih2.Bytes()) {
+				ihs = append(ihs[:i], append([]*tx.InoutHash{ih2}, ihs[i:]...)...)
 			}
 		}
 	}
