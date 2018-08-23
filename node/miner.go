@@ -53,7 +53,7 @@ func mine(s *setting.Setting, mtx *tx.HashWithType) error {
 	if mtx.Type == tx.TypeRewardFee && uint64(s.MinimumFee*aklib.ADK) > tr.Outputs[len(tr.Outputs)-1].Value {
 		return nil
 	}
-	madr, _, err := address.ParseAddress58(s.MinerAddress, s.Config)
+	madr, _, err := address.ParseAddress58(s.Config, s.MinerAddress)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func mine(s *setting.Setting, mtx *tx.HashWithType) error {
 }
 
 func issueTicket(s *setting.Setting) error {
-	madr, _, err := address.ParseAddress58(s.MinerAddress, s.Config)
+	madr, _, err := address.ParseAddress58(s.Config, s.MinerAddress)
 	if err != nil {
 		log.Fatal(err)
 	}

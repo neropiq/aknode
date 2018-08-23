@@ -41,7 +41,7 @@ func dumpprivkey(conf *setting.Setting, req *Request, res *Response) error {
 	if wallet.Secret.seed == nil || wallet.Secret.pwd == nil {
 		return errors.New("call walletpassphrase first")
 	}
-	res.Result = address.HDSeed58(conf.Config, wallet.Secret.seed, wallet.Secret.pwd)
+	res.Result = address.HDSeed58(conf.Config, wallet.Secret.seed, wallet.Secret.pwd, false)
 	return nil
 }
 

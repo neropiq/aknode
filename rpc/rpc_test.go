@@ -73,13 +73,13 @@ func setup(t *testing.T) {
 	s.Bind = "127.0.0.1"
 	s.Port = 9624
 	s.MyHostPort = ":9624"
-	seed := address.GenerateSeed()
-	a, err2 = address.New(address.Height10, seed, s.Config)
+	seed := address.GenerateSeed32()
+	a, err2 = address.NewFromSeed(s.Config, seed, false)
 	if err2 != nil {
 		t.Error(err2)
 	}
 	s.Config.Genesis = map[string]uint64{
-		a.Address58(): aklib.ADKSupply,
+		a.Address58(s.Config): aklib.ADKSupply,
 	}
 	s.RPCUser = "user"
 	s.RPCPassword = "user"
@@ -211,10 +211,10 @@ func TestSig(t *testing.T) {
 		t.Error(err)
 	}
 	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
-	adrs := newAddress(t, "")
+	adrs := newAddressT(t, "")
 	tr := tx.New(s.Config, genesis)
 	tr.AddInput(genesis, 0)
-	if err := tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply-10*aklib.ADK); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply-10*aklib.ADK); err != nil {
 		t.Error(err)
 	}
 	if err := tr.AddOutput(s.Config, adrs[0], 10*aklib.ADK); err != nil {
@@ -239,18 +239,12 @@ func TestSig(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if aa.address.LeafNo() != 1 {
-		t.Error("invalid leaf no", aa.address.LeafNo())
-	}
 	tr = tx.New(s.Config, genesis)
 	tr.AddInput(txid, 0)
-	if err := tr.AddOutput(s.Config, a.Address58(), (0.2-0.1)*aklib.ADK); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), (0.2-0.1)*aklib.ADK); err != nil {
 		t.Error(err)
 	}
 	if err := tr.AddOutput(s.Config, adrs[0], 0.1*aklib.ADK); err != nil {
-		t.Error(err)
-	}
-	if err := aa.address.SetLeafNo(5); err != nil {
 		t.Error(err)
 	}
 	if err := tr.Sign(aa.address); err != nil {
@@ -270,9 +264,6 @@ func TestSig(t *testing.T) {
 	aa, err = getAddress(&s, adrs[0])
 	if err != nil {
 		t.Error(err)
-	}
-	if aa.address.LeafNo() != 7 {
-		t.Error("invalid leaf no", aa.address.LeafNo())
 	}
 }
 

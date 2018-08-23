@@ -122,7 +122,7 @@ func Run(setting *setting.Setting) {
 func qrHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id := q.Get("id")
-	_, _, err := address.ParseAddress58(id, s.Config)
+	_, _, err := address.ParseAddress58(s.Config, id)
 	if err != nil {
 		renderError(w, "invalid address")
 		return
@@ -240,12 +240,12 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, sig := range tr.Signatures {
-			sigadr, err := sig.Address(s.Config)
+			sigadr := sig.Address(s.Config, false)
+			adr, err := address.Address58(s.Config, sigadr)
 			if err != nil {
 				renderError(w, err.Error())
-				return
 			}
-			info.Signs[address.To58(sigadr)] = true
+			info.Signs[adr] = true
 		}
 	}
 	err = tmpl.ExecuteTemplate(w, "tx", &info)
@@ -257,7 +257,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id := q.Get("id")
-	_, _, err := address.ParseAddress58(id, s.Config)
+	_, _, err := address.ParseAddress58(s.Config, id)
 	if err != nil {
 		renderError(w, err.Error())
 		return
@@ -320,7 +320,7 @@ func searchHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id := q.Get("id")
 	_, err1 := hex.DecodeString(id)
-	_, _, err2 := address.ParseAddress58(id, s.Config)
+	_, _, err2 := address.ParseAddress58(s.Config, id)
 	switch {
 	case err1 == nil:
 		http.Redirect(w, r, "/tx?id="+id, http.StatusFound)

@@ -158,7 +158,7 @@ func GetHisoty(s *setting.Setting, adrstr string, utxoOnly bool) ([]*tx.InoutHas
 
 //GetHisoty2 returns utxo (or all outputs) and input hashes associated with  address adr.
 func GetHisoty2(akdb *badger.DB, cfg *aklib.Config, adrstr string, utxoOnly bool) ([]*tx.InoutHash, error) {
-	adrbyte, _, err := address.ParseAddress58(adrstr, cfg)
+	adrbyte, _, err := address.ParseAddress58(cfg, adrstr)
 	if err != nil {
 		return nil, err
 	}

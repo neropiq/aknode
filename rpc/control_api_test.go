@@ -59,13 +59,13 @@ func TestControlAPI(t *testing.T) {
 	acs := []string{"ac1", ""}
 	var adr string
 	for _, ac := range acs {
-		for _, adr = range newAddress(t, ac) {
+		for _, adr = range newAddressT(t, ac) {
 			t.Log(adr)
 		}
 	}
 	tr := tx.New(s.Config, genesis)
 	tr.AddInput(genesis, 0)
-	if err := tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply-10); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply-10); err != nil {
 		t.Error(err)
 	}
 	if err := tr.AddOutput(s.Config, adr, 10); err != nil {
@@ -241,7 +241,7 @@ func testdumpseed(t *testing.T) {
 	if !ok {
 		t.Error("invalid return")
 	}
-	r, err := address.HDFrom58(seed, wallet.Secret.pwd, s.Config)
+	r, _, err := address.HDFrom58(s.Config, seed, wallet.Secret.pwd)
 	if err != nil {
 		t.Error(err)
 	}
@@ -369,19 +369,19 @@ func testimportwallet(t *testing.T, pwd []byte) {
 		if ba.Index != wa.Index {
 			t.Error("invalid account index")
 		}
-		if len(wa.Address2) != len(ba.Address2) {
+		if len(wa.AddressChange) != len(ba.AddressChange) {
 			t.Error("invalid account address")
 		}
-		if len(wa.Address10) != len(ba.Address10) {
+		if len(wa.AddressPublic) != len(ba.AddressPublic) {
 			t.Error("invalid account address")
 		}
-		for adr := range ba.Address2 {
-			if _, ok := wa.Address2[adr]; !ok {
+		for adr := range ba.AddressChange {
+			if _, ok := wa.AddressChange[adr]; !ok {
 				t.Error("invalid account address")
 			}
 		}
-		for adr := range ba.Address10 {
-			if _, ok := wa.Address10[adr]; !ok {
+		for adr := range ba.AddressPublic {
+			if _, ok := wa.AddressPublic[adr]; !ok {
 				t.Error("invalid account address")
 			}
 		}

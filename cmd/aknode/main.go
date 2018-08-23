@@ -104,7 +104,7 @@ func main() {
 	flag.Parse()
 
 	if update {
-		if err := updater.Update("AidosKuneen/akwallet"); err != nil {
+		if err := updater.Update("AidosKuneen/akwallet", setting.Version); err != nil {
 			log.Fatal(err)
 		}
 	}

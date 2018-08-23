@@ -36,6 +36,9 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
+//DefaultMinimumFee is the minimum fee to receive minable tx.
+const DefaultMinimumFee = 0.05
+
 //Version is the version of aknode
 const Version = "1.0.0"
 
@@ -164,10 +167,10 @@ func Load(s []byte) (*Setting, error) {
 		return nil, errors.New("You must specify mining address")
 	}
 	if se.RunFeeMiner && se.MinimumFee == 0 {
-		se.MinimumFee = 0.05
+		se.MinimumFee = DefaultMinimumFee
 	}
 	if se.MinerAddress != "" {
-		if _, _, err := address.ParseAddress58(se.MinerAddress, se.Config); err != nil {
+		if _, _, err := address.ParseAddress58(se.Config, se.MinerAddress); err != nil {
 			return nil, err
 		}
 	}

@@ -116,7 +116,7 @@ func TestWalletAPI(t *testing.T) {
 	ac2val := make(map[string]uint64)
 	adrr := ""
 	for _, ac := range acs {
-		for _, adr := range newAddress(t, ac) {
+		for _, adr := range newAddressT(t, ac) {
 			t.Log(adr)
 			adrr = adr
 			adr2ac[adr] = ac
@@ -143,7 +143,7 @@ func TestWalletAPI(t *testing.T) {
 		if preadr != "" {
 			remain -= prev / 2
 		}
-		if err := tr.AddOutput(s.Config, a.Address58(), remain-v); err != nil {
+		if err := tr.AddOutput(s.Config, a.Address58(s.Config), remain-v); err != nil {
 			t.Error(err)
 		}
 		if err := tr.AddOutput(s.Config, adr, v); err != nil {
@@ -827,7 +827,7 @@ func testListAccounts(t *testing.T, ac2val map[string]uint64, acc ...string) {
 	}
 }
 
-func newAddress(t *testing.T, ac string) []string {
+func newAddressT(t *testing.T, ac string) []string {
 	adrs := make([]string, 3)
 	req := &Request{
 		JSONRPC: "1.0",
@@ -856,7 +856,7 @@ func newAddress(t *testing.T, ac string) []string {
 		if !ok {
 			t.Error("result must be string")
 		}
-		if _, _, err := address.ParseAddress58(adrstr, s.Config); err != nil {
+		if _, _, err := address.ParseAddress58(s.Config, adrstr); err != nil {
 			t.Error(err)
 		}
 		adrs[i] = adrstr

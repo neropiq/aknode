@@ -54,13 +54,13 @@ func setup(t *testing.T) {
 		panic(err2)
 	}
 	s.Config = aklib.DebugConfig
-	seed := address.GenerateSeed()
-	a, err2 = address.New(address.Height10, seed, s.Config)
+	seed := address.GenerateSeed32()
+	a, err2 = address.NewFromSeed(s.Config, seed, false)
 	if err2 != nil {
 		t.Error(err2)
 	}
 	s.Config.Genesis = map[string]uint64{
-		a.Address58(): aklib.ADKSupply,
+		a.Address58(s.Config): aklib.ADKSupply,
 	}
 	leaves.Init(&s)
 	if err := Init(&s); err != nil {
@@ -91,7 +91,7 @@ func TestImesh(t *testing.T) {
 	t.Log(hex.EncodeToString(genesis[0]))
 	tr := tx.New(s.Config, genesis[0])
 	tr.AddInput(genesis[0], 0)
-	if err := tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tr.Sign(a); err != nil {
@@ -123,7 +123,7 @@ func TestImesh(t *testing.T) {
 
 	tr0 := tx.New(s.Config, genesis[0])
 	tr0.AddInput(genesis[0], 0)
-	if err := tr0.AddOutput(s.Config, a.Address58(), aklib.ADKSupply-1); err != nil {
+	if err := tr0.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply-1); err != nil {
 		t.Error(err)
 	}
 	if err := tr0.Sign(a); err != nil {
@@ -149,7 +149,7 @@ func TestImesh(t *testing.T) {
 
 	tr1 := tx.New(s.Config, tr.Hash())
 	tr1.AddInput(genesis[0], 0)
-	if err := tr1.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
+	if err := tr1.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tr1.Sign(a); err != nil {
@@ -161,7 +161,7 @@ func TestImesh(t *testing.T) {
 
 	tr2 := tx.New(s.Config, genesis[0])
 	tr2.AddInput(tr1.Hash(), 0)
-	if err := tr2.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
+	if err := tr2.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tr2.Sign(a); err != nil {
@@ -201,7 +201,7 @@ func TestImesh(t *testing.T) {
 
 	tr3 := tx.NewMinableFee(s.Config, genesis[0])
 	tr3.AddInput(tr1.Hash(), 0)
-	if err := tr3.AddOutput(s.Config, a.Address58(), aklib.ADKSupply-100); err != nil {
+	if err := tr3.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply-100); err != nil {
 		t.Error(err)
 	}
 	if err := tr3.AddOutput(s.Config, "", 100); err != nil {
@@ -222,14 +222,14 @@ func TestImesh(t *testing.T) {
 		t.Error("invalid resolved tx", len(trs))
 	}
 
-	it, err2 := tx.IssueTicket(s.Config, a, genesis[0])
+	it, err2 := tx.IssueTicket(s.Config, genesis[0])
 	if err2 != nil {
 		t.Error(err2)
 	}
 
 	tr4 := tx.NewMinableTicket(s.Config, it.Hash(), genesis[0])
 	tr4.AddInput(tr1.Hash(), 0)
-	if err := tr4.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
+	if err := tr4.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tr4.Sign(a); err != nil {
@@ -253,7 +253,7 @@ func TestImesh2(t *testing.T) {
 	defer teardown(t)
 	tr := tx.New(s.Config, genesis[0])
 	tr.AddInput(genesis[0], 0)
-	if err := tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tr.Sign(a); err != nil {
@@ -275,7 +275,7 @@ func TestImesh2(t *testing.T) {
 
 	tr1 := tx.NewMinableFee(s.Config, genesis[0])
 	tr1.AddInput(tr.Hash(), 0)
-	if err := tr1.AddOutput(s.Config, a.Address58(), aklib.ADKSupply-10); err != nil {
+	if err := tr1.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply-10); err != nil {
 		t.Error(err)
 	}
 	if err := tr1.AddOutput(s.Config, "", 10); err != nil {
@@ -310,7 +310,7 @@ func TestImesh2(t *testing.T) {
 	}
 	tr2 := tx.New(s.Config, genesis[0])
 	tr2.AddInput(tr.Hash(), 0)
-	if err := tr2.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
+	if err := tr2.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tr2.Sign(a); err != nil {
@@ -416,7 +416,7 @@ func TestImesh4(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	hs, err2 := GetHisoty(&s, a.Address58(), true)
+	hs, err2 := GetHisoty(&s, a.Address58(s.Config), true)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -426,14 +426,14 @@ func TestImesh4(t *testing.T) {
 	if !bytes.Equal(hs[0].Hash, genesis[0]) || hs[0].Type != tx.TypeOut {
 		t.Error("should be equal")
 	}
-	seed := address.GenerateSeed()
-	a1, err2 := address.New(address.Height10, seed, s.Config)
+	seed := address.GenerateSeed32()
+	a1, err2 := address.NewFromSeed(s.Config, seed, false)
 	if err2 != nil {
 		t.Error(err2)
 	}
 	tr := tx.New(s.Config, genesis[0])
 	tr.AddInput(genesis[0], 0)
-	if err := tr.AddOutput(s.Config, a1.Address58(), aklib.ADKSupply); err != nil {
+	if err := tr.AddOutput(s.Config, a1.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tr.Sign(a); err != nil {
@@ -446,14 +446,14 @@ func TestImesh4(t *testing.T) {
 		t.Error(err)
 	}
 
-	seed = address.GenerateSeed()
-	a2, err2 := address.New(address.Height10, seed, s.Config)
+	seed = address.GenerateSeed32()
+	a2, err2 := address.NewFromSeed(s.Config, seed, false)
 	if err2 != nil {
 		t.Error(err2)
 	}
 	tr2 := tx.New(s.Config, genesis[0])
 	tr2.AddInput(tr.Hash(), 0)
-	if err := tr2.AddOutput(s.Config, a2.Address58(), aklib.ADKSupply); err != nil {
+	if err := tr2.AddOutput(s.Config, a2.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tr2.Sign(a1); err != nil {
@@ -473,7 +473,7 @@ func TestImesh4(t *testing.T) {
 		t.Error("invalid length of txs")
 	}
 
-	hs, err2 = GetHisoty(&s, a.Address58(), true)
+	hs, err2 = GetHisoty(&s, a.Address58(s.Config), true)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -484,7 +484,7 @@ func TestImesh4(t *testing.T) {
 	if !bytes.Equal(hs[0].Hash, tr.Hash()) || hs[0].Type != tx.TypeIn {
 		t.Error("should be equal")
 	}
-	hs, err2 = GetHisoty(&s, a.Address58(), false)
+	hs, err2 = GetHisoty(&s, a.Address58(s.Config), false)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -500,7 +500,7 @@ func TestImesh4(t *testing.T) {
 	default:
 		t.Error("should be equal")
 	}
-	hs, err2 = GetHisoty(&s, a1.Address58(), true)
+	hs, err2 = GetHisoty(&s, a1.Address58(s.Config), true)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -510,7 +510,7 @@ func TestImesh4(t *testing.T) {
 	if !bytes.Equal(hs[0].Hash, tr2.Hash()) || hs[0].Type != tx.TypeIn {
 		t.Error("should be equal")
 	}
-	hs, err2 = GetHisoty(&s, a2.Address58(), true)
+	hs, err2 = GetHisoty(&s, a2.Address58(s.Config), true)
 	if err2 != nil {
 		t.Error(err2)
 	}

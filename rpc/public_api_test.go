@@ -40,7 +40,7 @@ func TestPublicAPI(t *testing.T) {
 
 	tr := tx.NewMinableFee(s.Config, genesis)
 	tr.AddInput(genesis, 0)
-	tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply-10)
+	tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply-10)
 	tr.AddOutput(s.Config, "", 10)
 	if err := tr.Sign(a); err != nil {
 		t.Error(err)
@@ -50,7 +50,7 @@ func TestPublicAPI(t *testing.T) {
 	testgetfeetx(t, float64(100)/aklib.ADK, nil)
 	testgetfeetx(t, float64(10)/aklib.ADK, tr.Hash())
 
-	ti, err := tx.IssueTicket(s.Config, a, genesis)
+	ti, err := tx.IssueTicket(s.Config, genesis)
 	if err != nil {
 		t.Error(err)
 	}
@@ -58,7 +58,7 @@ func TestPublicAPI(t *testing.T) {
 
 	tr = tx.NewMinableTicket(s.Config, ti.Hash(), genesis)
 	tr.AddInput(genesis, 0)
-	if err := tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tr.Sign(a); err != nil {
@@ -124,7 +124,7 @@ func testgethist(t *testing.T, h tx.Hash) {
 		ID:      "curltest",
 		Method:  "getlasthistory",
 	}
-	params := []interface{}{a.Address58()}
+	params := []interface{}{a.Address58(s.Config)}
 	var err error
 	req.Params, err = json.Marshal(params)
 	if err != nil {

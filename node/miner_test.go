@@ -40,7 +40,7 @@ func TestMiner(t *testing.T) {
 	s.RunFeeMiner = true
 	s.RunTicketMiner = true
 
-	ti, err := tx.IssueTicket(s.Config, a.Address(), genesis)
+	ti, err := tx.IssueTicket(s.Config, genesis)
 	if err != nil {
 		t.Error(err)
 	}
@@ -91,12 +91,12 @@ func TestMiner(t *testing.T) {
 		t.Error(err)
 	}
 
-	seed := address.GenerateSeed()
-	a3, err2 := address.New(address.Height10, seed, s.Config)
+	seed := address.GenerateSeed32()
+	a3, err2 := address.NewFromSeed(s.Config, seed, false)
 	if err2 != nil {
 		t.Error(err2)
 	}
-	s.MinerAddress = a3.Address58()
+	s.MinerAddress = a3.Address58(s.Config)
 	txd := msg.Txs{
 		&msg.Tx{
 			Type: msg.InvTxNormal,
@@ -108,7 +108,7 @@ func TestMiner(t *testing.T) {
 	}
 	tr := tx.NewMinableTicket(s.Config, ti.Hash(), genesis)
 	tr.AddInput(genesis, 0)
-	if err := tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tr.Sign(a); err != nil {
@@ -128,7 +128,7 @@ func TestMiner(t *testing.T) {
 	for i := 0; i < 30 && len(inout) == 0; i++ {
 		var err error
 		time.Sleep(10 * time.Second)
-		inout, err = imesh.GetHisoty(&s, a3.Address58(), true)
+		inout, err = imesh.GetHisoty(&s, a3.Address58(s.Config), true)
 		if err != nil {
 			t.Error(err)
 		}
@@ -137,15 +137,15 @@ func TestMiner(t *testing.T) {
 		t.Error("failed to mine")
 	}
 
-	seed = address.GenerateSeed()
-	a2, err2 := address.New(address.Height10, seed, s.Config)
+	seed = address.GenerateSeed32()
+	a2, err2 := address.NewFromSeed(s.Config, seed, false)
 	if err2 != nil {
 		t.Error(err2)
 	}
-	s.MinerAddress = a2.Address58()
+	s.MinerAddress = a2.Address58(s.Config)
 	tr = tx.NewMinableFee(s.Config, genesis)
 	tr.AddInput(inout[0].Hash, 0)
-	if err := tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply-10); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply-10); err != nil {
 		t.Error(err)
 	}
 	if err := tr.AddOutput(s.Config, "", 10); err != nil {
@@ -168,7 +168,7 @@ func TestMiner(t *testing.T) {
 	for i := 0; i < 30 && len(inout) == 0; i++ {
 		var err error
 		time.Sleep(10 * time.Second)
-		inout, err = imesh.GetHisoty(&s, a2.Address58(), true)
+		inout, err = imesh.GetHisoty(&s, a2.Address58(s.Config), true)
 		if err != nil {
 			t.Error(err)
 		}

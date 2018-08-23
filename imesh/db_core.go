@@ -138,7 +138,7 @@ func getTxFunc(s *setting.Setting) func(hash []byte) (*tx.Body, error) {
 
 //IsValid checks transaction tr is valid for a mamber of iMesh.
 func IsValid(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
-	return tr.CheckAll(getTxFunc(s), s.Config, typ)
+	return tr.CheckAll(s.Config, getTxFunc(s), typ)
 }
 
 //GetTx returns a transaction  from  hash.

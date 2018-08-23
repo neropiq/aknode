@@ -39,7 +39,7 @@ func (w *Wallet) GetUTXO(ac string, outtotal uint64) ([]*tx.UTXO, error) {
 	var total uint64
 	if ac == "*" {
 		for acname := range wallet.Accounts {
-			u, bal, err := getUTXO102(w.conf, acname, false, true)
+			u, bal, err := getUTXO102(w.conf, acname, false)
 			if err != nil {
 				return nil, err
 			}
@@ -48,7 +48,7 @@ func (w *Wallet) GetUTXO(ac string, outtotal uint64) ([]*tx.UTXO, error) {
 		}
 		if outtotal > total {
 			for acname := range wallet.Accounts {
-				u, bal, err := getUTXO102(w.conf, acname, true, true)
+				u, bal, err := getUTXO102(w.conf, acname, true)
 				if err != nil {
 					return nil, err
 				}
@@ -58,12 +58,12 @@ func (w *Wallet) GetUTXO(ac string, outtotal uint64) ([]*tx.UTXO, error) {
 		}
 	} else {
 		var err error
-		utxos, total, err = getUTXO102(w.conf, ac, false, true)
+		utxos, total, err = getUTXO102(w.conf, ac, false)
 		if err != nil {
 			return nil, err
 		}
 		if outtotal > total {
-			u10, t10, err := getUTXO102(w.conf, ac, true, true)
+			u10, t10, err := getUTXO102(w.conf, ac, true)
 			if err != nil {
 				return nil, err
 			}

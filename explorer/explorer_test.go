@@ -62,14 +62,14 @@ func setup(t *testing.T) {
 	s.Bind = "127.0.0.1"
 	s.Port = 9624
 	s.MyHostPort = ":9624"
-	seed := address.GenerateSeed()
+	seed := address.GenerateSeed32()
 	var err2 error
-	a, err2 = address.New(address.Height10, seed, s.Config)
+	a, err2 = address.NewFromSeed(s.Config, seed, false)
 	if err2 != nil {
 		t.Error(err2)
 	}
 	s.Config.Genesis = map[string]uint64{
-		a.Address58(): aklib.ADKSupply,
+		a.Address58(s.Config): aklib.ADKSupply,
 	}
 	leaves.Init(&s)
 	if err := imesh.Init(&s); err != nil {
@@ -131,13 +131,13 @@ func TestExploere(t *testing.T) {
 	adr2val := make(map[string]uint64)
 	addrs := make([]*address.Address, 3)
 	for i := 0; i < 3; i++ {
-		seed := address.GenerateSeed()
+		seed := address.GenerateSeed32()
 		var err2 error
-		addrs[i], err2 = address.New(address.Height10, seed, s.Config)
+		addrs[i], err2 = address.NewFromSeed(s.Config, seed, false)
 		if err2 != nil {
 			t.Error(err2)
 		}
-		adr2val[addrs[i].Address58()] = uint64(rand.R.Int31())
+		adr2val[addrs[i].Address58(s.Config)] = uint64(rand.R.Int31())
 	}
 	h := genesis
 	var remain = aklib.ADKSupply
@@ -152,7 +152,7 @@ func TestExploere(t *testing.T) {
 			t.Fatal(v)
 		}
 		remain -= v
-		if err := tr.AddOutput(s.Config, a.Address58(), remain); err != nil {
+		if err := tr.AddOutput(s.Config, a.Address58(s.Config), remain); err != nil {
 			t.Error(err)
 		}
 		if err := tr.AddOutput(s.Config, adr, v); err != nil {
@@ -174,14 +174,14 @@ func TestExploere(t *testing.T) {
 	tr = tx.New(s.Config, genesis, h)
 	tr.AddInput(h, 0)
 	remain -= 10
-	if err := tr.AddOutput(s.Config, a.Address58(), remain); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), remain); err != nil {
 		t.Error(err)
 	}
 	if err := tr.AddOutput(s.Config, adrs, 1); err != nil {
 		t.Error(err)
 	}
 	if err := tr.AddMultisigOut(s.Config, 2, 9,
-		addrs[0].Address58(), addrs[1].Address58(), addrs[2].Address58()); err != nil {
+		addrs[0].Address58(s.Config), addrs[1].Address58(s.Config), addrs[2].Address58(s.Config)); err != nil {
 		t.Error(err)
 	}
 	if err := tr.Sign(a); err != nil {
@@ -201,14 +201,14 @@ func TestExploere(t *testing.T) {
 	tr.AddMultisigIn(h, 0)
 	remain += 9
 	remain -= 10
-	if err := tr.AddOutput(s.Config, a.Address58(), remain); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), remain); err != nil {
 		t.Error(err)
 	}
 	if err := tr.AddOutput(s.Config, adrs, 1); err != nil {
 		t.Error(err)
 	}
 	if err := tr.AddMultisigOut(s.Config, 2, 9,
-		addrs[0].Address58(), addrs[1].Address58(), addrs[2].Address58()); err != nil {
+		addrs[0].Address58(s.Config), addrs[1].Address58(s.Config), addrs[2].Address58(s.Config)); err != nil {
 		t.Error(err)
 	}
 	if err := tr.Sign(a); err != nil {

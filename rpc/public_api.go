@@ -97,7 +97,7 @@ func getnodeinfo(conf *setting.Setting, req *Request, res *Response) error {
 		defer mutex.Unlock()
 		var total uint64
 		for ac := range wallet.Accounts {
-			_, b, err := getUTXO(conf, ac, false)
+			_, b, err := getUTXO(conf, ac)
 			if err != nil {
 				return err
 			}

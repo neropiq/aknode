@@ -48,7 +48,7 @@ func getnewaddress(conf *setting.Setting, req *Request, res *Response) error {
 		return errors.New("invalid param length")
 	}
 	mutex.Lock()
-	res.Result, err = newAddress10(conf, acc)
+	res.Result, err = newAddress(conf, acc, true)
 	mutex.Unlock()
 	return err
 }
@@ -60,7 +60,7 @@ func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) er
 	var r0 [][]interface{}
 	for acc, ac := range wallet.Accounts {
 		us := make(map[string]uint64)
-		utxos, _, err := getUTXO(conf, acc, false)
+		utxos, _, err := getUTXO(conf, acc)
 		if err != nil {
 			return err
 		}
@@ -71,13 +71,11 @@ func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) er
 			r1 := make([]interface{}, 0, 3)
 			r1 = append(r1, adr)
 			r1 = append(r1, float64(us[adr])/aklib.ADK)
-			_, h, err := address.ParseAddress58(adr, conf.Config)
+			_, _, err := address.ParseAddress58(conf.Config, adr)
 			if err != nil {
 				return err
 			}
-			if h == address.Height10 {
-				r1 = append(r1, acc)
-			}
+			r1 = append(r1, acc)
 			r0 = append(r0, r1)
 		}
 	}
@@ -99,13 +97,13 @@ func getbalance(conf *setting.Setting, req *Request, res *Response) error {
 	defer mutex.RUnlock()
 	var bal uint64
 	if accstr != "*" {
-		_, bal, err = getUTXO(conf, accstr, false)
+		_, bal, err = getUTXO(conf, accstr)
 		if err != nil {
 			return err
 		}
 	} else {
 		for acc := range wallet.Accounts {
-			_, ba, err := getUTXO(conf, acc, false)
+			_, ba, err := getUTXO(conf, acc)
 			if err != nil {
 				return err
 			}
@@ -121,7 +119,7 @@ func listaccounts(conf *setting.Setting, req *Request, res *Response) error {
 	defer mutex.RUnlock()
 	result := make(map[string]float64)
 	for acc := range wallet.Accounts {
-		_, ba, err := getUTXO(conf, acc, false)
+		_, ba, err := getUTXO(conf, acc)
 		if err != nil {
 			return err
 		}
@@ -155,7 +153,7 @@ func validateaddress(conf *setting.Setting, req *Request, res *Response) error {
 		return errors.New("invalid param length")
 	}
 	valid := false
-	_, _, err = address.ParseAddress58(adrstr, conf.Config)
+	_, _, err = address.ParseAddress58(conf.Config, adrstr)
 	if err == nil {
 		valid = true
 	}
@@ -236,7 +234,7 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 	defer mutex.RUnlock()
 	detailss = make([]*Details, 0, len(tr.Body.Inputs)+len(tr.Body.Outputs))
 	for vout, out := range tr.Body.Outputs {
-		dt, errr := newTransaction(tr, out, int64(vout), false)
+		dt, errr := newTransaction(conf, tr, out, int64(vout), false)
 		if errr != nil {
 			return errr
 		}
@@ -255,7 +253,7 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 		if err != nil {
 			return err
 		}
-		dt, errr := newTransaction(tr, out, int64(in.Index), true)
+		dt, errr := newTransaction(conf, tr, out, int64(in.Index), true)
 		if errr != nil {
 			return errr
 		}
@@ -377,7 +375,7 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 		if h.Type == tx.TypeIn {
 			vout = tr.Body.Inputs[h.Index].Index
 		}
-		dt, err := newTransaction(tr, out, int64(vout), h.Type == tx.TypeIn)
+		dt, err := newTransaction(conf, tr, out, int64(vout), h.Type == tx.TypeIn)
 		if err != nil {
 			return err
 		}
@@ -387,8 +385,11 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 	return nil
 }
 
-func newTransaction(tr *imesh.TxInfo, out *tx.Output, vout int64, isInput bool) (*Transaction, error) {
-	adr := address.To58(out.Address)
+func newTransaction(conf *setting.Setting, tr *imesh.TxInfo, out *tx.Output, vout int64, isInput bool) (*Transaction, error) {
+	adr, err := address.Address58(conf.Config, out.Address)
+	if err != nil {
+		return nil, err
+	}
 	ac, ok := findAddress(adr)
 	f := false
 	emp := ""

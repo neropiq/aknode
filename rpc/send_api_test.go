@@ -59,7 +59,7 @@ func TestSendAPI(t *testing.T) {
 	ac2adr := make(map[string][]string)
 	var total uint64
 	for _, ac := range acs {
-		for _, adr := range newAddress(t, ac) {
+		for _, adr := range newAddressT(t, ac) {
 			t.Log(adr)
 			adr2ac[adr] = ac
 			adr2val[adr] = 10 * aklib.ADK
@@ -68,11 +68,11 @@ func TestSendAPI(t *testing.T) {
 			total += adr2val[adr]
 		}
 	}
-	outadrs := newAddress(t, "")
-	outadrs0 := newAddress(t, "")
+	outadrs := newAddressT(t, "")
+	outadrs0 := newAddressT(t, "")
 	tr := tx.New(s.Config, genesis)
 	tr.AddInput(genesis, 0)
-	if err := tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply-total); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply-total); err != nil {
 		t.Error(err)
 	}
 	for adr, v := range adr2val {
@@ -332,7 +332,7 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 		t.Error(err)
 	}
 	var resp Response
-	utxo0, _, err := getAllUTXOs(&s, false)
+	utxo0, _, err := getAllUTXOs(&s)
 	if err != nil {
 		t.Error(err)
 	}
@@ -346,7 +346,7 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 	if err != nil {
 		t.Error(err)
 	}
-	utxo1, _, err := getAllUTXOs(&s, false)
+	utxo1, _, err := getAllUTXOs(&s)
 	if err != nil {
 		t.Error(err)
 	}
@@ -356,7 +356,7 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 		adr2: uint64(0.3 * aklib.ADK),
 	}, false)
 	confirmAll(t, nil, true)
-	utxo2, _, err := getAllUTXOs(&s, false)
+	utxo2, _, err := getAllUTXOs(&s)
 	if err != nil {
 		t.Error(err)
 	}
@@ -381,7 +381,7 @@ func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 		t.Error(err)
 	}
 	var resp Response
-	utxo0, _, err := getAllUTXOs(&s, false)
+	utxo0, _, err := getAllUTXOs(&s)
 	if err != nil {
 		t.Error(err)
 	}
@@ -389,7 +389,7 @@ func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 	if err != nil {
 		t.Error(err)
 	}
-	utxo1, _, err := getAllUTXOs(&s, false)
+	utxo1, _, err := getAllUTXOs(&s)
 	if err != nil {
 		t.Error(err)
 	}
@@ -399,7 +399,7 @@ func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 		adr1: uint64(0.2 * aklib.ADK),
 	}, false)
 	confirmAll(t, nil, true)
-	utxo2, _, err := getAllUTXOs(&s, false)
+	utxo2, _, err := getAllUTXOs(&s)
 	if err != nil {
 		t.Error(err)
 	}
@@ -422,7 +422,7 @@ func testsendfrom(t *testing.T, adr1 string, adr2ac map[string]string) {
 		t.Error(err)
 	}
 	var resp Response
-	utxo0, _, err := getAllUTXOs(&s, false)
+	utxo0, _, err := getAllUTXOs(&s)
 	if err != nil {
 		t.Error(err)
 	}
@@ -430,7 +430,7 @@ func testsendfrom(t *testing.T, adr1 string, adr2ac map[string]string) {
 	if err != nil {
 		t.Error(err)
 	}
-	utxo1, _, err := getAllUTXOs(&s, false)
+	utxo1, _, err := getAllUTXOs(&s)
 	if err != nil {
 		t.Error(err)
 	}
@@ -439,7 +439,7 @@ func testsendfrom(t *testing.T, adr1 string, adr2ac map[string]string) {
 		adr1: uint64(0.2 * aklib.ADK),
 	}, false)
 	confirmAll(t, nil, true)
-	utxo2, _, err := getAllUTXOs(&s, false)
+	utxo2, _, err := getAllUTXOs(&s)
 	if err != nil {
 		t.Error(err)
 	}

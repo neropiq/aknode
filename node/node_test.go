@@ -58,13 +58,13 @@ func setup(t *testing.T) {
 	s.Bind = "127.0.0.1"
 	s.Port = 44134
 	s.MyHostPort = ":44134"
-	seed := address.GenerateSeed()
-	a, err2 = address.New(address.Height10, seed, s.Config)
+	seed := address.GenerateSeed32()
+	a, err2 = address.NewFromSeed(s.Config, seed, false)
 	if err2 != nil {
 		t.Error(err2)
 	}
 	s.Config.Genesis = map[string]uint64{
-		a.Address58(): aklib.ADKSupply,
+		a.Address58(s.Config): aklib.ADKSupply,
 	}
 	leaves.Init(&s)
 	if err := imesh.Init(&s); err != nil {
@@ -122,7 +122,7 @@ func TestNode2(t *testing.T) {
 	defer teardown(t)
 	tr := tx.New(s.Config, genesis)
 	tr.AddInput(genesis, 0)
-	if err := tr.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tr.Sign(a); err != nil {
@@ -134,7 +134,7 @@ func TestNode2(t *testing.T) {
 
 	tra2 := tx.New(s.Config, tr.Hash())
 	tra2.AddInput(genesis, 0)
-	if err := tra2.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
+	if err := tra2.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tra2.Sign(a); err != nil {
@@ -146,7 +146,7 @@ func TestNode2(t *testing.T) {
 
 	tra3 := tx.New(s.Config, tra2.Hash())
 	tra3.AddInput(genesis, 0)
-	if err := tra3.AddOutput(s.Config, a.Address58(), aklib.ADKSupply); err != nil {
+	if err := tra3.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
 	if err := tra3.Sign(a); err != nil {
