@@ -65,9 +65,9 @@ func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) er
 			return err
 		}
 		for _, utxo := range utxos {
-			us[utxo.addressName] = utxo.value
+			us[utxo.Address.String()] = utxo.Value
 		}
-		for adr := range ac.Address {
+		for _, adr := range ac.allAddress() {
 			r1 := make([]interface{}, 0, 3)
 			r1 = append(r1, adr)
 			r1 = append(r1, float64(us[adr])/aklib.ADK)
@@ -228,7 +228,7 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 	}
 	var amount int64
 	var detailss []*Details
-	tr, err := imesh.GetTxInfo(conf, txid)
+	tr, err := imesh.GetTxInfo(conf.DB, txid)
 	if err != nil {
 		return err
 	}
@@ -365,7 +365,7 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 		if skipped++; skipped <= skip {
 			continue
 		}
-		tr, err := imesh.GetTxInfo(conf, h.Hash)
+		tr, err := imesh.GetTxInfo(conf.DB, h.Hash)
 		if err != nil {
 			return err
 		}

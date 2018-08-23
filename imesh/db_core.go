@@ -73,8 +73,8 @@ func (ti *TxInfo) sigKey() []byte {
 	return key[:5]
 }
 
-func (ti *TxInfo) nextTxNo(s *setting.Setting, txn *badger.Txn) error {
-	if err := updateTxNo(s, txn); err != nil {
+func (ti *TxInfo) nextTxNo(txn *badger.Txn) error {
+	if err := updateTxNo(txn); err != nil {
 		return err
 	}
 	ti.TxNo = txno.TxNo
@@ -83,7 +83,7 @@ func (ti *TxInfo) nextTxNo(s *setting.Setting, txn *badger.Txn) error {
 
 //PreviousOutput returns an output of the input tx.
 func PreviousOutput(s *setting.Setting, in *tx.Input) (*tx.Output, error) {
-	prev, err := GetTxInfo(s, in.PreviousTX)
+	prev, err := GetTxInfo(s.DB, in.PreviousTX)
 	if err != nil {
 		return nil, err
 	}
@@ -107,18 +107,17 @@ func Has(s *setting.Setting, hash []byte) (bool, error) {
 }
 
 //Put puts a transaction info.
-//called only from Init.
-func (ti *TxInfo) put(s *setting.Setting, h tx.Hash) error {
-	return s.DB.Update(func(txn *badger.Txn) error {
-		return db.Put(txn, h, ti, db.HeaderTxInfo)
+func (ti *TxInfo) Put(akdb *badger.DB) error {
+	return akdb.Update(func(txn *badger.Txn) error {
+		return db.Put(txn, ti.Hash, ti, db.HeaderTxInfo)
 	})
 
 }
 
 //GetTxInfo gets a transaction info.
-func GetTxInfo(s *setting.Setting, h tx.Hash) (*TxInfo, error) {
+func GetTxInfo(akdb *badger.DB, h tx.Hash) (*TxInfo, error) {
 	var ti TxInfo
-	err := s.DB.View(func(txn *badger.Txn) error {
+	err := akdb.View(func(txn *badger.Txn) error {
 		return db.Get(txn, h, &ti, db.HeaderTxInfo)
 	})
 	ti.Hash = h
@@ -129,7 +128,7 @@ func GetTxInfo(s *setting.Setting, h tx.Hash) (*TxInfo, error) {
 //This is for funcs in tx  package.
 func getTxFunc(s *setting.Setting) func(hash []byte) (*tx.Body, error) {
 	return func(hash []byte) (*tx.Body, error) {
-		ti, err := GetTxInfo(s, hash)
+		ti, err := GetTxInfo(s.DB, hash)
 		if err != nil {
 			return nil, err
 		}
@@ -143,10 +142,10 @@ func IsValid(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 }
 
 //GetTx returns a transaction  from  hash.
-func GetTx(s *setting.Setting, hash []byte) (*tx.Transaction, error) {
+func GetTx(akdb *badger.DB, hash []byte) (*tx.Transaction, error) {
 	var sig tx.Signatures
 	var ti TxInfo
-	err := s.DB.View(func(txn *badger.Txn) error {
+	err := akdb.View(func(txn *badger.Txn) error {
 		if err2 := db.Get(txn, hash, &ti, db.HeaderTxInfo); err2 != nil {
 			return err2
 		}
@@ -159,6 +158,26 @@ func GetTx(s *setting.Setting, hash []byte) (*tx.Transaction, error) {
 		Body:       ti.Body,
 		Signatures: sig,
 	}, nil
+}
+
+//PutTxDirect puts a transaction  into db without checking tx relation..
+func PutTxDirect(akdb *badger.DB, tr *tx.Transaction) error {
+	ti := TxInfo{
+		Body:     tr.Body,
+		Received: time.Now().Truncate(time.Second),
+	}
+	return akdb.Update(func(txn *badger.Txn) error {
+		if err := ti.nextTxNo(txn); err != nil {
+			return err
+		}
+		if err2 := db.Put(txn, tr.Hash(), &ti, db.HeaderTxInfo); err2 != nil {
+			return err2
+		}
+		if err := putAddressToTx(txn, tr); err != nil {
+			return err
+		}
+		return db.Put(txn, ti.sigKey(), tr.Signatures, db.HeaderTxSig)
+	})
 }
 
 //called synchonously from resolve
@@ -174,7 +193,7 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 	}
 
 	return s.DB.Update(func(txn *badger.Txn) error {
-		if err := ti.nextTxNo(s, txn); err != nil {
+		if err := ti.nextTxNo(txn); err != nil {
 			return err
 		}
 		if err2 := db.Put(txn, tr.Hash(), &ti, db.HeaderTxInfo); err2 != nil {
@@ -197,7 +216,7 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 				}
 			}
 		}
-		if err := putAddressToTx(s, txn, tr); err != nil {
+		if err := putAddressToTx(txn, tr); err != nil {
 			return err
 		}
 		return db.Put(txn, ti.sigKey(), tr.Signatures, db.HeaderTxSig)
@@ -295,7 +314,7 @@ func putMinableTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 //IsMinableTxValid returns true if all inputs are not used in imesh.
 func IsMinableTxValid(s *setting.Setting, tr *tx.Transaction) (bool, error) {
 	for _, prev := range tx.InputHashes(tr.Body) {
-		ti, err := GetTxInfo(s, prev.Hash)
+		ti, err := GetTxInfo(s.DB, prev.Hash)
 		if err != nil {
 			return false, err
 		}
@@ -414,7 +433,7 @@ func isBrokenTx(s *setting.Setting, h []byte) (bool, error) {
 }
 
 //locked by mutex
-func updateTxNo(s *setting.Setting, txn *badger.Txn) error {
+func updateTxNo(txn *badger.Txn) error {
 	txno.Lock()
 	defer txno.Unlock()
 	txno.TxNo++

@@ -25,6 +25,8 @@ import (
 	"errors"
 	"log"
 
+	"github.com/AidosKuneen/aknode/imesh/leaves"
+
 	"github.com/AidosKuneen/aklib"
 
 	"github.com/AidosKuneen/aklib/address"
@@ -33,17 +35,17 @@ import (
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-var mineCh chan *imesh.HashWithType
+var mineCh chan *tx.HashWithType
 
 //AddForMine adds a minable tx for mine.
-func addForMine(s *setting.Setting, tr *imesh.HashWithType) {
+func addForMine(tr *tx.HashWithType) {
 	if len(mineCh) != 0 {
 		<-mineCh
 	}
 	mineCh <- tr
 }
 
-func mine(s *setting.Setting, mtx *imesh.HashWithType) error {
+func mine(s *setting.Setting, mtx *tx.HashWithType) error {
 	tr, err := imesh.GetMinableTx(s, mtx.Hash, mtx.Type)
 	if err != nil {
 		return err
@@ -75,9 +77,34 @@ func mine(s *setting.Setting, mtx *imesh.HashWithType) error {
 	return nil
 }
 
+func issueTicket(s *setting.Setting) error {
+	madr, _, err := address.ParseAddress58(s.MinerAddress, s.Config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	tr, err := tx.IssueTicket(s.Config, madr, leaves.Get(0)...)
+	if err != nil {
+		log.Println(err)
+	}
+	if err := imesh.CheckAddTx(s, tr, tx.TypeNormal); err != nil {
+		log.Println(err)
+	}
+	Resolve()
+	log.Println("ticket issued,", tr.Hash())
+	return nil
+}
+
 //RunMiner runs a miner
 func RunMiner(s *setting.Setting) {
-	mineCh = make(chan *imesh.HashWithType, 1)
+	mineCh = make(chan *tx.HashWithType, 1)
+
+	if s.RunTicketIssuer {
+		go func() {
+			if err := issueTicket(s); err != nil {
+				log.Println(err)
+			}
+		}()
+	}
 
 	go func() {
 		for h := range mineCh {

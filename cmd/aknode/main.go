@@ -36,6 +36,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/AidosKuneen/aknode/consensus"
+
+	"github.com/AidosKuneen/aklib/updater"
 	"github.com/AidosKuneen/aknode/explorer"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
@@ -101,7 +104,7 @@ func main() {
 	flag.Parse()
 
 	if update {
-		if err := selfUpdate(); err != nil {
+		if err := updater.Update("AidosKuneen/akwallet"); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -179,7 +182,7 @@ func initialize(setting *setting.Setting) error {
 		return err
 	}
 
-	rpc.GoNotify(setting, nil)
+	rpc.GoNotify(setting, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
 
 	if setting.RPCUser != "" {
 		if err := checkWalletSeed(setting); err != nil {

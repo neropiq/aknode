@@ -33,9 +33,7 @@ import (
 	"github.com/AidosKuneen/aklib/arypack"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
-	"github.com/AidosKuneen/aknode/consensus"
 	"github.com/AidosKuneen/aknode/imesh"
-	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/setting"
 
 	"github.com/dgraph-io/badger"
@@ -47,19 +45,32 @@ const walletVersion = 1
 
 //Address is an address with its index in HD wallet.
 type Address struct {
+	conf       *setting.Setting
 	EncAddress []byte `json:"encoded_address"`
 	address    *address.Address
 }
 
 //Account represents an account with addresses.
 type Account struct {
-	Index         uint32              `json:"index"`
-	CountAddress2 uint32              `json:"count_accress2"`
-	Address       map[string]struct{} `json:"address"`
+	Index     uint32              `json:"index"`
+	Address2  map[string]struct{} `json:"address2"`
+	Address10 map[string]struct{} `json:"address10"`
+}
+
+func (ac *Account) allAddress() []string {
+	adrs := make([]string, 0, len(ac.Address2)*len(ac.Address10))
+	for a := range ac.Address2 {
+		adrs = append(adrs, a)
+	}
+	for a := range ac.Address10 {
+		adrs = append(adrs, a)
+	}
+	return adrs
 }
 
 //Wallet represents a wallet in RPC..
 type Wallet struct {
+	conf   *setting.Setting
 	Secret struct {
 		seed    []byte
 		EncSeed []byte `json:"seed"`
@@ -80,13 +91,16 @@ const poolSize = 20 //FIXME
 
 //Init initialize wallet struct.
 func Init(s *setting.Setting) error {
-	return s.DB.View(func(txn *badger.Txn) error {
+	err := s.DB.View(func(txn *badger.Txn) error {
 		err := db.Get(txn, nil, &wallet, db.HeaderWallet)
 		if err != nil && err != badger.ErrKeyNotFound {
 			return err
 		}
 		return nil
 	})
+	wallet.conf = s
+	return err
+
 }
 
 //locked by mutex
@@ -121,9 +135,9 @@ func putAddress(s *setting.Setting, adr *Address, update bool) error {
 		return errors.New("need to call walletpassphrase to encrypt address")
 	}
 	if update {
-		adr.EncAddress = encrypt(arypack.Marshal(adr.address), wallet.Secret.pwd)
+		adr.EncAddress = address.EncryptSeed(arypack.Marshal(adr.address), wallet.Secret.pwd)
 	} else {
-		dat, err2 := decrypt(adr.EncAddress, wallet.Secret.pwd)
+		dat, err2 := address.DecryptSeed(adr.EncAddress, wallet.Secret.pwd)
 		if err2 != nil {
 			return err2
 		}
@@ -147,7 +161,7 @@ func getAddress(s *setting.Setting, name string) (*Address, error) {
 		if err := db.Get(txn, []byte(name), &adr, db.HeaderWalletAddress); err != nil {
 			return err
 		}
-		dat, err2 := decrypt(adr.EncAddress, wallet.Secret.pwd)
+		dat, err2 := address.DecryptSeed(adr.EncAddress, wallet.Secret.pwd)
 		if err2 != nil {
 			return err2
 		}
@@ -193,7 +207,7 @@ func InitSecret(s *setting.Setting, pwd []byte) error {
 	if _, err := rand.Read(seed); err != nil {
 		panic(err)
 	}
-	wallet.Secret.EncSeed = encrypt(seed, pwd)
+	wallet.Secret.EncSeed = address.EncryptSeed(seed, pwd)
 	wallet.Secret.seed = seed
 	wallet.Secret.pwd = pwd
 	if err := fillPool(s); err != nil {
@@ -211,7 +225,7 @@ func clearSecret() {
 
 func decryptSecret(s *setting.Setting, pwd []byte) error {
 	var err error
-	wallet.Secret.seed, err = decrypt(wallet.Secret.EncSeed, pwd)
+	wallet.Secret.seed, err = address.DecryptSeed(wallet.Secret.EncSeed, pwd)
 	if err != nil {
 		return err
 	}
@@ -230,6 +244,7 @@ func fillPool(s *setting.Setting) error {
 			return err
 		}
 		adr := &Address{
+			conf:    s,
 			address: a,
 		}
 		if err := putAddress(s, adr, true); err != nil {
@@ -239,13 +254,6 @@ func fillPool(s *setting.Setting) error {
 		wallet.Pool.Index++
 	}
 	return putWallet(s)
-}
-
-type utxo struct {
-	address     *Address
-	addressName string
-	*tx.InoutHash
-	value uint64
 }
 
 func updateLeaf(s *setting.Setting, sig *address.Signature, adr *Address, adrname string) error {
@@ -265,8 +273,8 @@ func updateLeaf(s *setting.Setting, sig *address.Signature, adr *Address, adrnam
 	}
 	return nil
 }
-func getAllUTXOs(s *setting.Setting, checkSig bool) ([]*utxo, uint64, error) {
-	var utxos []*utxo
+func getAllUTXOs(s *setting.Setting, checkSig bool) ([]*tx.UTXO, uint64, error) {
+	var utxos []*tx.UTXO
 	var bals uint64
 	for ac := range wallet.Accounts {
 		u, bal, err := getUTXO(s, ac, checkSig)
@@ -278,15 +286,37 @@ func getAllUTXOs(s *setting.Setting, checkSig bool) ([]*utxo, uint64, error) {
 	}
 	return utxos, bals, nil
 }
-func getUTXO(s *setting.Setting, acname string, checkSig bool) ([]*utxo, uint64, error) {
+func getUTXO(s *setting.Setting, acname string, checkSig bool) ([]*tx.UTXO, uint64, error) {
 	var bal uint64
-	var utxos []*utxo
+	var utxos []*tx.UTXO
+	u10, b10, err := getUTXO102(s, acname, true, checkSig)
+	if err != nil {
+		return nil, 0, err
+	}
+	bal += b10
+	utxos = append(utxos, u10...)
+	u2, b2, err := getUTXO102(s, acname, false, checkSig)
+	if err != nil {
+		return nil, 0, err
+	}
+	bal += b2
+	utxos = append(utxos, u2...)
+	return utxos, bal, nil
+}
+
+func getUTXO102(s *setting.Setting, acname string, is10 bool, checkSig bool) ([]*tx.UTXO, uint64, error) {
+	var bal uint64
+	var utxos []*tx.UTXO
 	a, ok := wallet.Accounts[acname]
 	if !ok {
 		return nil, 0, errors.New("account not found")
 	}
+	adrmap := a.Address10
+	if !is10 {
+		adrmap = a.Address2
+	}
 	var err error
-	for adrname := range a.Address {
+	for adrname := range adrmap {
 		var adr *Address
 		if checkSig {
 			adr, err = getAddress(s, adrname)
@@ -308,7 +338,7 @@ func getUTXO(s *setting.Setting, acname string, checkSig bool) ([]*utxo, uint64,
 				if !checkSig {
 					continue
 				}
-				tr, err := imesh.GetTx(s, h.Hash)
+				tr, err := imesh.GetTx(s.DB, h.Hash)
 				if err != nil {
 					return nil, 0, err
 				}
@@ -318,21 +348,20 @@ func getUTXO(s *setting.Setting, acname string, checkSig bool) ([]*utxo, uint64,
 					}
 				}
 			case tx.TypeOut:
-				tr, err := imesh.GetTxInfo(s, h.Hash)
+				tr, err := imesh.GetTxInfo(s.DB, h.Hash)
 				if err != nil {
 					return nil, 0, err
 				}
 				if tr.Status != imesh.StatusConfirmed {
 					continue
 				}
-				u := &utxo{
-					address:     adr,
-					addressName: adrname,
-					value:       tr.Body.Outputs[h.Index].Value,
-					InoutHash:   h,
+				u := &tx.UTXO{
+					Address:   adr,
+					Value:     tr.Body.Outputs[h.Index].Value,
+					InoutHash: h,
 				}
 				utxos = append(utxos, u)
-				bal += u.value
+				bal += u.Value
 			}
 		}
 
@@ -348,22 +377,28 @@ func getUTXO(s *setting.Setting, acname string, checkSig bool) ([]*utxo, uint64,
 	return utxos, bal, nil
 }
 
-func (adr *Address) sign(s *setting.Setting, tr *tx.Transaction) error {
+func (adr *Address) String() string {
+	return adr.address.Address58()
+}
+
+//Sign signs a tx and puts the state of the adr to DB.
+func (adr *Address) Sign(tr *tx.Transaction) error {
 	if adr.address == nil {
 		return errors.New("call walletpassphrase first")
 	}
 	if err := tr.Sign(adr.address); err != nil {
 		return err
 	}
-	return putAddress(s, adr, true)
+	return putAddress(adr.conf, adr, true)
 }
 
 func newAddress10(s *setting.Setting, aname string) (string, error) {
 	ac, ok := wallet.Accounts[aname]
 	if !ok {
 		ac = &Account{
-			Index:   uint32(len(wallet.Accounts)),
-			Address: make(map[string]struct{}),
+			Index:     uint32(len(wallet.Accounts)),
+			Address2:  make(map[string]struct{}),
+			Address10: make(map[string]struct{}),
 		}
 		wallet.Accounts[aname] = ac
 	}
@@ -372,33 +407,46 @@ func newAddress10(s *setting.Setting, aname string) (string, error) {
 	}
 	a := wallet.Pool.Address[0]
 	wallet.Pool.Address = wallet.Pool.Address[1:]
-	ac.Address[a] = struct{}{}
+	ac.Address10[a] = struct{}{}
 	return a, putWallet(s)
 }
 
-func newAddress2(s *setting.Setting, ac *Account) (*address.Address, error) {
+//NewAddress2 returns a new address with height=2.
+func (w *Wallet) NewAddress2(acstr string) (*address.Address, error) {
+	if acstr == "*" {
+		for acstr = range wallet.Accounts {
+			break
+		}
+	}
+	ac, ok := wallet.Accounts[acstr]
+	if !ok {
+		return nil, errors.New("invalid account name")
+	}
 	if wallet.Secret.pwd == nil {
 		return nil, errors.New("call walletpassphrase first")
 	}
-	seed := address.HDseed(wallet.Secret.seed, address.Height2, ac.Index, ac.CountAddress2)
-	a, err := address.New(address.Height2, seed, s.Config)
+	seed := address.HDseed(wallet.Secret.seed, address.Height2, ac.Index, uint32(len(ac.Address2)))
+	a, err := address.New(address.Height2, seed, w.conf.Config)
 	if err != nil {
 		return nil, err
 	}
 	adr := &Address{
+		conf:    w.conf,
 		address: a,
 	}
-	if err := putAddress(s, adr, true); err != nil {
+	if err := putAddress(w.conf, adr, true); err != nil {
 		return nil, err
 	}
-	ac.Address[a.Address58()] = struct{}{}
-	ac.CountAddress2++
-	return a, putWallet(s)
+	ac.Address2[a.Address58()] = struct{}{}
+	return a, putWallet(w.conf)
 }
 
 func findAddress(adrstr string) (string, bool) {
 	for name, acc := range wallet.Accounts {
-		if _, isMine := acc.Address[adrstr]; isMine {
+		if _, isMine := acc.Address2[adrstr]; isMine {
+			return name, true
+		}
+		if _, isMine := acc.Address10[adrstr]; isMine {
 			return name, true
 		}
 	}
@@ -420,17 +468,13 @@ func (h *History) GetOutput(s *setting.Setting) (*tx.Output, error) {
 
 //GoNotify runs gorouitine to get history of addresses in wallet.
 //This func needs to run even if RPC is stopped for collecting history.
-func GoNotify(s *setting.Setting, creg func(chan []*imesh.HashWithType)) {
-	nnotify := make(chan []*imesh.HashWithType, 10)
-	node.RegisterTxNotifier(nnotify)
-	cnotify := make(chan []*imesh.HashWithType, 10)
+func GoNotify(s *setting.Setting, nreg, creg func(chan []tx.Hash)) {
+	nnotify := make(chan []tx.Hash, 10)
+	nreg(nnotify)
+	cnotify := make(chan []tx.Hash, 10)
 
 	if s.WalletNotify != "" {
-		if creg == nil {
-			consensus.RegisterTxNotifier(cnotify)
-		} else {
-			creg(cnotify)
-		}
+		creg(cnotify)
 		go func() {
 			for noti := range cnotify {
 				if err := walletnotifyRunCommand(s, noti); err != nil {
@@ -443,10 +487,7 @@ func GoNotify(s *setting.Setting, creg func(chan []*imesh.HashWithType)) {
 		for noti := range nnotify {
 			trs := make([]*imesh.TxInfo, 0, len(noti))
 			for _, h := range noti {
-				if h.Type != tx.TypeNormal {
-					continue
-				}
-				tr, err := imesh.GetTxInfo(s, h.Hash)
+				tr, err := imesh.GetTxInfo(s.DB, h)
 				if err != nil {
 					log.Println(err)
 				}
@@ -467,13 +508,10 @@ func GoNotify(s *setting.Setting, creg func(chan []*imesh.HashWithType)) {
 
 var debugNotify chan string
 
-func walletnotifyRunCommand(s *setting.Setting, noti []*imesh.HashWithType) error {
+func walletnotifyRunCommand(s *setting.Setting, noti []tx.Hash) error {
 start:
 	for _, h := range noti {
-		if h.Type != tx.TypeNormal {
-			continue
-		}
-		tr, err := imesh.GetTxInfo(s, h.Hash)
+		tr, err := imesh.GetTxInfo(s.DB, h)
 		if err != nil {
 			return err
 		}
@@ -482,7 +520,7 @@ start:
 			if !ok {
 				continue
 			}
-			str, err := runCommand(s, h.Hash)
+			str, err := runCommand(s, h)
 			if err != nil {
 				return err
 			}
@@ -500,7 +538,7 @@ start:
 			if !ok {
 				continue
 			}
-			str, err := runCommand(s, h.Hash)
+			str, err := runCommand(s, h)
 			if err != nil {
 				return err
 			}
@@ -509,7 +547,7 @@ start:
 			}
 			continue start
 		}
-		log.Println("didn't run cmd", h.Hash)
+		log.Println("didn't run cmd", h)
 	}
 	return nil
 }

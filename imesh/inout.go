@@ -31,7 +31,7 @@ import (
 //If ih is output, returns the output specified by ih.
 //If ih is input, return output refered by the input.
 func GetOutput(s *setting.Setting, ih *tx.InoutHash) (*tx.Output, error) {
-	tr, err := GetTxInfo(s, ih.Hash)
+	tr, err := GetTxInfo(s.DB, ih.Hash)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func GetOutput(s *setting.Setting, ih *tx.InoutHash) (*tx.Output, error) {
 		return tr.Body.Outputs[ih.Index], nil
 	case tx.TypeIn:
 		in := tr.Body.Inputs[ih.Index]
-		prev, err := GetTxInfo(s, in.PreviousTX)
+		prev, err := GetTxInfo(s.DB, in.PreviousTX)
 		if err != nil {
 			return nil, err
 		}

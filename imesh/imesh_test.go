@@ -81,7 +81,7 @@ func teardown(t *testing.T) {
 func TestImesh(t *testing.T) {
 	setup(t)
 	defer teardown(t)
-	g, err2 := GetTx(&s, genesis[0])
+	g, err2 := GetTx(s.DB, genesis[0])
 	if err2 != nil {
 		t.Error(err2)
 	}

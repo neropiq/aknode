@@ -24,6 +24,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/AidosKuneen/aklib/tx"
+
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aknode/setting"
 )
@@ -77,11 +79,11 @@ func sendmany(conf *setting.Setting, req *Request, res *Response) error {
 	if wallet.Secret.pwd == nil {
 		return errors.New("not priviledged")
 	}
-	trs := make([]output, len(target))
+	trs := make([]*tx.RawOutput, len(target))
 	i := 0
 	for k, v := range target {
-		trs[i].address = k
-		trs[i].value = uint64(v * aklib.ADK)
+		trs[i].Address = k
+		trs[i].Value = uint64(v * aklib.ADK)
 		i++
 	}
 	res.Result, err = Send(conf, acc, []byte(conf.RPCTxTag), trs...)
@@ -103,9 +105,9 @@ func sendfrom(conf *setting.Setting, req *Request, res *Response) error {
 	if wallet.Secret.pwd == nil {
 		return errors.New("not priviledged")
 	}
-	res.Result, err = Send(conf, acc, []byte(conf.RPCTxTag), output{
-		address: adrstr,
-		value:   uint64(value * aklib.ADK),
+	res.Result, err = Send(conf, acc, []byte(conf.RPCTxTag), &tx.RawOutput{
+		Address: adrstr,
+		Value:   uint64(value * aklib.ADK),
 	})
 	return err
 }
@@ -126,9 +128,9 @@ func sendtoaddress(conf *setting.Setting, req *Request, res *Response) error {
 	if wallet.Secret.pwd == nil {
 		return errors.New("not priviledged")
 	}
-	res.Result, err = Send(conf, "*", []byte(conf.RPCTxTag), output{
-		address: adrstr,
-		value:   uint64(value * aklib.ADK),
+	res.Result, err = Send(conf, "*", []byte(conf.RPCTxTag), &tx.RawOutput{
+		Address: adrstr,
+		Value:   uint64(value * aklib.ADK),
 	})
 	return err
 }

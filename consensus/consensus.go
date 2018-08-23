@@ -22,12 +22,11 @@ package consensus
 
 import (
 	"github.com/AidosKuneen/aklib/tx"
-	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/setting"
 )
 
 var (
-	notify chan []*imesh.HashWithType
+	notify chan []tx.Hash
 )
 
 //Confirm confirms txs and return hashes of confirmed txs.
@@ -37,12 +36,9 @@ func Confirm(s *setting.Setting) ([]tx.Hash, error) {
 	//do concensus
 
 	if notify != nil {
-		txs := make([]*imesh.HashWithType, len(tr))
+		txs := make([]tx.Hash, len(tr))
 		for i := range tr {
-			txs[i] = &imesh.HashWithType{
-				Hash: tr[i],
-				Type: tx.TypeNormal,
-			}
+			txs[i] = tr[i]
 		}
 		notify <- txs
 	}
@@ -50,6 +46,6 @@ func Confirm(s *setting.Setting) ([]tx.Hash, error) {
 }
 
 //RegisterTxNotifier registers a notifier for resolved txs.
-func RegisterTxNotifier(n chan []*imesh.HashWithType) {
+func RegisterTxNotifier(n chan []tx.Hash) {
 	notify = n
 }

@@ -177,7 +177,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		renderError(w, notFound)
 		return
 	}
-	ti, err := imesh.GetTxInfo(s, txid)
+	ti, err := imesh.GetTxInfo(s.DB, txid)
 	if !ok {
 		renderError(w, err.Error())
 		return
@@ -226,7 +226,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for i, inp := range ti.Body.MultiSigIns {
-		ti, err := imesh.GetTxInfo(s, inp.PreviousTX)
+		ti, err := imesh.GetTxInfo(s.DB, inp.PreviousTX)
 		if err != nil {
 			renderError(w, err.Error())
 			return
@@ -234,7 +234,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		info.MInputs[i] = ti.Body.MultiSigOuts[inp.Index]
 	}
 	if len(ti.Body.MultiSigIns) != 0 {
-		tr, err := imesh.GetTx(s, txid)
+		tr, err := imesh.GetTx(s.DB, txid)
 		if err != nil {
 			renderError(w, err.Error())
 			return
@@ -286,7 +286,7 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		case tx.TypeMulin:
 			info.MInputs = append(info.MInputs, h.Hash)
 		case tx.TypeOut:
-			ti, err := imesh.GetTxInfo(s, h.Hash)
+			ti, err := imesh.GetTxInfo(s.DB, h.Hash)
 			if err != nil {
 				renderError(w, err.Error())
 				return

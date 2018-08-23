@@ -32,6 +32,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AidosKuneen/aknode/consensus"
+
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
@@ -53,7 +55,7 @@ func TestControlAPI(t *testing.T) {
 	if err := decryptSecret(&s, pwd); err != nil {
 		t.Error(err)
 	}
-	GoNotify(&s, nil)
+	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
 	acs := []string{"ac1", ""}
 	var adr string
 	for _, ac := range acs {
@@ -367,14 +369,19 @@ func testimportwallet(t *testing.T, pwd []byte) {
 		if ba.Index != wa.Index {
 			t.Error("invalid account index")
 		}
-		if ba.CountAddress2 != wa.CountAddress2 {
-			t.Error("invalid count address2")
-		}
-		if len(wa.Address) != len(ba.Address) {
+		if len(wa.Address2) != len(ba.Address2) {
 			t.Error("invalid account address")
 		}
-		for adr := range ba.Address {
-			if _, ok := wa.Address[adr]; !ok {
+		if len(wa.Address10) != len(ba.Address10) {
+			t.Error("invalid account address")
+		}
+		for adr := range ba.Address2 {
+			if _, ok := wa.Address2[adr]; !ok {
+				t.Error("invalid account address")
+			}
+		}
+		for adr := range ba.Address10 {
+			if _, ok := wa.Address10[adr]; !ok {
 				t.Error("invalid account address")
 			}
 		}

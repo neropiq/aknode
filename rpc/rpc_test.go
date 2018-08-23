@@ -39,6 +39,7 @@ import (
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/consensus"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/node"
@@ -209,7 +210,7 @@ func TestSig(t *testing.T) {
 	if err := decryptSecret(&s, pwd); err != nil {
 		t.Error(err)
 	}
-	GoNotify(&s, nil)
+	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
 	adrs := newAddress(t, "")
 	tr := tx.New(s.Config, genesis)
 	tr.AddInput(genesis, 0)

@@ -184,7 +184,7 @@ func getrawtx(conf *setting.Setting, req *Request, res *Response) error {
 	if err != nil {
 		return err
 	}
-	tr, err := imesh.GetTx(conf, id)
+	tr, err := imesh.GetTx(conf.DB, id)
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func gettxsstatus(conf *setting.Setting, req *Request, res *Response) error {
 			r = append(r, -1)
 			continue
 		}
-		tr, err := imesh.GetTxInfo(conf, tid)
+		tr, err := imesh.GetTxInfo(conf.DB, tid)
 		if err != nil {
 			return err
 		}

@@ -29,6 +29,7 @@ import (
 	"log"
 	"sort"
 
+	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
@@ -37,7 +38,7 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-func updateAddressToTx(s *setting.Setting, txn *badger.Txn, adr []byte, addH, delH []byte) error {
+func updateAddressToTx(txn *badger.Txn, adr []byte, addH, delH []byte) error {
 	var hashes [][]byte
 	if err := db.Get(txn, adr, &hashes, db.HeaderAddressToTx); err != nil && err != badger.ErrKeyNotFound {
 		return err
@@ -64,7 +65,7 @@ func updateAddressToTx(s *setting.Setting, txn *badger.Txn, adr []byte, addH, de
 	return db.Put(txn, adr, hashes, db.HeaderAddressToTx)
 }
 
-func putInputAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction) error {
+func putInputAddressToTx(txn *badger.Txn, tr *tx.Transaction) error {
 	if tr.TicketInput != nil {
 		var ti TxInfo
 		if err := db.Get(txn, tr.TicketInput, &ti, db.HeaderTxInfo); err != nil {
@@ -72,7 +73,7 @@ func putInputAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction
 		}
 		addH := tx.Inout2key(tr.Hash(), tx.TypeTicketin, 0)
 		delH := tx.Inout2key(tr.TicketInput, tx.TypeTicketout, 0)
-		if err := updateAddressToTx(s, txn, ti.Body.TicketOutput, addH, delH); err != nil {
+		if err := updateAddressToTx(txn, ti.Body.TicketOutput, addH, delH); err != nil {
 			return err
 		}
 	}
@@ -84,14 +85,14 @@ func putInputAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction
 		adr := ti.Body.Outputs[inp.Index].Address
 		addH := tx.Inout2key(tr.Hash(), tx.TypeIn, byte(i))
 		delH := tx.Inout2key(inp.PreviousTX, tx.TypeOut, inp.Index)
-		if err := updateAddressToTx(s, txn, adr, addH, delH); err != nil {
+		if err := updateAddressToTx(txn, adr, addH, delH); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func putMultisigInAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction) error {
+func putMultisigInAddressToTx(txn *badger.Txn, tr *tx.Transaction) error {
 	for i, inp := range tr.MultiSigIns {
 		var ti TxInfo
 		if err := db.Get(txn, inp.PreviousTX, &ti, db.HeaderTxInfo); err != nil {
@@ -100,7 +101,7 @@ func putMultisigInAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transa
 		for _, adr := range ti.Body.MultiSigOuts[inp.Index].Addresses {
 			addH := tx.Inout2key(tr.Hash(), tx.TypeMulin, byte(i))
 			delH := tx.Inout2key(inp.PreviousTX, tx.TypeMulout, inp.Index)
-			if err := updateAddressToTx(s, txn, adr, addH, delH); err != nil {
+			if err := updateAddressToTx(txn, adr, addH, delH); err != nil {
 				return err
 			}
 		}
@@ -108,27 +109,27 @@ func putMultisigInAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transa
 	return nil
 }
 
-func putOutputAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction) error {
+func putOutputAddressToTx(txn *badger.Txn, tr *tx.Transaction) error {
 	if tr.TicketOutput != nil {
 		addH := tx.Inout2key(tr.Hash(), tx.TypeTicketout, 0)
-		if err := updateAddressToTx(s, txn, tr.TicketOutput, addH, nil); err != nil {
+		if err := updateAddressToTx(txn, tr.TicketOutput, addH, nil); err != nil {
 			return err
 		}
 	}
 	for i, inp := range tr.Outputs {
 		addH := tx.Inout2key(tr.Hash(), tx.TypeOut, byte(i))
-		if err := updateAddressToTx(s, txn, inp.Address, addH, nil); err != nil {
+		if err := updateAddressToTx(txn, inp.Address, addH, nil); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func putMultisigOutAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction) error {
+func putMultisigOutAddressToTx(txn *badger.Txn, tr *tx.Transaction) error {
 	for i, out := range tr.MultiSigOuts {
 		for _, adr := range out.Addresses {
 			addH := tx.Inout2key(tr.Hash(), tx.TypeMulout, byte(i))
-			if err := updateAddressToTx(s, txn, adr, addH, nil); err != nil {
+			if err := updateAddressToTx(txn, adr, addH, nil); err != nil {
 				return err
 			}
 		}
@@ -137,27 +138,32 @@ func putMultisigOutAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Trans
 }
 
 //should be called synchonously, but check for sure.
-func putAddressToTx(s *setting.Setting, txn *badger.Txn, tr *tx.Transaction) error {
-	if err := putInputAddressToTx(s, txn, tr); err != nil {
+func putAddressToTx(txn *badger.Txn, tr *tx.Transaction) error {
+	if err := putInputAddressToTx(txn, tr); err != nil {
 		return err
 	}
-	if err := putMultisigInAddressToTx(s, txn, tr); err != nil {
+	if err := putMultisigInAddressToTx(txn, tr); err != nil {
 		return err
 	}
-	if err := putOutputAddressToTx(s, txn, tr); err != nil {
+	if err := putOutputAddressToTx(txn, tr); err != nil {
 		return err
 	}
-	return putMultisigOutAddressToTx(s, txn, tr)
+	return putMultisigOutAddressToTx(txn, tr)
 }
 
 //GetHisoty returns utxo (or all outputs) and input hashes associated with  address adr.
 func GetHisoty(s *setting.Setting, adrstr string, utxoOnly bool) ([]*tx.InoutHash, error) {
-	adrbyte, _, err := address.ParseAddress58(adrstr, s.Config)
+	return GetHisoty2(s.DB, s.Config, adrstr, utxoOnly)
+}
+
+//GetHisoty2 returns utxo (or all outputs) and input hashes associated with  address adr.
+func GetHisoty2(akdb *badger.DB, cfg *aklib.Config, adrstr string, utxoOnly bool) ([]*tx.InoutHash, error) {
+	adrbyte, _, err := address.ParseAddress58(adrstr, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var hashes [][]byte
-	err = s.DB.View(func(txn *badger.Txn) error {
+	err = akdb.View(func(txn *badger.Txn) error {
 		err2 := db.Get(txn, adrbyte, &hashes, db.HeaderAddressToTx)
 		if err2 == badger.ErrKeyNotFound {
 			return nil
@@ -182,7 +188,7 @@ func GetHisoty(s *setting.Setting, adrstr string, utxoOnly bool) ([]*tx.InoutHas
 			if ih.Type == tx.TypeOut || ih.Type == tx.TypeMulout || ih.Type == tx.TypeTicketout {
 				continue
 			}
-			tr, err := GetTxInfo(s, ih.Hash)
+			tr, err := GetTxInfo(akdb, ih.Hash)
 			if err != nil {
 				return nil, err
 			}

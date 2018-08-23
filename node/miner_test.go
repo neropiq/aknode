@@ -40,7 +40,7 @@ func TestMiner(t *testing.T) {
 	s.RunFeeMiner = true
 	s.RunTicketMiner = true
 
-	ti, err := tx.IssueTicket(s.Config, a, genesis)
+	ti, err := tx.IssueTicket(s.Config, a.Address(), genesis)
 	if err != nil {
 		t.Error(err)
 	}
@@ -124,7 +124,7 @@ func TestMiner(t *testing.T) {
 		t.Error(err)
 	}
 
-	var inout []*imesh.InoutHash
+	var inout []*tx.InoutHash
 	for i := 0; i < 30 && len(inout) == 0; i++ {
 		var err error
 		time.Sleep(10 * time.Second)

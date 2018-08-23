@@ -398,7 +398,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 			for _, inv := range invs {
 				switch inv.Type {
 				case msg.InvTxNormal:
-					tr, err := imesh.GetTx(s, inv.Hash[:])
+					tr, err := imesh.GetTx(s.DB, inv.Hash[:])
 					if err != nil {
 						log.Println(err)
 						continue

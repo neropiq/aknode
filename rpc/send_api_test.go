@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AidosKuneen/aknode/consensus"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 
 	"github.com/AidosKuneen/aknode/msg"
@@ -50,7 +51,7 @@ func TestSendAPI(t *testing.T) {
 		t.Error(err)
 	}
 	clearSecret()
-	GoNotify(&s, nil)
+	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
 	acs := []string{"ac1", ""}
 	adr2ac := make(map[string]string)
 	adr2val := make(map[string]uint64)
@@ -171,16 +172,16 @@ func testgetnodeinfo(t *testing.T) *NodeInfo {
 	return result
 }
 
-func getDiff(t *testing.T, u0, u1 []*utxo) map[string]int64 {
+func getDiff(t *testing.T, u0, u1 []*tx.UTXO) map[string]int64 {
 	diff := make(map[string]int64)
 
 	bal0 := make(map[string]int64)
 	for _, u := range u0 {
-		bal0[u.addressName] += int64(u.value)
+		bal0[u.Address.String()] += int64(u.Value)
 	}
 	bal1 := make(map[string]int64)
 	for _, u := range u1 {
-		bal1[u.addressName] += int64(u.value)
+		bal1[u.Address.String()] += int64(u.Value)
 	}
 	for adr, val := range bal0 {
 		if v := bal1[adr] - val; v != 0 {
@@ -210,7 +211,7 @@ func checkResponse(t *testing.T, diff map[string]int64, acc string,
 	if err != nil {
 		t.Error(err)
 	}
-	tx, err := imesh.GetTx(&s, txid)
+	tx, err := imesh.GetTx(s.DB, txid)
 	if err != nil {
 		t.Error(err, txid, result)
 	}

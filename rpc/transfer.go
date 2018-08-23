@@ -21,10 +21,7 @@
 package rpc
 
 import (
-	"errors"
-	"fmt"
 	"log"
-	"sort"
 	"sync"
 	"time"
 
@@ -36,98 +33,68 @@ import (
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-func buildTx(conf *setting.Setting, ac string, tag []byte, outputs ...output) (*tx.Transaction, error) {
-	tr := tx.New(conf.Config, leaves.Get(tx.DefaultPreviousSize)...)
-	tr.Message = tag
-	var outtotal uint64
-	for _, o := range outputs {
-		if err := tr.AddOutput(conf.Config, o.address, o.value); err != nil {
-			return nil, err
-		}
-		outtotal += o.value
-	}
-
-	var utxos []*utxo
+//GetUTXO returns UTXOs whose total is over outtotal.
+func (w *Wallet) GetUTXO(ac string, outtotal uint64) ([]*tx.UTXO, error) {
+	var utxos []*tx.UTXO
 	var total uint64
-	var account *Account
 	if ac == "*" {
-		for acname, acc := range wallet.Accounts {
-			account = acc
-			u, bal, err := getUTXO(conf, acname, true)
+		for acname := range wallet.Accounts {
+			u, bal, err := getUTXO102(w.conf, acname, false, true)
 			if err != nil {
 				return nil, err
 			}
 			total += bal
 			utxos = append(utxos, u...)
 		}
+		if outtotal > total {
+			for acname := range wallet.Accounts {
+				u, bal, err := getUTXO102(w.conf, acname, true, true)
+				if err != nil {
+					return nil, err
+				}
+				total += bal
+				utxos = append(utxos, u...)
+			}
+		}
 	} else {
-		var ok bool
-		account, ok = wallet.Accounts[ac]
-		if !ok {
-			return nil, errors.New("invalid account")
-		}
 		var err error
-		utxos, total, err = getUTXO(conf, ac, true)
+		utxos, total, err = getUTXO102(w.conf, ac, false, true)
 		if err != nil {
 			return nil, err
 		}
-	}
-	if outtotal > total {
-		return nil, fmt.Errorf("insufficient balance, needed %v, balance %v", outtotal, total)
-	}
-	sort.Slice(utxos, func(i, j int) bool {
-		return utxos[i].value < utxos[j].value
-	})
-	i := sort.Search(len(utxos), func(i int) bool {
-		return utxos[i].value >= outtotal
-	})
-	change := int64(outtotal)
-	var adrs []*Address
-	if i == len(utxos) {
-		i--
-	}
-	for ; i >= 0 && change > 0; i-- {
-		tr.AddInput(utxos[i].Hash, utxos[i].Index)
-		adrs = append(adrs, utxos[i].address)
-		change -= int64(utxos[i].value)
-	}
-	if change > 0 {
-		return nil, fmt.Errorf("insufficient balance %v", change)
-	}
-	if change != 0 {
-		adr, err := newAddress2(conf, account)
-		if err != nil {
-			return nil, err
-		}
-		if err := tr.AddOutput(conf.Config, adr.Address58(), uint64(-change)); err != nil {
-			return nil, err
+		if outtotal > total {
+			u10, t10, err := getUTXO102(w.conf, ac, true, true)
+			if err != nil {
+				return nil, err
+			}
+			total += t10
+			utxos = append(utxos, u10...)
 		}
 	}
-	for _, a := range adrs {
-		if err := a.sign(conf, tr); err != nil {
-			return nil, err
-		}
-	}
-	return tr, nil
+	return utxos, nil
 }
 
-var powMutex sync.Mutex
-
-type output struct {
-	address string
-	value   uint64
+//GetLeaves return leaves hashes.
+func (w *Wallet) GetLeaves() ([]tx.Hash, error) {
+	return leaves.Get(tx.DefaultPreviousSize), nil
 }
+
+var powmutex sync.Mutex
 
 //Send sends token.
-func Send(conf *setting.Setting, ac string, tag []byte, outputs ...output) (string, error) {
-	powMutex.Lock()
-	defer powMutex.Unlock()
-	tr, err := buildTx(conf, ac, tag, outputs...)
+func Send(conf *setting.Setting, ac string, tag []byte, outputs ...*tx.RawOutput) (string, error) {
+
+	mutex.Lock()
+	tr, err := tx.Build(conf.Config, &wallet, ac, tag, outputs)
+	mutex.Unlock()
 	if err != nil {
 		return "", err
 	}
 	log.Println("starting PoW...")
-	if err := tr.PoW(); err != nil {
+	powmutex.Lock()
+	err = tr.PoW()
+	powmutex.Unlock()
+	if err != nil {
 		return "", err
 	}
 	if err := imesh.IsValid(conf, tr, tx.TypeNormal); err != nil {

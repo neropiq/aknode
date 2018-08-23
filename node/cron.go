@@ -34,7 +34,7 @@ import (
 
 var (
 	ch     = make(chan struct{}, 2)
-	notify chan []*imesh.HashWithType
+	notify chan []tx.Hash
 )
 
 //Resolve run resolve routine.
@@ -45,7 +45,7 @@ func Resolve() {
 }
 
 //RegisterTxNotifier registers a notifier for resolved txs.
-func RegisterTxNotifier(n chan []*imesh.HashWithType) {
+func RegisterTxNotifier(n chan []tx.Hash) {
 	notify = n
 }
 
@@ -61,6 +61,7 @@ func goResolve(s *setting.Setting) {
 			log.Println("resolved txid:", hex.EncodeToString(tr.Hash))
 		}
 		if len(trs) != 0 {
+			ntrs := make([]tx.Hash, 0, len(trs))
 			log.Println(" broadcasting resolved txs...")
 			inv := make(msg.Inventories, 0, len(trs))
 			for _, h := range trs {
@@ -75,12 +76,17 @@ func goResolve(s *setting.Setting) {
 				})
 				if (h.Type == tx.TypeRewardFee && s.RunFeeMiner) ||
 					(h.Type == tx.TypeRewardTicket && s.RunTicketMiner) {
-					addForMine(s, h)
+					addForMine(h)
+				}
+				if h.Type == tx.TypeNormal {
+					ntrs = append(ntrs, h.Hash)
 				}
 			}
 			WriteAll(s, inv, msg.CmdInv)
+			if notify != nil {
+				notify <- ntrs
+			}
 		}
-
 		ts, err2 := imesh.GetSearchingTx(s)
 		if err2 != nil {
 			log.Println(err2)
@@ -102,9 +108,7 @@ func goResolve(s *setting.Setting) {
 			}
 			writeGetData(s, inv)
 		}
-		if notify != nil {
-			notify <- trs
-		}
+
 		//wait to collect noexsistence txs
 		time.Sleep(5 * time.Second)
 	}

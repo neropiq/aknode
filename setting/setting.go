@@ -79,10 +79,11 @@ type Setting struct {
 	ExplorerPort           uint16 `json:"explorer_port"`
 	ExplorerMaxConnections uint16 `json:"explorer_max_connections"`
 
-	MinimumFee     float64 `json:"minimum_fee"`
-	RunFeeMiner    bool    `json:"run_fee_miner"`
-	RunTicketMiner bool    `json:"run_ticket_miner"`
-	MinerAddress   string  `json:"miner_address"`
+	MinimumFee      float64 `json:"minimum_fee"`
+	RunFeeMiner     bool    `json:"run_fee_miner"`
+	RunTicketMiner  bool    `json:"run_ticket_miner"`
+	RunTicketIssuer bool    `json:"run_ticket_issuer"`
+	MinerAddress    string  `json:"miner_address"`
 
 	DB     *badger.DB    `json:"-"`
 	Config *aklib.Config `json:"-"`
@@ -159,7 +160,7 @@ func Load(s []byte) (*Setting, error) {
 	if se.ExplorerMaxConnections == 0 {
 		se.ExplorerMaxConnections = 1
 	}
-	if (se.RunFeeMiner || se.RunTicketMiner) && se.MinerAddress == "" {
+	if (se.RunTicketIssuer || se.RunFeeMiner || se.RunTicketMiner) && se.MinerAddress == "" {
 		return nil, errors.New("You must specify mining address")
 	}
 	if se.RunFeeMiner && se.MinimumFee == 0 {

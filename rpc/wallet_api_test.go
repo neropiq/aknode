@@ -39,7 +39,7 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-func confirmAll(t *testing.T, notify chan []*imesh.HashWithType, confirm bool) {
+func confirmAll(t *testing.T, notify chan []tx.Hash, confirm bool) {
 	var txs []tx.Hash
 	err := s.DB.Update(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -74,19 +74,12 @@ func confirmAll(t *testing.T, notify chan []*imesh.HashWithType, confirm bool) {
 	}
 
 	if notify != nil {
-		ts := make([]*imesh.HashWithType, len(txs))
-		for i := range txs {
-			ts[i] = &imesh.HashWithType{
-				Hash: txs[i],
-				Type: tx.TypeNormal,
-			}
-		}
 		select {
-		case notify <- ts:
+		case notify <- txs:
 		case <-time.After(5 * time.Second):
 			t.Fatal("failed to notify")
 		}
-		t.Log("notifird", len(ts))
+		t.Log("notifird", len(txs))
 		for _, tr := range txs {
 			select {
 			case str := <-debugNotify:
@@ -113,8 +106,8 @@ func TestWalletAPI(t *testing.T) {
 		t.Error(err)
 	}
 	clearSecret()
-	var cnotify chan []*imesh.HashWithType
-	GoNotify(&s, func(ch chan []*imesh.HashWithType) {
+	var cnotify chan []tx.Hash
+	GoNotify(&s, node.RegisterTxNotifier, func(ch chan []tx.Hash) {
 		cnotify = ch
 	})
 	acs := []string{"ac1", "ac2", ""}
@@ -171,7 +164,7 @@ func TestWalletAPI(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if err := gadr.sign(&s, tr); err != nil {
+			if err := gadr.Sign(tr); err != nil {
 				t.Fatal(err)
 			}
 			wallet.Secret.pwd = nil
@@ -515,7 +508,7 @@ func testgettransaction(t *testing.T, adr2ac map[string]string, tr *tx.Transacti
 		}
 	}
 	for _, in := range tr.Body.Inputs {
-		txi, err := imesh.GetTxInfo(&s, in.PreviousTX)
+		txi, err := imesh.GetTxInfo(s.DB, in.PreviousTX)
 		if err != nil {
 			t.Error(err)
 		}

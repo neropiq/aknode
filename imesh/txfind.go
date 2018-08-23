@@ -36,12 +36,6 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-//HashWithType is hash with tx type.
-type HashWithType struct {
-	Hash tx.Hash
-	Type tx.Type
-}
-
 type unresolvedTx struct {
 	prevs      []tx.Hash
 	Type       tx.Type
@@ -52,7 +46,7 @@ type unresolvedTx struct {
 
 //Noexist represents a non-existence transaction.
 type Noexist struct {
-	*HashWithType
+	*tx.HashWithType
 	Count    byte
 	Searched time.Time
 }
@@ -91,12 +85,12 @@ func Init(s *setting.Setting) error {
 		if err := putTxSub(s, tr); err != nil {
 			return err
 		}
-		t, err := GetTxInfo(s, tr.Hash())
+		t, err := GetTxInfo(s.DB, tr.Hash())
 		if err != nil {
 			return err
 		}
 		t.Status = StatusConfirmed
-		if err := t.put(s, tr.Hash()); err != nil {
+		if err := t.Put(s.DB); err != nil {
 			return err
 		}
 		if err := leaves.CheckAdd(s, tr); err != nil {
@@ -148,7 +142,7 @@ func AddNoexistTxHash(s *setting.Setting, h tx.Hash, typ tx.Type) error {
 		return nil
 	}
 	unresolved.Noexists[h.Array()] = &Noexist{
-		HashWithType: &HashWithType{
+		HashWithType: &tx.HashWithType{
 			Hash: h,
 			Type: typ,
 		},
@@ -222,13 +216,13 @@ func GetSearchingTx(s *setting.Setting) ([]Noexist, error) {
 
 //Resolve checks all reference of unresolvev txs
 //and add to imesh if all are resolved.
-func Resolve(s *setting.Setting) ([]*HashWithType, error) {
+func Resolve(s *setting.Setting) ([]*tx.HashWithType, error) {
 	unresolved.Lock()
 	defer unresolved.Unlock()
 	if err := isResolved(s); err != nil {
 		return nil, err
 	}
-	var trs []*HashWithType
+	var trs []*tx.HashWithType
 	for hs, tr := range unresolved.Txs {
 		if !tr.broken && tr.unresolved {
 			tr.visited = false
@@ -241,7 +235,7 @@ func Resolve(s *setting.Setting) ([]*HashWithType, error) {
 		}
 		h := make(tx.Hash, 32)
 		copy(h, hs[:])
-		trs = append(trs, &HashWithType{
+		trs = append(trs, &tx.HashWithType{
 			Hash: h,
 			Type: tr.Type,
 		})
@@ -282,7 +276,7 @@ func (tr *unresolvedTx) dfs(s *setting.Setting, h [32]byte) error {
 			tr.unresolved = true
 			if _, ok1 := unresolved.Noexists[prev.Array()]; !ok1 {
 				unresolved.Noexists[prev.Array()] = &Noexist{
-					HashWithType: &HashWithType{
+					HashWithType: &tx.HashWithType{
 						Hash: prev,
 						Type: tx.TypeNormal,
 					},
