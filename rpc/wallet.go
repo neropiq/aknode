@@ -45,9 +45,9 @@ const walletVersion = 1
 
 //Address is an address with its index in HD wallet.
 type Address struct {
-	conf       *setting.Setting
 	EncAddress []byte `json:"encoded_address"`
 	address    *address.Address
+	Adrstr     string
 }
 
 //Account represents an account with addresses.
@@ -145,27 +145,26 @@ func putAddress(s *setting.Setting, adr *Address, update bool) error {
 			return err
 		}
 	}
-	name := adr.address.Address58(s.Config)
+	adr.Adrstr = adr.address.Address58(s.Config)
 	return s.DB.Update(func(txn *badger.Txn) error {
-		return db.Put(txn, []byte(name), adr, db.HeaderWalletAddress)
+		return db.Put(txn, []byte(adr.Adrstr), adr, db.HeaderWalletAddress)
 	})
 }
 
 //locked by mutex
 func getAddress(s *setting.Setting, name string) (*Address, error) {
 	var adr Address
-	if wallet.Secret.pwd == nil {
-		return nil, errors.New("need to call walletpassphrase to encrypt address")
-	}
 	return &adr, s.DB.View(func(txn *badger.Txn) error {
 		if err := db.Get(txn, []byte(name), &adr, db.HeaderWalletAddress); err != nil {
 			return err
+		}
+		if wallet.Secret.pwd == nil {
+			return nil
 		}
 		dat, err2 := address.DecryptSeed(adr.EncAddress, wallet.Secret.pwd)
 		if err2 != nil {
 			return err2
 		}
-		adr.conf = s
 		return arypack.Unmarshal(dat, &adr.address)
 	})
 }
@@ -187,7 +186,6 @@ func getAllAddress(s *setting.Setting) (map[string]*Address, error) {
 			if err := arypack.Unmarshal(v, &adr); err != nil {
 				return err
 			}
-			adr.conf = s
 			adrs[string(item.Key()[1:])] = &adr
 		}
 		return nil
@@ -246,8 +244,8 @@ func fillPool(s *setting.Setting) error {
 			return err
 		}
 		adr := &Address{
-			conf:    s,
 			address: a,
+			Adrstr:  a.Address58(s.Config),
 		}
 		if err := putAddress(s, adr, true); err != nil {
 			return err
@@ -303,11 +301,9 @@ func getUTXO102(s *setting.Setting, acname string, isPublic bool) ([]*tx.UTXO, u
 	for adrname := range adrmap {
 		var adr *Address
 		var err error
-		if wallet.Secret.pwd != nil {
-			adr, err = getAddress(s, adrname)
-			if err != nil {
-				return nil, 0, err
-			}
+		adr, err = getAddress(s, adrname)
+		if err != nil {
+			return nil, 0, err
 		}
 		hs, err := imesh.GetHisoty(s, adrname, true)
 		if err != nil {
@@ -337,7 +333,7 @@ func getUTXO102(s *setting.Setting, acname string, isPublic bool) ([]*tx.UTXO, u
 }
 
 func (adr *Address) String() string {
-	return adr.address.Address58(adr.conf.Config)
+	return adr.Adrstr
 }
 
 //Sign signs a tx and puts the state of the adr to DB.
