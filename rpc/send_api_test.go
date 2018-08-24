@@ -346,6 +346,9 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 	if err != nil {
 		t.Error(err)
 	}
+	t.Log(wallet.Secret.pwd)
+	t.Log(wallet.Secret.seed)
+
 	utxo1, _, err := getAllUTXOs(&s)
 	if err != nil {
 		t.Error(err)

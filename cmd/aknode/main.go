@@ -144,8 +144,7 @@ func main() {
 }
 
 func checkWalletSeed(s *setting.Setting) error {
-	emp := rpc.IsSecretEmpty(s)
-	if emp {
+	if rpc.IsSecretEmpty() {
 		fmt.Print("This is the first time you run RPC. Enter walletpassphrase...")
 		pwd, err := terminal.ReadPassword(int(syscall.Stdin)) //int conversion is needed for win
 		fmt.Println("")

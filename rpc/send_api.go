@@ -82,8 +82,10 @@ func sendmany(conf *setting.Setting, req *Request, res *Response) error {
 	trs := make([]*tx.RawOutput, len(target))
 	i := 0
 	for k, v := range target {
-		trs[i].Address = k
-		trs[i].Value = uint64(v * aklib.ADK)
+		trs[i] = &tx.RawOutput{
+			Address: k,
+			Value:   uint64(v * aklib.ADK),
+		}
 		i++
 	}
 	res.Result, err = Send(conf, acc, []byte(conf.RPCTxTag), trs...)

@@ -153,10 +153,10 @@ func putAddress(s *setting.Setting, adr *Address, update bool) error {
 
 //locked by mutex
 func getAddress(s *setting.Setting, name string) (*Address, error) {
+	var adr Address
 	if wallet.Secret.pwd == nil {
 		return nil, errors.New("need to call walletpassphrase to encrypt address")
 	}
-	var adr Address
 	return &adr, s.DB.View(func(txn *badger.Txn) error {
 		if err := db.Get(txn, []byte(name), &adr, db.HeaderWalletAddress); err != nil {
 			return err
@@ -165,6 +165,7 @@ func getAddress(s *setting.Setting, name string) (*Address, error) {
 		if err2 != nil {
 			return err2
 		}
+		adr.conf = s
 		return arypack.Unmarshal(dat, &adr.address)
 	})
 }
@@ -186,6 +187,7 @@ func getAllAddress(s *setting.Setting) (map[string]*Address, error) {
 			if err := arypack.Unmarshal(v, &adr); err != nil {
 				return err
 			}
+			adr.conf = s
 			adrs[string(item.Key()[1:])] = &adr
 		}
 		return nil
@@ -301,7 +303,7 @@ func getUTXO102(s *setting.Setting, acname string, isPublic bool) ([]*tx.UTXO, u
 	for adrname := range adrmap {
 		var adr *Address
 		var err error
-		if !IsSecretEmpty() {
+		if wallet.Secret.pwd != nil {
 			adr, err = getAddress(s, adrname)
 			if err != nil {
 				return nil, 0, err
