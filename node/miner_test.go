@@ -40,7 +40,7 @@ func TestMiner(t *testing.T) {
 	s.RunFeeMiner = true
 	s.RunTicketMiner = true
 
-	ti, err := tx.IssueTicket(s.Config, genesis)
+	ti, err := tx.IssueTicket(s.Config, a.Address(s.Config), genesis)
 	if err != nil {
 		t.Error(err)
 	}
@@ -114,6 +114,9 @@ func TestMiner(t *testing.T) {
 	if err := tr.Sign(a); err != nil {
 		t.Error(err)
 	}
+	if err := tr.Check(s.Config, tx.TypeRewardTicket); err != nil {
+		t.Fatal(err)
+	}
 	txd = msg.Txs{
 		&msg.Tx{
 			Type: msg.InvTxRewardTicket,
@@ -134,7 +137,7 @@ func TestMiner(t *testing.T) {
 		}
 	}
 	if len(inout) == 0 {
-		t.Error("failed to mine")
+		t.Fatal("failed to mine")
 	}
 
 	seed = address.GenerateSeed32()
@@ -154,6 +157,11 @@ func TestMiner(t *testing.T) {
 	if err := tr.Sign(a); err != nil {
 		t.Error(err)
 	}
+	if err := tr.Check(s.Config, tx.TypeRewardFee); err != nil {
+		t.Fatal(err)
+	}
+	// t.Fatal()
+
 	txd = msg.Txs{
 		&msg.Tx{
 			Type: msg.InvTxRewardFee,
