@@ -83,10 +83,7 @@ var powmutex sync.Mutex
 
 //Send sends token.
 func Send(conf *setting.Setting, ac string, tag []byte, outputs ...*tx.RawOutput) (string, error) {
-
-	mutex.Lock()
 	tr, err := tx.Build(conf.Config, &wallet, ac, tag, outputs)
-	mutex.Unlock()
 	if err != nil {
 		return "", err
 	}

@@ -35,7 +35,7 @@
 {{$root:=.}}
 {{range .MInputs}}
             <div class="tx small-address truncate">
-              {{.N}} out of {{len .Addresses}}
+              {{.M}} out of {{len .Addresses}}
               <br>
 			{{range .Addresses}}
 			{{if (index $root.Signs .String)}}
@@ -71,7 +71,7 @@
             <h5>Multisig Outputs</h5>
 {{range .MOutputs}}
             <div class="tx small-address truncate">
-              {{.N}} out of {{len .Addresses}}
+              {{.M}} out of {{len .Addresses}}
               <br>
 {{range .Addresses}}
               <a href="/address?id={{.String}}">{{.String}}</a>

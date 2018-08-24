@@ -194,7 +194,7 @@ func getAllAddress(s *setting.Setting) (map[string]*Address, error) {
 }
 
 //IsSecretEmpty returns true if secret is empty.
-func IsSecretEmpty(s *setting.Setting) bool {
+func IsSecretEmpty() bool {
 	return wallet.Secret.EncSeed == nil
 }
 
@@ -300,6 +300,13 @@ func getUTXO102(s *setting.Setting, acname string, isPublic bool) ([]*tx.UTXO, u
 	}
 	for adrname := range adrmap {
 		var adr *Address
+		var err error
+		if !IsSecretEmpty() {
+			adr, err = getAddress(s, adrname)
+			if err != nil {
+				return nil, 0, err
+			}
+		}
 		hs, err := imesh.GetHisoty(s, adrname, true)
 		if err != nil {
 			return nil, 0, err
@@ -336,10 +343,7 @@ func (adr *Address) Sign(tr *tx.Transaction) error {
 	if adr.address == nil {
 		return errors.New("call walletpassphrase first")
 	}
-	if err := tr.Sign(adr.address); err != nil {
-		return err
-	}
-	return putAddress(adr.conf, adr, true)
+	return tr.Sign(adr.address)
 }
 
 //NewChangeAddress returns a new address for change.

@@ -111,6 +111,7 @@ func setup(t *testing.T) {
 	wallet.Pool.Index = 0
 	wallet.Accounts = make(map[string]*Account)
 	t.Log(imesh.GetTxNo())
+	Init(&s)
 }
 
 func teardown(t *testing.T) {
@@ -258,6 +259,7 @@ func TestSig(t *testing.T) {
 	}
 	node.Resolve()
 	time.Sleep(6 * time.Second)
+
 	confirmAll(t, nil, true)
 	testsendtoaddress2(t, adrs[1], 9.9)
 	confirmAll(t, nil, true)
@@ -280,6 +282,7 @@ func testsendtoaddress2(t *testing.T, adr1 string, v float64) tx.Hash {
 		t.Error(err)
 	}
 	var resp Response
+
 	err = sendtoaddress(&s, req, &resp)
 	if err != nil {
 		t.Error(err)

@@ -241,8 +241,8 @@ func TestWalletAPI(t *testing.T) {
 
 	confirmAll(t, cnotify, true)
 	testgetaccount(t, adrr, adr2ac[adrr])
-	testvalidateaddress1(t, "AKADRST52y1usByb4NJz48GRPFERY72c7MeAo15McZBvDBUMSNyuCoBPdn", true)
-	testvalidateaddress1(t, "AKADRST52y1usByb4NJz48GRPFERY72c7MeAo15McZBvDBUMSNyuCoBPda", false)
+	testvalidateaddress1(t, "AKADRSD2smqjURgpGy3iYx67Vr3nGs7jqe444Hi7vkabhNSvnc58UDVNV", true)
+	testvalidateaddress1(t, "AKADRSD2smqjURgpGy3iYx67Vr3nGs7jqe444Hi7vkabhNSvnc58UDVNa", false)
 	testvalidateaddress2(t, adrr, adr2ac[adrr])
 	testListAccounts(t, ac2val, acs...)
 	testlistaddressgroupings(t, adr2ac, adr2val)
@@ -407,7 +407,7 @@ func testvalidateaddress1(t *testing.T, adr string, isValid bool) {
 		t.Error("params must be nil")
 	}
 	if result.IsValid != isValid {
-		t.Error("validity of address must be ", isValid)
+		t.Fatal("validity of address must be ", isValid, adr)
 	}
 	if result.Address != adr {
 		t.Error("invalid address")
