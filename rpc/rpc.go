@@ -156,7 +156,6 @@ func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 		}
 	}()
-
 	var req Request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), 400)

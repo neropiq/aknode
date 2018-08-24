@@ -75,7 +75,9 @@ func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) er
 			if err != nil {
 				return err
 			}
-			r1 = append(r1, acc)
+			if _, ok := ac.AddressPublic[adr]; ok {
+				r1 = append(r1, acc)
+			}
 			r0 = append(r0, r1)
 		}
 	}
