@@ -28,13 +28,32 @@ import (
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/node"
 
+	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/setting"
 )
 
+type trWallet struct {
+	conf *setting.Setting
+	*Wallet
+}
+
+//NewChangeAddress returns a new address for change.
+func (w *trWallet) NewChangeAddress(aname string) (*address.Address, error) {
+	adrstr, err := newAddress(w.conf, aname, false)
+	if err != nil {
+		return nil, err
+	}
+	adr, err := getAddress(w.conf, adrstr)
+	if err != nil {
+		return nil, err
+	}
+	return adr.address, nil
+}
+
 //GetUTXO returns UTXOs whose total is over outtotal.
-func (w *Wallet) GetUTXO(ac string, outtotal uint64) ([]*tx.UTXO, error) {
+func (w *trWallet) GetUTXO(ac string, outtotal uint64) ([]*tx.UTXO, error) {
 	var utxos []*tx.UTXO
 	var total uint64
 	if ac == "*" {
@@ -83,7 +102,11 @@ var powmutex sync.Mutex
 
 //Send sends token.
 func Send(conf *setting.Setting, ac string, tag []byte, outputs ...*tx.RawOutput) (string, error) {
-	tr, err := tx.Build(conf.Config, &wallet, ac, tag, outputs)
+	w := &trWallet{
+		conf:   conf,
+		Wallet: &wallet,
+	}
+	tr, err := tx.Build(conf.Config, w, ac, tag, outputs)
 	if err != nil {
 		return "", err
 	}

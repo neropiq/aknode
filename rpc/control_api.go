@@ -136,7 +136,6 @@ func importwallet(conf *setting.Setting, req *Request, res *Response) error {
 	pwd := wallet.Secret.pwd
 	wallet = *d.Wallet
 	wallet.Secret.pwd = pwd
-	wallet.conf = conf
 	if err := putHistory(conf, d.Hist); err != nil {
 		return err
 	}

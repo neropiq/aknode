@@ -70,7 +70,6 @@ func (ac *Account) allAddress() []string {
 
 //Wallet represents a wallet in RPC..
 type Wallet struct {
-	conf   *setting.Setting
 	Secret struct {
 		seed    []byte
 		EncSeed []byte `json:"seed"`
@@ -91,7 +90,6 @@ const poolSize = 20 //FIXME
 
 //Init initialize wallet struct.
 func Init(s *setting.Setting) error {
-	wallet.conf = s
 	err := s.DB.View(func(txn *badger.Txn) error {
 		err := db.Get(txn, nil, &wallet, db.HeaderWallet)
 		if err != nil && err != badger.ErrKeyNotFound {
@@ -342,19 +340,6 @@ func (adr *Address) Sign(tr *tx.Transaction) error {
 		return errors.New("call walletpassphrase first")
 	}
 	return tr.Sign(adr.address)
-}
-
-//NewChangeAddress returns a new address for change.
-func (w *Wallet) NewChangeAddress(aname string) (*address.Address, error) {
-	adrstr, err := newAddress(w.conf, aname, false)
-	if err != nil {
-		return nil, err
-	}
-	adr, err := getAddress(w.conf, adrstr)
-	if err != nil {
-		return nil, err
-	}
-	return adr.address, nil
 }
 
 func newAddress(s *setting.Setting, aname string, isPublic bool) (string, error) {
