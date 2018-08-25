@@ -36,7 +36,6 @@ import (
 
 type trWallet struct {
 	conf *setting.Setting
-	*Wallet
 }
 
 //NewChangeAddress returns a new address for change.
@@ -94,7 +93,7 @@ func (w *trWallet) GetUTXO(ac string, outtotal uint64) ([]*tx.UTXO, error) {
 }
 
 //GetLeaves return leaves hashes.
-func (w *Wallet) GetLeaves() ([]tx.Hash, error) {
+func (w *trWallet) GetLeaves() ([]tx.Hash, error) {
 	return leaves.Get(tx.DefaultPreviousSize), nil
 }
 
@@ -103,8 +102,7 @@ var powmutex sync.Mutex
 //Send sends token.
 func Send(conf *setting.Setting, ac string, tag []byte, outputs ...*tx.RawOutput) (string, error) {
 	w := &trWallet{
-		conf:   conf,
-		Wallet: &wallet,
+		conf: conf,
 	}
 	tr, err := tx.Build(conf.Config, w, ac, tag, outputs)
 	if err != nil {
