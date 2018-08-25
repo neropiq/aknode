@@ -511,6 +511,7 @@ func TestNode4(t *testing.T) {
 	if err2 != nil {
 		t.Error(err2)
 	}
+	time.Sleep(3 * time.Second)
 	to := net.JoinHostPort(s.Bind, strconv.Itoa(int(s.Port)))
 	conn, err2 := net.DialTimeout("tcp", to, 3*time.Second)
 	if err2 != nil {

@@ -283,6 +283,7 @@ func nonce() msg.Nonce {
 }
 
 //Run runs a rouintine for a peer.
+//悪・即・バン
 func (p *peer) run(s *setting.Setting) {
 	if err := p.runLoop(s); err != nil {
 		log.Println(err)
