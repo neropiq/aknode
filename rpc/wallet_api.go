@@ -48,6 +48,7 @@ func getnewaddress(conf *setting.Setting, req *Request, res *Response) error {
 		return errors.New("invalid param length")
 	}
 	mutex.Lock()
+	defer mutex.Unlock()
 	if len(wallet.AddressPublic) == 0 {
 		wallet.AccountName = acc
 	} else {
@@ -56,7 +57,6 @@ func getnewaddress(conf *setting.Setting, req *Request, res *Response) error {
 		}
 	}
 	res.Result, err = newPublicAddress(conf)
-	mutex.Unlock()
 	return err
 }
 

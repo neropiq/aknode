@@ -106,6 +106,9 @@ func setup(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	wallet.AccountName = ""
+	wallet.Secret.seed = nil
+	wallet.Secret.pwd = nil
 	wallet.Secret.EncSeed = nil
 	wallet.Pool.Address = nil
 	wallet.Pool.Index = 0

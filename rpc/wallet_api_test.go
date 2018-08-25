@@ -93,6 +93,7 @@ func confirmAll(t *testing.T, notify chan []tx.Hash, confirm bool) {
 		}
 	}
 }
+
 func TestWalletAPI2(t *testing.T) {
 	setup(t)
 	defer teardown(t)
