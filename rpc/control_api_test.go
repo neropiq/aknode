@@ -32,15 +32,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AidosKuneen/aknode/consensus"
-
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/consensus"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/node"
+
 	"github.com/dgraph-io/badger"
 )
 
