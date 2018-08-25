@@ -56,7 +56,7 @@ func TestControlAPI(t *testing.T) {
 		t.Error(err)
 	}
 	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
-	acs := []string{"ac1", ""}
+	acs := []string{"ac1"}
 	var adr string
 	for _, ac := range acs {
 		for _, adr = range newAddressT(t, ac) {
@@ -301,7 +301,8 @@ func testimportwallet(t *testing.T, pwd []byte) {
 	wdat := filepath.Join(tdir, "tmp.dat")
 	bu := wallet
 	wallet = Wallet{
-		Accounts: make(map[string]*Account),
+		AddressChange: make(map[string]struct{}),
+		AddressPublic: make(map[string]struct{}),
 	}
 	wallet.Secret.pwd = pwd
 	hist, err := getHistory(&s)
@@ -361,29 +362,20 @@ func testimportwallet(t *testing.T, pwd []byte) {
 			t.Error("invalid pool address")
 		}
 	}
-	if len(bu.Accounts) != len(wallet.Accounts) {
-		t.Error("invalid accounts")
+	if len(bu.AddressChange) != len(wallet.AddressChange) {
+		t.Error("invalid account address")
 	}
-	for k, ba := range bu.Accounts {
-		wa := wallet.Accounts[k]
-		if ba.Index != wa.Index {
-			t.Error("invalid account index")
-		}
-		if len(wa.AddressChange) != len(ba.AddressChange) {
+	if len(bu.AddressPublic) != len(wallet.AddressPublic) {
+		t.Error("invalid account address")
+	}
+	for adr := range bu.AddressChange {
+		if _, ok := wallet.AddressChange[adr]; !ok {
 			t.Error("invalid account address")
 		}
-		if len(wa.AddressPublic) != len(ba.AddressPublic) {
+	}
+	for adr := range bu.AddressPublic {
+		if _, ok := wallet.AddressPublic[adr]; !ok {
 			t.Error("invalid account address")
-		}
-		for adr := range ba.AddressChange {
-			if _, ok := wa.AddressChange[adr]; !ok {
-				t.Error("invalid account address")
-			}
-		}
-		for adr := range ba.AddressPublic {
-			if _, ok := wa.AddressPublic[adr]; !ok {
-				t.Error("invalid account address")
-			}
 		}
 	}
 
@@ -396,10 +388,7 @@ func testimportwallet(t *testing.T, pwd []byte) {
 	}
 	for i, h := range hist {
 		h2 := hist2[i]
-		if h.Account != h2.Account {
-			t.Error("invalid hist")
-		}
-		if h.InoutHash.Serialize() != h2.InoutHash.Serialize() {
+		if h.Serialize() != h2.Serialize() {
 			t.Error("invalid hist")
 		}
 	}

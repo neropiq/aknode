@@ -93,7 +93,35 @@ func confirmAll(t *testing.T, notify chan []tx.Hash, confirm bool) {
 		}
 	}
 }
-
+func TestWalletAPI2(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+	pwd := []byte("pwd")
+	if err := InitSecret(&s, pwd); err != nil {
+		t.Error(err)
+	}
+	if err := decryptSecret(&s, pwd); err != nil {
+		t.Error(err)
+	}
+	clearSecret()
+	newAddressT(t, "")
+	req := &Request{
+		JSONRPC: "1.0",
+		ID:      "curltest",
+		Method:  "getnewaddress",
+		Params:  json.RawMessage{},
+	}
+	params := []interface{}{"ac"}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
+	}
+	var resp Response
+	if err := getnewaddress(&s, req, &resp); err == nil {
+		t.Error("should  be error")
+	}
+}
 func TestWalletAPI(t *testing.T) {
 	debugNotify = make(chan string)
 	setup(t)
@@ -110,7 +138,7 @@ func TestWalletAPI(t *testing.T) {
 	GoNotify(&s, node.RegisterTxNotifier, func(ch chan []tx.Hash) {
 		cnotify = ch
 	})
-	acs := []string{"ac1", "ac2", ""}
+	acs := []string{""}
 	adr2ac := make(map[string]string)
 	adr2val := make(map[string]uint64)
 	ac2val := make(map[string]uint64)

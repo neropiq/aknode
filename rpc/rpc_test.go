@@ -109,7 +109,8 @@ func setup(t *testing.T) {
 	wallet.Secret.EncSeed = nil
 	wallet.Pool.Address = nil
 	wallet.Pool.Index = 0
-	wallet.Accounts = make(map[string]*Account)
+	wallet.AddressChange = make(map[string]struct{})
+	wallet.AddressPublic = make(map[string]struct{})
 	t.Log(imesh.GetTxNo())
 	Init(&s)
 }

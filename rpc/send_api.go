@@ -88,7 +88,10 @@ func sendmany(conf *setting.Setting, req *Request, res *Response) error {
 		}
 		i++
 	}
-	res.Result, err = Send(conf, acc, []byte(conf.RPCTxTag), trs...)
+	if acc != wallet.AccountName {
+		return errors.New("invalid account name")
+	}
+	res.Result, err = Send(conf, []byte(conf.RPCTxTag), trs...)
 	return err
 }
 
@@ -107,7 +110,10 @@ func sendfrom(conf *setting.Setting, req *Request, res *Response) error {
 	if wallet.Secret.pwd == nil {
 		return errors.New("not priviledged")
 	}
-	res.Result, err = Send(conf, acc, []byte(conf.RPCTxTag), &tx.RawOutput{
+	if acc != wallet.AccountName {
+		return errors.New("invalid account name")
+	}
+	res.Result, err = Send(conf, []byte(conf.RPCTxTag), &tx.RawOutput{
 		Address: adrstr,
 		Value:   uint64(value * aklib.ADK),
 	})
@@ -130,7 +136,7 @@ func sendtoaddress(conf *setting.Setting, req *Request, res *Response) error {
 	if wallet.Secret.pwd == nil {
 		return errors.New("not priviledged")
 	}
-	res.Result, err = Send(conf, "*", []byte(conf.RPCTxTag), &tx.RawOutput{
+	res.Result, err = Send(conf, []byte(conf.RPCTxTag), &tx.RawOutput{
 		Address: adrstr,
 		Value:   uint64(value * aklib.ADK),
 	})

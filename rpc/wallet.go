@@ -50,24 +50,6 @@ type Address struct {
 	Adrstr     string
 }
 
-//Account represents an account with addresses.
-type Account struct {
-	Index         uint32              `json:"index"`
-	AddressChange map[string]struct{} `json:"address_change"`
-	AddressPublic map[string]struct{} `json:"address_public"`
-}
-
-func (ac *Account) allAddress() []string {
-	adrs := make([]string, 0, len(ac.AddressChange)*len(ac.AddressPublic))
-	for a := range ac.AddressChange {
-		adrs = append(adrs, a)
-	}
-	for a := range ac.AddressPublic {
-		adrs = append(adrs, a)
-	}
-	return adrs
-}
-
 //Wallet represents a wallet in RPC..
 type Wallet struct {
 	Secret struct {
@@ -75,15 +57,18 @@ type Wallet struct {
 		EncSeed []byte `json:"seed"`
 		pwd     []byte
 	}
-	Accounts map[string]*Account `json:"accounts"`
-	Pool     struct {
+	AccountName   string
+	AddressPublic map[string]struct{} `json:"address_public"`
+	AddressChange map[string]struct{} `json:"address_change"`
+	Pool          struct {
 		Index   uint32   `json:"index"`
 		Address []string `json:"address"`
 	} `json:"pool"`
 }
 
 var wallet = Wallet{
-	Accounts: make(map[string]*Account),
+	AddressChange: make(map[string]struct{}),
+	AddressPublic: make(map[string]struct{}),
 }
 
 const poolSize = 20 //FIXME
@@ -99,6 +84,17 @@ func Init(s *setting.Setting) error {
 	})
 	return err
 
+}
+
+func allAddress() []string {
+	adrs := make([]string, 0, len(wallet.AddressChange)*len(wallet.AddressPublic))
+	for a := range wallet.AddressChange {
+		adrs = append(adrs, a)
+	}
+	for a := range wallet.AddressPublic {
+		adrs = append(adrs, a)
+	}
+	return adrs
 }
 
 //locked by mutex
@@ -254,29 +250,16 @@ func fillPool(s *setting.Setting) error {
 	return putWallet(s)
 }
 
-func getAllUTXOs(s *setting.Setting) ([]*tx.UTXO, uint64, error) {
-	var utxos []*tx.UTXO
-	var bals uint64
-	for ac := range wallet.Accounts {
-		u, bal, err := getUTXO(s, ac)
-		if err != nil {
-			return nil, 0, err
-		}
-		utxos = append(utxos, u...)
-		bals += bal
-	}
-	return utxos, bals, nil
-}
-func getUTXO(s *setting.Setting, acname string) ([]*tx.UTXO, uint64, error) {
+func getUTXO(s *setting.Setting) ([]*tx.UTXO, uint64, error) {
 	var bal uint64
 	var utxos []*tx.UTXO
-	u10, b10, err := getUTXO102(s, acname, true)
+	u10, b10, err := getUTXO102(s, true)
 	if err != nil {
 		return nil, 0, err
 	}
 	bal += b10
 	utxos = append(utxos, u10...)
-	u2, b2, err := getUTXO102(s, acname, false)
+	u2, b2, err := getUTXO102(s, false)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -285,16 +268,12 @@ func getUTXO(s *setting.Setting, acname string) ([]*tx.UTXO, uint64, error) {
 	return utxos, bal, nil
 }
 
-func getUTXO102(s *setting.Setting, acname string, isPublic bool) ([]*tx.UTXO, uint64, error) {
+func getUTXO102(s *setting.Setting, isPublic bool) ([]*tx.UTXO, uint64, error) {
 	var bal uint64
 	var utxos []*tx.UTXO
-	a, ok := wallet.Accounts[acname]
-	if !ok {
-		return nil, 0, errors.New("account not found")
-	}
-	adrmap := a.AddressChange
+	adrmap := wallet.AddressChange
 	if isPublic {
-		adrmap = a.AddressPublic
+		adrmap = wallet.AddressPublic
 	}
 	for adrname := range adrmap {
 		var adr *Address
@@ -342,49 +321,48 @@ func (adr *Address) Sign(tr *tx.Transaction) error {
 	return tr.Sign(adr.address)
 }
 
-func newAddress(s *setting.Setting, aname string, isPublic bool) (string, error) {
-	if aname == "*" {
-		for aname = range wallet.Accounts {
-			break
-		}
-	}
-	ac, ok := wallet.Accounts[aname]
-	if !ok {
-		ac = &Account{
-			Index:         uint32(len(wallet.Accounts)),
-			AddressChange: make(map[string]struct{}),
-			AddressPublic: make(map[string]struct{}),
-		}
-		wallet.Accounts[aname] = ac
-	}
+func newPublicAddress(s *setting.Setting) (string, error) {
 	if len(wallet.Pool.Address) == 0 {
 		return "", errors.New("pool is empty")
 	}
 	a := wallet.Pool.Address[0]
 	wallet.Pool.Address = wallet.Pool.Address[1:]
-	if isPublic {
-		ac.AddressPublic[a] = struct{}{}
-	} else {
-		ac.AddressChange[a] = struct{}{}
-	}
+	wallet.AddressPublic[a] = struct{}{}
 	return a, putWallet(s)
 }
 
-func findAddress(adrstr string) (string, bool) {
-	for name, acc := range wallet.Accounts {
-		if _, isMine := acc.AddressPublic[adrstr]; isMine {
-			return name, true
-		}
-		if _, isMine := acc.AddressChange[adrstr]; isMine {
-			return name, true
-		}
+func newChangeAddress(s *setting.Setting) (string, error) {
+	if wallet.Secret.seed == nil || wallet.Secret.pwd == nil {
+		return "", nil
 	}
-	return "", false
+	seed := address.HDseed(wallet.Secret.seed, 1, uint32(len(wallet.AddressChange)))
+	a, err := address.NewFromSeed(s.Config, seed, false)
+	if err != nil {
+		return "", err
+	}
+	adr := &Address{
+		address: a,
+		Adrstr:  a.Address58(s.Config),
+	}
+	if err := putAddress(s, adr, true); err != nil {
+		return "", err
+	}
+	wallet.AddressChange[adr.Adrstr] = struct{}{}
+	return adr.Adrstr, putWallet(s)
+}
+
+func findAddress(adrstr string) bool {
+	if _, isMine := wallet.AddressPublic[adrstr]; isMine {
+		return true
+	}
+	if _, isMine := wallet.AddressChange[adrstr]; isMine {
+		return true
+	}
+	return false
 }
 
 //History is a tx history for an account.
 type History struct {
-	Account string `json:"account"`
 	tx.InoutHash
 }
 
@@ -445,8 +423,7 @@ start:
 			return err
 		}
 		for _, out := range tr.Body.Outputs {
-			_, ok := findAddress(out.Address.String())
-			if !ok {
+			if !findAddress(out.Address.String()) {
 				continue
 			}
 			str, err := runCommand(s, h)
@@ -463,8 +440,7 @@ start:
 			if err != nil {
 				return err
 			}
-			_, ok := findAddress(out.Address.String())
-			if !ok {
+			if !findAddress(out.Address.String()) {
 				continue
 			}
 			str, err := runCommand(s, h)
@@ -489,13 +465,11 @@ func walletnotifyUpdate(s *setting.Setting, trs []*imesh.TxInfo) error {
 	}
 	for _, tr := range trs {
 		for i, out := range tr.Body.Outputs {
-			ac, ok := findAddress(out.Address.String())
-			if !ok {
+			if !findAddress(out.Address.String()) {
 				continue
 			}
 			hist = append(hist, &History{
-				Account: ac,
-				InoutHash: tx.InoutHash{
+				tx.InoutHash{
 					Type:  tx.TypeOut,
 					Hash:  tr.Hash,
 					Index: byte(i),
@@ -507,13 +481,11 @@ func walletnotifyUpdate(s *setting.Setting, trs []*imesh.TxInfo) error {
 			if err != nil {
 				return err
 			}
-			ac, ok := findAddress(out.Address.String())
-			if !ok {
+			if !findAddress(out.Address.String()) {
 				continue
 			}
 			hist = append(hist, &History{
-				Account: ac,
-				InoutHash: tx.InoutHash{
+				tx.InoutHash{
 					Type:  tx.TypeIn,
 					Hash:  tr.Hash,
 					Index: byte(i),

@@ -52,10 +52,9 @@ func TestSendAPI(t *testing.T) {
 	}
 	clearSecret()
 	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
-	acs := []string{"ac1", ""}
+	acs := []string{""}
 	adr2ac := make(map[string]string)
 	adr2val := make(map[string]uint64)
-	ac2val := make(map[string]uint64)
 	ac2adr := make(map[string][]string)
 	var total uint64
 	for _, ac := range acs {
@@ -63,7 +62,6 @@ func TestSendAPI(t *testing.T) {
 			t.Log(adr)
 			adr2ac[adr] = ac
 			adr2val[adr] = 10 * aklib.ADK
-			ac2val[ac] += adr2val[adr]
 			ac2adr[ac] = append(ac2adr[ac], adr)
 			total += adr2val[adr]
 		}
@@ -92,7 +90,7 @@ func TestSendAPI(t *testing.T) {
 	node.Resolve()
 	time.Sleep(6 * time.Second)
 	params := []interface{}{
-		"ac1",
+		"",
 		map[string]float64{
 			ac2adr[""][0]: 0.1,
 		},
@@ -198,7 +196,7 @@ func getDiff(t *testing.T, u0, u1 []*tx.UTXO) map[string]int64 {
 	return diff
 }
 
-func checkResponse(t *testing.T, diff map[string]int64, acc string,
+func checkResponse(t *testing.T, diff map[string]int64,
 	resp *Response, sendto map[string]uint64, isConf bool) tx.Hash {
 	if resp.Error != nil {
 		t.Error(resp.Error)
@@ -255,12 +253,8 @@ func checkResponse(t *testing.T, diff map[string]int64, acc string,
 		if out.Value != uint64(-v) {
 			t.Error("invalid value")
 		}
-		ac, ok := findAddress(out.Address.String())
-		if !ok {
+		if ok := findAddress(out.Address.String()); !ok {
 			t.Error("invalid account", out.Address)
-		}
-		if acc != "*" && acc != ac {
-			t.Error("invalid account")
 		}
 	}
 	if len(tx.Outputs)-1 != len(sendto) && len(tx.Outputs) != len(sendto) {
@@ -320,7 +314,7 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 		ID:      "curltest",
 		Method:  "sendmany",
 	}
-	params := []interface{}{"ac1",
+	params := []interface{}{"",
 		map[string]float64{
 			adr1: 0.2,
 			adr2: 0.3,
@@ -332,7 +326,7 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 		t.Error(err)
 	}
 	var resp Response
-	utxo0, _, err := getAllUTXOs(&s)
+	utxo0, _, err := getUTXO(&s)
 	if err != nil {
 		t.Error(err)
 	}
@@ -349,22 +343,22 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 	t.Log(wallet.Secret.pwd)
 	t.Log(wallet.Secret.seed)
 
-	utxo1, _, err := getAllUTXOs(&s)
+	utxo1, _, err := getUTXO(&s)
 	if err != nil {
 		t.Error(err)
 	}
 	diff := getDiff(t, utxo0, utxo1)
-	checkResponse(t, diff, "ac1", &resp, map[string]uint64{
+	checkResponse(t, diff, &resp, map[string]uint64{
 		adr1: uint64(0.2 * aklib.ADK),
 		adr2: uint64(0.3 * aklib.ADK),
 	}, false)
 	confirmAll(t, nil, true)
-	utxo2, _, err := getAllUTXOs(&s)
+	utxo2, _, err := getUTXO(&s)
 	if err != nil {
 		t.Error(err)
 	}
 	diff = getDiff(t, utxo0, utxo2)
-	checkResponse(t, diff, "ac1", &resp, map[string]uint64{
+	checkResponse(t, diff, &resp, map[string]uint64{
 		adr1: uint64(0.2 * aklib.ADK),
 		adr2: uint64(0.3 * aklib.ADK),
 	}, true)
@@ -384,7 +378,7 @@ func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 		t.Error(err)
 	}
 	var resp Response
-	utxo0, _, err := getAllUTXOs(&s)
+	utxo0, _, err := getUTXO(&s)
 	if err != nil {
 		t.Error(err)
 	}
@@ -392,22 +386,22 @@ func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 	if err != nil {
 		t.Error(err)
 	}
-	utxo1, _, err := getAllUTXOs(&s)
+	utxo1, _, err := getUTXO(&s)
 	if err != nil {
 		t.Error(err)
 	}
 
 	diff := getDiff(t, utxo0, utxo1)
-	checkResponse(t, diff, "*", &resp, map[string]uint64{
+	checkResponse(t, diff, &resp, map[string]uint64{
 		adr1: uint64(0.2 * aklib.ADK),
 	}, false)
 	confirmAll(t, nil, true)
-	utxo2, _, err := getAllUTXOs(&s)
+	utxo2, _, err := getUTXO(&s)
 	if err != nil {
 		t.Error(err)
 	}
 	diff = getDiff(t, utxo0, utxo2)
-	return checkResponse(t, diff, "*", &resp, map[string]uint64{
+	return checkResponse(t, diff, &resp, map[string]uint64{
 		adr1: uint64(0.2 * aklib.ADK),
 	}, true)
 }
@@ -418,14 +412,14 @@ func testsendfrom(t *testing.T, adr1 string, adr2ac map[string]string) {
 		ID:      "curltest",
 		Method:  "sendfrom",
 	}
-	params := []interface{}{"ac1", adr1, 0.2}
+	params := []interface{}{"", adr1, 0.2}
 	var err error
 	req.Params, err = json.Marshal(params)
 	if err != nil {
 		t.Error(err)
 	}
 	var resp Response
-	utxo0, _, err := getAllUTXOs(&s)
+	utxo0, _, err := getUTXO(&s)
 	if err != nil {
 		t.Error(err)
 	}
@@ -433,21 +427,21 @@ func testsendfrom(t *testing.T, adr1 string, adr2ac map[string]string) {
 	if err != nil {
 		t.Error(err)
 	}
-	utxo1, _, err := getAllUTXOs(&s)
+	utxo1, _, err := getUTXO(&s)
 	if err != nil {
 		t.Error(err)
 	}
 	diff := getDiff(t, utxo0, utxo1)
-	checkResponse(t, diff, "ac1", &resp, map[string]uint64{
+	checkResponse(t, diff, &resp, map[string]uint64{
 		adr1: uint64(0.2 * aklib.ADK),
 	}, false)
 	confirmAll(t, nil, true)
-	utxo2, _, err := getAllUTXOs(&s)
+	utxo2, _, err := getUTXO(&s)
 	if err != nil {
 		t.Error(err)
 	}
 	diff = getDiff(t, utxo0, utxo2)
-	checkResponse(t, diff, "ac1", &resp, map[string]uint64{
+	checkResponse(t, diff, &resp, map[string]uint64{
 		adr1: uint64(0.2 * aklib.ADK),
 	}, true)
 }

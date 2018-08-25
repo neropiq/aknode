@@ -48,7 +48,14 @@ func getnewaddress(conf *setting.Setting, req *Request, res *Response) error {
 		return errors.New("invalid param length")
 	}
 	mutex.Lock()
-	res.Result, err = newAddress(conf, acc, true)
+	if len(wallet.AddressPublic) == 0 {
+		wallet.AccountName = acc
+	} else {
+		if wallet.AccountName != acc {
+			return errors.New("invalid accout name")
+		}
+	}
+	res.Result, err = newPublicAddress(conf)
 	mutex.Unlock()
 	return err
 }
@@ -58,28 +65,26 @@ func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) er
 	defer mutex.RUnlock()
 	var result [][][]interface{}
 	var r0 [][]interface{}
-	for acc, ac := range wallet.Accounts {
-		us := make(map[string]uint64)
-		utxos, _, err := getUTXO(conf, acc)
+	us := make(map[string]uint64)
+	utxos, _, err := getUTXO(conf)
+	if err != nil {
+		return err
+	}
+	for _, utxo := range utxos {
+		us[utxo.Address.String()] = utxo.Value
+	}
+	for _, adr := range allAddress() {
+		r1 := make([]interface{}, 0, 3)
+		r1 = append(r1, adr)
+		r1 = append(r1, float64(us[adr])/aklib.ADK)
+		_, _, err := address.ParseAddress58(conf.Config, adr)
 		if err != nil {
 			return err
 		}
-		for _, utxo := range utxos {
-			us[utxo.Address.String()] = utxo.Value
+		if _, ok := wallet.AddressPublic[adr]; ok {
+			r1 = append(r1, wallet.AccountName)
 		}
-		for _, adr := range ac.allAddress() {
-			r1 := make([]interface{}, 0, 3)
-			r1 = append(r1, adr)
-			r1 = append(r1, float64(us[adr])/aklib.ADK)
-			_, _, err := address.ParseAddress58(conf.Config, adr)
-			if err != nil {
-				return err
-			}
-			if _, ok := ac.AddressPublic[adr]; ok {
-				r1 = append(r1, acc)
-			}
-			r0 = append(r0, r1)
-		}
+		r0 = append(r0, r1)
 	}
 	result = append(result, r0)
 	res.Result = result
@@ -97,36 +102,23 @@ func getbalance(conf *setting.Setting, req *Request, res *Response) error {
 	}
 	mutex.RLock()
 	defer mutex.RUnlock()
-	var bal uint64
-	if accstr != "*" {
-		_, bal, err = getUTXO(conf, accstr)
-		if err != nil {
-			return err
-		}
-	} else {
-		for acc := range wallet.Accounts {
-			_, ba, err := getUTXO(conf, acc)
-			if err != nil {
-				return err
-			}
-			bal += ba
-		}
+	if accstr != "*" && wallet.AccountName != accstr {
+		return errors.New("invalid accout name")
 	}
+	_, bal, err := getUTXO(conf)
 	res.Result = float64(bal) / 100000000
-	return nil
+	return err
 }
 
 func listaccounts(conf *setting.Setting, req *Request, res *Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 	result := make(map[string]float64)
-	for acc := range wallet.Accounts {
-		_, ba, err := getUTXO(conf, acc)
-		if err != nil {
-			return err
-		}
-		result[acc] = float64(ba) / aklib.ADK
+	_, ba, err := getUTXO(conf)
+	if err != nil {
+		return err
 	}
+	result[wallet.AccountName] = float64(ba) / aklib.ADK
 	res.Result = result
 	return nil
 }
@@ -161,7 +153,7 @@ func validateaddress(conf *setting.Setting, req *Request, res *Response) error {
 	}
 	mutex.RLock()
 	defer mutex.RUnlock()
-	ac, isMine := findAddress(adrstr)
+	isMine := findAddress(adrstr)
 	infoi := Info{
 		IsValid: valid,
 		Address: adrstr,
@@ -170,7 +162,7 @@ func validateaddress(conf *setting.Setting, req *Request, res *Response) error {
 	t := false
 	empty := ""
 	if isMine {
-		infoi.Account = &ac
+		infoi.Account = &wallet.AccountName
 		infoi.IsWatchOnly = &t
 		infoi.IsScript = &t
 		infoi.Pubkey = &empty
@@ -356,12 +348,12 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 	if err != nil {
 		return err
 	}
+	if acc != "*" && acc != wallet.AccountName {
+		return errors.New("invalid accout name")
+	}
 	var ltx []*Transaction
 	for skipped, i := 0, 0; i < len(hist) && len(ltx) < num; i++ {
 		h := hist[len(hist)-i-1]
-		if acc != "*" && h.Account != acc {
-			continue
-		}
 		if skipped++; skipped <= skip {
 			continue
 		}
@@ -392,7 +384,7 @@ func newTransaction(conf *setting.Setting, tr *imesh.TxInfo, out *tx.Output, vou
 	if err != nil {
 		return nil, err
 	}
-	ac, ok := findAddress(adr)
+	ok := findAddress(adr)
 	f := false
 	emp := ""
 	var zero int64
@@ -413,7 +405,7 @@ func newTransaction(conf *setting.Setting, tr *imesh.TxInfo, out *tx.Output, vou
 		Abandoned:         &f,
 	}
 	if ok {
-		dt.Account = &ac
+		dt.Account = &wallet.AccountName
 	}
 	if tr.Status == imesh.StatusConfirmed {
 		dt.Blockhash = &emp
@@ -442,9 +434,10 @@ func getaccount(conf *setting.Setting, req *Request, res *Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 	var ok bool
-	res.Result, ok = findAddress(adr)
+	ok = findAddress(adr)
 	if !ok {
 		return errors.New("address not found")
 	}
+	res.Result = wallet.AccountName
 	return nil
 }

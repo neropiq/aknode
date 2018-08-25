@@ -39,8 +39,8 @@ type trWallet struct {
 }
 
 //NewChangeAddress returns a new address for change.
-func (w *trWallet) NewChangeAddress(aname string) (*address.Address, error) {
-	adrstr, err := newAddress(w.conf, aname, false)
+func (w *trWallet) NewChangeAddress() (*address.Address, error) {
+	adrstr, err := newChangeAddress(w.conf)
 	if err != nil {
 		return nil, err
 	}
@@ -52,42 +52,20 @@ func (w *trWallet) NewChangeAddress(aname string) (*address.Address, error) {
 }
 
 //GetUTXO returns UTXOs whose total is over outtotal.
-func (w *trWallet) GetUTXO(ac string, outtotal uint64) ([]*tx.UTXO, error) {
+func (w *trWallet) GetUTXO(outtotal uint64) ([]*tx.UTXO, error) {
 	var utxos []*tx.UTXO
 	var total uint64
-	if ac == "*" {
-		for acname := range wallet.Accounts {
-			u, bal, err := getUTXO102(w.conf, acname, false)
-			if err != nil {
-				return nil, err
-			}
-			total += bal
-			utxos = append(utxos, u...)
-		}
-		if outtotal > total {
-			for acname := range wallet.Accounts {
-				u, bal, err := getUTXO102(w.conf, acname, true)
-				if err != nil {
-					return nil, err
-				}
-				total += bal
-				utxos = append(utxos, u...)
-			}
-		}
-	} else {
-		var err error
-		utxos, total, err = getUTXO102(w.conf, ac, false)
+	utxos, total, err := getUTXO102(w.conf, false)
+	if err != nil {
+		return nil, err
+	}
+	if outtotal > total {
+		u, bal, err := getUTXO102(w.conf, true)
 		if err != nil {
 			return nil, err
 		}
-		if outtotal > total {
-			u10, t10, err := getUTXO102(w.conf, ac, true)
-			if err != nil {
-				return nil, err
-			}
-			total += t10
-			utxos = append(utxos, u10...)
-		}
+		total += bal
+		utxos = append(utxos, u...)
 	}
 	return utxos, nil
 }
@@ -100,11 +78,11 @@ func (w *trWallet) GetLeaves() ([]tx.Hash, error) {
 var powmutex sync.Mutex
 
 //Send sends token.
-func Send(conf *setting.Setting, ac string, tag []byte, outputs ...*tx.RawOutput) (string, error) {
+func Send(conf *setting.Setting, tag []byte, outputs ...*tx.RawOutput) (string, error) {
 	w := &trWallet{
 		conf: conf,
 	}
-	tr, err := tx.Build(conf.Config, w, ac, tag, outputs)
+	tr, err := tx.Build(conf.Config, w, tag, outputs)
 	if err != nil {
 		return "", err
 	}

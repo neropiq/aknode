@@ -95,13 +95,9 @@ func getnodeinfo(conf *setting.Setting, req *Request, res *Response) error {
 	if conf.RPCUser != "" {
 		mutex.Lock()
 		defer mutex.Unlock()
-		var total uint64
-		for ac := range wallet.Accounts {
-			_, b, err := getUTXO(conf, ac)
-			if err != nil {
-				return err
-			}
-			total += b
+		_, total, err := getUTXO(conf)
+		if err != nil {
+			return err
 		}
 		bal = &total
 	}
