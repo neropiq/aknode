@@ -243,8 +243,14 @@ func TestExploere(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	madr := tr.Body.MultiSigOuts[0].Address(s.Config)
+	t.Log(madr)
+	resp, err = cl.Get(fmt.Sprintf("http://localhost:%d/maddress?id=%s", s.ExplorerPort, madr))
+	if err != nil {
+		t.Error(err)
+	}
 	if resp.StatusCode != http.StatusOK {
-		t.Fatal("should be OK")
+		t.Error("should be OK")
 	}
 	resp, err = cl.Get(fmt.Sprintf("http://localhost:%d/tx?id=%s", s.ExplorerPort, tr.Hash()))
 	if err != nil {

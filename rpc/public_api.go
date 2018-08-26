@@ -27,6 +27,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/AidosKuneen/aklib/address"
+
 	"github.com/AidosKuneen/aklib"
 
 	"github.com/AidosKuneen/aknode/imesh/leaves"
@@ -272,5 +274,28 @@ func gettxsstatus(conf *setting.Setting, req *Request, res *Response) error {
 		}
 	}
 	res.Result = r
+	return nil
+}
+
+func getmultisiginfo(conf *setting.Setting, req *Request, res *Response) error {
+	if len(req.Params) == 0 {
+		return errors.New("must specify mutisig address")
+	}
+	var data []string
+	if err := json.Unmarshal(req.Params, &data); err != nil {
+		return err
+	}
+	if len(data) != 1 {
+		return errors.New("mus specify one multisig address")
+	}
+	madr, err := address.ParseMultisigAddress(conf.Config, data[0])
+	if err != nil {
+		return err
+	}
+	mul, err := imesh.GetMultisig(conf.DB, madr)
+	if err != nil {
+		return err
+	}
+	res.Result = mul
 	return nil
 }

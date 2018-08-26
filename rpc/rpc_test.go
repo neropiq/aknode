@@ -47,7 +47,7 @@ import (
 )
 
 var s, s1 setting.Setting
-var a *address.Address
+var a, b *address.Address
 var genesis tx.Hash
 var l net.Listener
 var tdir string
@@ -75,6 +75,11 @@ func setup(t *testing.T) {
 	s.MyHostPort = ":9624"
 	seed := address.GenerateSeed32()
 	a, err2 = address.NewFromSeed(s.Config, seed, false)
+	if err2 != nil {
+		t.Error(err2)
+	}
+	seed = address.GenerateSeed32()
+	b, err2 = address.NewFromSeed(s.Config, seed, false)
 	if err2 != nil {
 		t.Error(err2)
 	}

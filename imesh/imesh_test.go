@@ -40,7 +40,7 @@ import (
 )
 
 var s setting.Setting
-var a *address.Address
+var a, b *address.Address
 var genesis []tx.Hash
 
 func setup(t *testing.T) {
@@ -62,6 +62,11 @@ func setup(t *testing.T) {
 	s.Config.Genesis = map[string]uint64{
 		a.Address58(s.Config): aklib.ADKSupply,
 	}
+	seed = address.GenerateSeed32()
+	b, err2 = address.NewFromSeed(s.Config, seed, false)
+	if err2 != nil {
+		t.Error(err2)
+	}
 	leaves.Init(&s)
 	if err := Init(&s); err != nil {
 		t.Error(err)
@@ -77,7 +82,44 @@ func teardown(t *testing.T) {
 		t.Error(err)
 	}
 }
+func TestImesh5(t *testing.T) {
+	setup(t)
+	defer teardown(t)
 
+	tr := tx.New(s.Config, genesis[0])
+	tr.AddInput(genesis[0], 0)
+	if err := tr.AddMultisigOut(s.Config, 1, aklib.ADKSupply, a.Address58(s.Config), b.Address58(s.Config)); err != nil {
+		t.Error(err)
+	}
+	if err := tr.Sign(a); err != nil {
+		t.Error(err)
+	}
+	if err := tr.PoW(); err != nil {
+		t.Error(err)
+	}
+	if err := CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
+		t.Error(err)
+	}
+	if _, err := Resolve(&s); err != nil {
+		t.Error(err)
+	}
+	madr := address.MultisigAddressByte(s.Config, 1, a.Address(s.Config), b.Address(s.Config))
+	msig, err := GetMultisig(s.DB, madr)
+	if err != nil {
+		t.Error(err)
+	}
+	if msig.M != 1 {
+		t.Error("invalid msig")
+	}
+	if len(msig.Addresses) != 2 {
+		t.Error("invalid msig")
+	}
+	if bytes.Equal(msig.Addresses[0], a.Address(s.Config)) && bytes.Equal(msig.Addresses[1], b.Address(s.Config)) ||
+		bytes.Equal(msig.Addresses[1], a.Address(s.Config)) && bytes.Equal(msig.Addresses[0], b.Address(s.Config)) {
+	} else {
+		t.Error("invalid msig")
+	}
+}
 func TestImesh(t *testing.T) {
 	setup(t)
 	defer teardown(t)

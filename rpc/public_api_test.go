@@ -74,6 +74,64 @@ func TestPublicAPI(t *testing.T) {
 	testgettxsstatus(t, ti.Hash(), true)
 }
 
+func TestPublicAPI2(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+	tr2 := tx.New(s.Config, genesis)
+	tr2.AddInput(genesis, 0)
+	if err := tr2.AddMultisigOut(s.Config, 1, aklib.ADKSupply, a.Address58(s.Config), b.Address58(s.Config)); err != nil {
+		t.Error(err)
+	}
+	if err := tr2.Sign(a); err != nil {
+		t.Error(err)
+	}
+	if err := tr2.PoW(); err != nil {
+		t.Error(err)
+	}
+	testsendrawtx(t, tr2, tx.TypeNormal)
+	time.Sleep(6 * time.Second)
+	testgetmultisiginfo(t, tr2)
+}
+
+func testgetmultisiginfo(t *testing.T, tr *tx.Transaction) {
+	req := &Request{
+		JSONRPC: "1.0",
+		ID:      "curltest",
+		Method:  "getmultisiginfo",
+		Params:  json.RawMessage{},
+	}
+	mout := tr.MultiSigOuts[0]
+	params := []interface{}{mout.Address(s.Config)}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
+	}
+	var resp Response
+	if err := getmultisiginfo(&s, req, &resp); err != nil {
+		t.Error(err)
+	}
+	if resp.Error != nil {
+		t.Error(resp.Error)
+	}
+	t.Log(resp.Result)
+	msig, ok := resp.Result.(*tx.MultisigStruct)
+	if !ok {
+		t.Error("invalid return")
+	}
+	if msig.M != 1 {
+		t.Error("invalid msig")
+	}
+	if len(msig.Addresses) != 2 {
+		t.Error("invalid msig")
+	}
+	if bytes.Equal(msig.Addresses[0], a.Address(s.Config)) && bytes.Equal(msig.Addresses[1], b.Address(s.Config)) ||
+		bytes.Equal(msig.Addresses[1], a.Address(s.Config)) && bytes.Equal(msig.Addresses[0], b.Address(s.Config)) {
+	} else {
+		t.Error("invalid msig")
+	}
+}
+
 func testgettxsstatus(t *testing.T, h tx.Hash, isConf bool) {
 	var zero [32]byte
 	var inva tx.Hash = zero[:]

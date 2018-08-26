@@ -3,7 +3,7 @@
   <footer class="page-footer black">
     <div class="footer-copyright">
       <div class="container">
-        <a class="white-text" href="http://materializecss.com">©2018 Aidos Develope / Aidos Foundation</a>
+        <a class="white-text" href="http://materializecss.com">©2018 Aidos Developer / Aidos Foundation</a>
       </div>
     </div>
   </footer>

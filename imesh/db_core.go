@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/rand"
 	"github.com/AidosKuneen/aklib/tx"
@@ -88,6 +89,15 @@ func PreviousOutput(s *setting.Setting, in *tx.Input) (*tx.Output, error) {
 		return nil, err
 	}
 	return prev.Body.Outputs[in.Index], nil
+}
+
+//PreviousMultisigOutput returns an output of the multisig input tx.
+func PreviousMultisigOutput(s *setting.Setting, in *tx.MultiSigIn) (*tx.MultiSigOut, error) {
+	prev, err := GetTxInfo(s.DB, in.PreviousTX)
+	if err != nil {
+		return nil, err
+	}
+	return prev.Body.MultiSigOuts[in.Index], nil
 }
 
 // Has returns true if hash exists in db.
@@ -161,7 +171,7 @@ func GetTx(akdb *badger.DB, hash []byte) (*tx.Transaction, error) {
 }
 
 //PutTxDirect puts a transaction  into db without checking tx relation..
-func PutTxDirect(akdb *badger.DB, tr *tx.Transaction) error {
+func PutTxDirect(s *aklib.Config, akdb *badger.DB, tr *tx.Transaction) error {
 	ti := TxInfo{
 		Body:     tr.Body,
 		Received: time.Now().Truncate(time.Second),
@@ -174,6 +184,9 @@ func PutTxDirect(akdb *badger.DB, tr *tx.Transaction) error {
 			return err2
 		}
 		if err := putAddressToTx(txn, tr); err != nil {
+			return err
+		}
+		if err := updateMulsigAddress(s, txn, tr); err != nil {
 			return err
 		}
 		return db.Put(txn, ti.sigKey(), tr.Signatures, db.HeaderTxSig)
@@ -217,6 +230,9 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 			}
 		}
 		if err := putAddressToTx(txn, tr); err != nil {
+			return err
+		}
+		if err := updateMulsigAddress(s.Config, txn, tr); err != nil {
 			return err
 		}
 		return db.Put(txn, ti.sigKey(), tr.Signatures, db.HeaderTxSig)

@@ -35,15 +35,9 @@
 {{$root:=.}}
 {{range .MInputs}}
             <div class="tx small-address truncate">
-              {{.M}} out of {{len .Addresses}}
+            {{$madr:=call $root.GetMultisigAddress .}}
+             <a href="/maddress?id={{$madr}}">{{$madr}}</a>
               <br>
-			{{range .Addresses}}
-			{{if (index $root.Signs .String)}}
-              <i class="red-text text-lighten-2 material-icons prefix">check</i>
-			{{end}}
-              <a href="/address?id={{.String}}">{{.String}}</a>
-              <br>
-			{{end}}
              <span class="right amount">{{toADK .Value}} ADK</span>
             </div>
 {{end}}
@@ -68,15 +62,13 @@
 {{end}}
 {{end}}
 {{if ne (len .MOutputs) 0}}
+{{$root:=.}}
             <h5>Multisig Outputs</h5>
 {{range .MOutputs}}
             <div class="tx small-address truncate">
-              {{.M}} out of {{len .Addresses}}
+            {{$madr:=call $root.GetMultisigAddress .}}
+             <a href="/maddress?id={{$madr}}">{{$madr}}</a> 
               <br>
-{{range .Addresses}}
-              <a href="/address?id={{.String}}">{{.String}}</a>
-               <br>
-{{end}}
              <span class="right amount">{{toADK .Value}} ADK</span>
             </div>
 {{end}}

@@ -21,6 +21,7 @@
 package explorer
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -97,6 +98,9 @@ func Run(setting *setting.Setting) {
 	mux.HandleFunc("/address/", func(w http.ResponseWriter, r *http.Request) {
 		addressHandle(setting, w, r)
 	})
+	mux.HandleFunc("/maddress/", func(w http.ResponseWriter, r *http.Request) {
+		maddressHandle(setting, w, r)
+	})
 	mux.HandleFunc("/qrcode/", func(w http.ResponseWriter, r *http.Request) {
 		qrHandle(setting, w, r)
 	})
@@ -122,8 +126,9 @@ func Run(setting *setting.Setting) {
 func qrHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id := q.Get("id")
-	_, _, err := address.ParseAddress58(s.Config, id)
-	if err != nil {
+	_, _, err1 := address.ParseAddress58(s.Config, id)
+	_, err2 := address.ParseMultisigAddress(s.Config, id)
+	if err1 != nil && err2 != nil {
 		renderError(w, "invalid address")
 		return
 	}
@@ -184,23 +189,24 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	}
 
 	info := struct {
-		TXID         string
-		Created      time.Time
-		Received     time.Time
-		Status       imesh.TxStatus
-		Inputs       []*tx.Output
-		MInputs      []*tx.MultiSigOut
-		Signs        map[string]bool
-		Outputs      []*tx.Output
-		MOutputs     []*tx.MultiSigOut
-		TicketInput  string
-		TicketOutput string
-		Message      string
-		MessageStr   string
-		Nonce        []uint32
-		GNonce       uint32
-		LockTime     time.Time
-		Parents      []tx.Hash
+		TXID               string
+		Created            time.Time
+		Received           time.Time
+		Status             imesh.TxStatus
+		Inputs             []*tx.Output
+		MInputs            []*tx.MultiSigOut
+		Signs              map[string]bool
+		Outputs            []*tx.Output
+		MOutputs           []*tx.MultiSigOut
+		TicketInput        string
+		TicketOutput       string
+		Message            string
+		MessageStr         string
+		Nonce              []uint32
+		GNonce             uint32
+		LockTime           time.Time
+		Parents            []tx.Hash
+		GetMultisigAddress func(*tx.MultiSigOut) string
 	}{
 		TXID:       id,
 		Created:    ti.Body.Time,
@@ -217,6 +223,9 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		GNonce:     ti.Body.Gnonce,
 		LockTime:   ti.Body.LockTime,
 		Parents:    ti.Body.Parent,
+		GetMultisigAddress: func(out *tx.MultiSigOut) string {
+			return out.Address(s.Config)
+		},
 	}
 	for i, inp := range ti.Body.Inputs {
 		info.Inputs[i], err = imesh.PreviousOutput(s, inp)
@@ -307,6 +316,70 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	id := q.Get("id")
+	madr, err := address.ParseMultisigAddress(s.Config, id)
+	if err != nil {
+		renderError(w, err.Error())
+		return
+	}
+	msig, err := imesh.GetMultisig(s.DB, madr)
+	if err != nil {
+		renderError(w, notFound)
+		return
+	}
+	hist, err := imesh.GetHisoty(s, msig.Addresses[0].String(), true)
+	if err != nil {
+		renderError(w, notFound)
+		return
+	}
+	info := struct {
+		Struct  *tx.MultisigStruct
+		Address string
+		Balance uint64
+		UTXOs   []tx.Hash
+		Inputs  []tx.Hash
+	}{
+		Struct:  msig,
+		Address: id,
+	}
+	for _, h := range hist {
+		switch h.Type {
+		case tx.TypeMulin:
+			tr, err := imesh.GetTx(s.DB, h.Hash)
+			if err != nil {
+				renderError(w, err.Error())
+				return
+			}
+			mout, err := imesh.PreviousMultisigOutput(s, tr.MultiSigIns[h.Index])
+			if err != nil {
+				renderError(w, err.Error())
+				return
+			}
+			if !bytes.Equal(madr, mout.AddressByte(s.Config)) {
+				continue
+			}
+			info.Inputs = append(info.Inputs, h.Hash)
+		case tx.TypeMulout:
+			tr, err := imesh.GetTx(s.DB, h.Hash)
+			if err != nil {
+				renderError(w, err.Error())
+				return
+			}
+			mout := tr.Body.MultiSigOuts[h.Index]
+			if !bytes.Equal(madr, mout.AddressByte(s.Config)) {
+				continue
+			}
+			info.Balance += mout.Value
+			info.UTXOs = append(info.UTXOs, h.Hash)
+		}
+	}
+	err = tmpl.ExecuteTemplate(w, "maddress", &info)
+	if err != nil {
+		renderError(w, err.Error())
+	}
+}
 func renderError(w http.ResponseWriter, str string) {
 	log.Println(str)
 	w.WriteHeader(http.StatusNotFound)
@@ -321,12 +394,16 @@ func searchHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	id := q.Get("id")
 	_, err1 := hex.DecodeString(id)
 	_, _, err2 := address.ParseAddress58(s.Config, id)
+	_, err3 := address.ParseMultisigAddress(s.Config, id)
 	switch {
 	case err1 == nil:
 		http.Redirect(w, r, "/tx?id="+id, http.StatusFound)
 		return
 	case err2 == nil:
 		http.Redirect(w, r, "/address?id="+id, http.StatusFound)
+		return
+	case err3 == nil:
+		http.Redirect(w, r, "/maddress?id="+id, http.StatusFound)
 		return
 	default:
 		renderError(w, notFound)

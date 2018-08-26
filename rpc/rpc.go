@@ -36,13 +36,14 @@ import (
 type rpcfunc func(*setting.Setting, *Request, *Response) error
 
 var publicRPCs = map[string]rpcfunc{
-	"sendrawtx":      sendrawtx,
-	"getnodeinfo":    getnodeinfo,
-	"getleaves":      getleaves,
-	"getlasthistory": getlasthistory,
-	"getrawtx":       getrawtx,
-	"getminabletx":   getminabletx,
-	"gettxsstatus":   gettxsstatus,
+	"sendrawtx":       sendrawtx,
+	"getnodeinfo":     getnodeinfo,
+	"getleaves":       getleaves,
+	"getlasthistory":  getlasthistory,
+	"getrawtx":        getrawtx,
+	"getminabletx":    getminabletx,
+	"gettxsstatus":    gettxsstatus,
+	"getmultisiginfo": getmultisiginfo,
 }
 
 var rpcs = map[string]rpcfunc{
