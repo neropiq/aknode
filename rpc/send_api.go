@@ -22,6 +22,7 @@ package rpc
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/AidosKuneen/aklib/tx"
@@ -117,6 +118,7 @@ func sendfrom(conf *setting.Setting, req *Request, res *Response) error {
 		Address: adrstr,
 		Value:   uint64(value * aklib.ADK),
 	})
+	log.Println(err)
 	return err
 }
 

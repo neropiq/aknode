@@ -133,14 +133,12 @@ func importwallet(conf *setting.Setting, req *Request, res *Response) error {
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
-	pwd := wallet.Secret.pwd
 	wallet = *d.Wallet
-	wallet.Secret.pwd = pwd
 	if err := putHistory(conf, d.Hist); err != nil {
 		return err
 	}
 	for _, adr := range d.Address {
-		if err := putAddress(conf, adr, false); err != nil {
+		if err := putAddress(conf, adr); err != nil {
 			return err
 		}
 	}

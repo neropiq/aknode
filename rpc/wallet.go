@@ -123,23 +123,22 @@ func putWallet(s *setting.Setting) error {
 	})
 }
 
-//locked by mutex
-func putAddress(s *setting.Setting, adr *Address, update bool) error {
+func (adr *Address) encrypt() error {
 	if wallet.Secret.pwd == nil {
 		return errors.New("need to call walletpassphrase to encrypt address")
 	}
-	if update {
-		adr.EncAddress = address.EncryptSeed(arypack.Marshal(adr.address), wallet.Secret.pwd)
-	} else {
-		dat, err2 := address.DecryptSeed(adr.EncAddress, wallet.Secret.pwd)
-		if err2 != nil {
-			return err2
-		}
-		if err := arypack.Unmarshal(dat, &adr.address); err != nil {
-			return err
-		}
+	adr.EncAddress = address.EncryptSeed(arypack.Marshal(adr.address), wallet.Secret.pwd)
+	return nil
+}
+
+//locked by mutex
+func putAddress(s *setting.Setting, adr *Address) error {
+	if adr.EncAddress == nil {
+		return errors.New("empty encaddress")
 	}
-	adr.Adrstr = adr.address.Address58(s.Config)
+	if adr.Adrstr == "" {
+		return errors.New("empty adrstr")
+	}
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, []byte(adr.Adrstr), adr, db.HeaderWalletAddress)
 	})
@@ -147,9 +146,12 @@ func putAddress(s *setting.Setting, adr *Address, update bool) error {
 
 //locked by mutex
 func getAddress(s *setting.Setting, name string) (*Address, error) {
+	log.Println(name)
+
 	var adr Address
 	return &adr, s.DB.View(func(txn *badger.Txn) error {
 		if err := db.Get(txn, []byte(name), &adr, db.HeaderWalletAddress); err != nil {
+			log.Println(err)
 			return err
 		}
 		if wallet.Secret.pwd == nil {
@@ -241,7 +243,10 @@ func fillPool(s *setting.Setting) error {
 			address: a,
 			Adrstr:  a.Address58(s.Config),
 		}
-		if err := putAddress(s, adr, true); err != nil {
+		if err := adr.encrypt(); err != nil {
+			return err
+		}
+		if err := putAddress(s, adr); err != nil {
 			return err
 		}
 		wallet.Pool.Address = append(wallet.Pool.Address, a.Address58(s.Config))
@@ -333,7 +338,7 @@ func newPublicAddress(s *setting.Setting) (string, error) {
 
 func newChangeAddress(s *setting.Setting) (string, error) {
 	if wallet.Secret.seed == nil || wallet.Secret.pwd == nil {
-		return "", nil
+		return "", errors.New("call walletpasspharse first")
 	}
 	seed := address.HDseed(wallet.Secret.seed, 1, uint32(len(wallet.AddressChange)))
 	a, err := address.NewFromSeed(s.Config, seed, false)
@@ -344,9 +349,13 @@ func newChangeAddress(s *setting.Setting) (string, error) {
 		address: a,
 		Adrstr:  a.Address58(s.Config),
 	}
-	if err := putAddress(s, adr, true); err != nil {
+	if err := adr.encrypt(); err != nil {
 		return "", err
 	}
+	if err := putAddress(s, adr); err != nil {
+		return "", err
+	}
+	log.Println(adr, adr.Adrstr)
 	wallet.AddressChange[adr.Adrstr] = struct{}{}
 	return adr.Adrstr, putWallet(s)
 }

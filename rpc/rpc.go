@@ -75,7 +75,7 @@ var rpcs = map[string]rpcfunc{
 }
 
 //Run runs RPC server.
-func Run(setting *setting.Setting) {
+func Run(setting *setting.Setting) net.Listener {
 	ipport := fmt.Sprintf("%s:%d", setting.RPCBind, setting.RPCPort)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -91,19 +91,20 @@ func Run(setting *setting.Setting) {
 		MaxHeaderBytes:    1 << 20,
 	}
 	fmt.Println("Starting RPC Server on", ipport)
+	ln, err := net.Listen("tcp", s.Addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var l net.Listener
+	if setting.RPCMaxConnections == 0 {
+		l = ln
+	} else {
+		l = netutil.LimitListener(ln, int(setting.RPCMaxConnections))
+	}
 	go func() {
-		ln, err := net.Listen("tcp", s.Addr)
-		if err != nil {
-			log.Fatal(err)
-		}
-		var l net.Listener
-		if setting.RPCMaxConnections == 0 {
-			l = ln
-		} else {
-			l = netutil.LimitListener(ln, int(setting.RPCMaxConnections))
-		}
 		log.Println(s.Serve(l))
 	}()
+	return l
 }
 
 //Request is for parsing request from client.

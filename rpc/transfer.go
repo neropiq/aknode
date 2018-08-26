@@ -46,6 +46,7 @@ func (w *trWallet) NewChangeAddress() (*address.Address, error) {
 	}
 	adr, err := getAddress(w.conf, adrstr)
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	return adr.address, nil
