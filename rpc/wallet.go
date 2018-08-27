@@ -75,6 +75,10 @@ const poolSize = 20 //FIXME
 
 //Init initialize wallet struct.
 func Init(s *setting.Setting) error {
+	wallet = Wallet{
+		AddressChange: make(map[string]struct{}),
+		AddressPublic: make(map[string]struct{}),
+	}
 	err := s.DB.View(func(txn *badger.Txn) error {
 		err := db.Get(txn, nil, &wallet, db.HeaderWallet)
 		if err != nil && err != badger.ErrKeyNotFound {
