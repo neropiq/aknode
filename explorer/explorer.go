@@ -183,12 +183,24 @@ func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		Statements   []Statement
 		Transactions []Transaction
 	}{
-		Net:     s.Config.Name,
-		Version: setting.Version,
-		Peers:   node.ConnSize(),
-		Time:    time.Now().Truncate(time.Second),
-		Txs:     imesh.GetTxNo(),
-		Leaves:  leaves.Size(),
+		Net:          s.Config.Name,
+		Version:      setting.Version,
+		Peers:        node.ConnSize(),
+		Time:         time.Now().Truncate(time.Second),
+		Txs:          imesh.GetTxNo(),
+		Leaves:       leaves.Size(),
+		Transactions: make([]Transaction, 0, 5),
+	}
+	for _, tr := range imesh.LatestTxs() {
+		var balance uint64
+		for _, o := range tr.Body.Outputs {
+			balance += o.Value
+		}
+		info.Transactions = append(info.Transactions, Transaction{
+			ID:   tr.Hash.String(),
+			ADK:  balance,
+			Time: tr.Received,
+		})
 	}
 
 	err := tmpl.ExecuteTemplate(w, "index", &info)
@@ -322,34 +334,39 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	info := struct {
-		Net                 string
-		Address             string
-		Balance             uint64
-		Received            uint64
-		ReceivedUnconfirmed uint64
-		Send                uint64
-		UTXOs               []tx.Hash
-		MUTXOs              []tx.Hash
-		Inputs              []tx.Hash
-		MInputs             []tx.Hash
-		Ticketins           []tx.Hash
-		Ticketouts          []tx.Hash
+		Net        string
+		Address    string
+		Balance    uint64
+		Received   uint64
+		Send       uint64
+		UTXOs      []tx.Hash
+		MUTXOs     []tx.Hash
+		Inputs     []tx.Hash
+		MInputs    []tx.Hash
+		Ticketins  []tx.Hash
+		Ticketouts []tx.Hash
 	}{
 		Net:     s.Config.Name,
 		Address: id,
 	}
 	for _, h := range hist {
+		ti, err := imesh.GetTxInfo(s.DB, h.Hash)
+		if err != nil {
+			renderError(w, err.Error())
+			return
+		}
 		switch h.Type {
 		case tx.TypeIn:
-			info.Inputs = append(info.Inputs, h.Hash)
-		case tx.TypeMulin:
-			info.MInputs = append(info.MInputs, h.Hash)
-		case tx.TypeOut:
-			ti, err := imesh.GetTxInfo(s.DB, h.Hash)
+			ins, err := imesh.PreviousOutput(s, ti.Body.Inputs[h.Index])
 			if err != nil {
 				renderError(w, err.Error())
 				return
 			}
+			info.Send += ins.Value
+			info.Inputs = append(info.Inputs, h.Hash)
+		case tx.TypeMulin:
+			info.MInputs = append(info.MInputs, h.Hash)
+		case tx.TypeOut:
 			info.Balance += ti.Body.Outputs[h.Index].Value
 			info.UTXOs = append(info.UTXOs, h.Hash)
 		case tx.TypeMulout:
@@ -360,6 +377,8 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 			info.Ticketouts = append(info.Ticketouts, h.Hash)
 		}
 	}
+	info.Received = info.Balance + info.Send
+
 	err = tmpl.ExecuteTemplate(w, "address", &info)
 	if err != nil {
 		renderError(w, err.Error())
@@ -415,6 +434,7 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 			if !bytes.Equal(madr, mout.AddressByte(s.Config)) {
 				continue
 			}
+			info.Send += mout.Value
 			info.Inputs = append(info.Inputs, h.Hash)
 		case tx.TypeMulout:
 			tr, err := imesh.GetTx(s.DB, h.Hash)
@@ -430,6 +450,7 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 			info.UTXOs = append(info.UTXOs, h.Hash)
 		}
 	}
+	info.Received = info.Balance + info.Send
 	err = tmpl.ExecuteTemplate(w, "maddress", &info)
 	if err != nil {
 		renderError(w, err.Error())

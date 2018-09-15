@@ -41,6 +41,13 @@ var txno = struct {
 	sync.RWMutex
 }{}
 
+var latestTxs = struct {
+	txs []*TxInfo
+	sync.RWMutex
+}{
+	txs: make([]*TxInfo, 0, 5),
+}
+
 //TxStatus is a stutus for eeach tx(confirmed or not)
 type TxStatus byte
 
@@ -173,6 +180,7 @@ func GetTx(akdb *badger.DB, hash []byte) (*tx.Transaction, error) {
 //PutTxDirect puts a transaction  into db without checking tx relation..
 func PutTxDirect(s *aklib.Config, akdb *badger.DB, tr *tx.Transaction) error {
 	ti := TxInfo{
+		Hash:     tr.Hash(),
 		Body:     tr.Body,
 		Received: time.Now().Truncate(time.Second),
 	}
@@ -189,6 +197,12 @@ func PutTxDirect(s *aklib.Config, akdb *badger.DB, tr *tx.Transaction) error {
 		if err := updateMulsigAddress(s, txn, tr); err != nil {
 			return err
 		}
+		latestTxs.Lock()
+		if len(latestTxs.txs) >= 5 {
+			latestTxs.txs = latestTxs.txs[1:]
+		}
+		latestTxs.txs = append(latestTxs.txs, &ti)
+		latestTxs.Unlock()
 		return db.Put(txn, ti.sigKey(), tr.Signatures, db.HeaderTxSig)
 	})
 }
@@ -196,6 +210,7 @@ func PutTxDirect(s *aklib.Config, akdb *badger.DB, tr *tx.Transaction) error {
 //called synchonously from resolve
 func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 	ti := TxInfo{
+		Hash:     tr.Hash(),
 		Body:     tr.Body,
 		Received: time.Now().Truncate(time.Second),
 	}
@@ -235,6 +250,12 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 		if err := updateMulsigAddress(s.Config, txn, tr); err != nil {
 			return err
 		}
+		latestTxs.Lock()
+		if len(latestTxs.txs) >= 5 {
+			latestTxs.txs = latestTxs.txs[1:]
+		}
+		latestTxs.txs = append(latestTxs.txs, &ti)
+		latestTxs.Unlock()
 		return db.Put(txn, ti.sigKey(), tr.Signatures, db.HeaderTxSig)
 	})
 }
@@ -472,4 +493,11 @@ func GetTxNo() uint64 {
 	txno.RLock()
 	defer txno.RUnlock()
 	return txno.TxNo
+}
+
+//LatestTxs returns 5 latest transactions received.
+func LatestTxs() []*TxInfo {
+	latestTxs.RLock()
+	defer latestTxs.RUnlock()
+	return latestTxs.txs
 }

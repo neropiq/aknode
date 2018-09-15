@@ -148,7 +148,7 @@
 						  				<tbody>
 {{range .Transactions}}
 						  					<tr>
-						  						<td class="text-success">{{.ID}}</td>
+						  						<td class="text-success text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.ID}}">{{.ID}}</a></td>
 						  						<td>{{toADK .ADK}} ADK</td>
 						  						<td>{{duration .Time}}</td>
 						  					</tr>
