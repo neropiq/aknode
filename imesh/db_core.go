@@ -199,7 +199,9 @@ func PutTxDirect(s *aklib.Config, akdb *badger.DB, tr *tx.Transaction) error {
 		}
 		latestTxs.Lock()
 		if len(latestTxs.txs) >= 5 {
-			latestTxs.txs = latestTxs.txs[1:]
+			copy(latestTxs.txs, latestTxs.txs[1:])
+			latestTxs.txs[len(latestTxs.txs)-1] = nil
+			latestTxs.txs = latestTxs.txs[:len(latestTxs.txs)-1]
 		}
 		latestTxs.txs = append(latestTxs.txs, &ti)
 		latestTxs.Unlock()
@@ -252,7 +254,9 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 		}
 		latestTxs.Lock()
 		if len(latestTxs.txs) >= 5 {
-			latestTxs.txs = latestTxs.txs[1:]
+			copy(latestTxs.txs, latestTxs.txs[1:])
+			latestTxs.txs[len(latestTxs.txs)-1] = nil
+			latestTxs.txs = latestTxs.txs[:len(latestTxs.txs)-1]
 		}
 		latestTxs.txs = append(latestTxs.txs, &ti)
 		latestTxs.Unlock()
