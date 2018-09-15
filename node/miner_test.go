@@ -92,7 +92,7 @@ func TestMiner(t *testing.T) {
 	}
 
 	seed := address.GenerateSeed32()
-	a3, err2 := address.NewFromSeed(s.Config, seed, false)
+	a3, err2 := address.New(s.Config, seed)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -141,7 +141,7 @@ func TestMiner(t *testing.T) {
 	}
 
 	seed = address.GenerateSeed32()
-	a2, err2 := address.NewFromSeed(s.Config, seed, false)
+	a2, err2 := address.New(s.Config, seed)
 	if err2 != nil {
 		t.Error(err2)
 	}

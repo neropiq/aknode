@@ -239,7 +239,7 @@ func fillPool(s *setting.Setting) error {
 	}
 	for i := len(wallet.Pool.Address); i < poolSize; i++ {
 		seed := address.HDseed(wallet.Secret.seed, 0, wallet.Pool.Index)
-		a, err := address.NewFromSeed(s.Config, seed, false)
+		a, err := address.New(s.Config, seed)
 		if err != nil {
 			return err
 		}
@@ -345,7 +345,7 @@ func newChangeAddress(s *setting.Setting) (string, error) {
 		return "", errors.New("call walletpasspharse first")
 	}
 	seed := address.HDseed(wallet.Secret.seed, 1, uint32(len(wallet.AddressChange)))
-	a, err := address.NewFromSeed(s.Config, seed, false)
+	a, err := address.New(s.Config, seed)
 	if err != nil {
 		return "", err
 	}

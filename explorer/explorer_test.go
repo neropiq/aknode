@@ -64,7 +64,7 @@ func setup(t *testing.T) {
 	s.MyHostPort = ":9624"
 	seed := address.GenerateSeed32()
 	var err2 error
-	a, err2 = address.NewFromSeed(s.Config, seed, false)
+	a, err2 = address.New(s.Config, seed)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -133,7 +133,7 @@ func TestExploere(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		seed := address.GenerateSeed32()
 		var err2 error
-		addrs[i], err2 = address.NewFromSeed(s.Config, seed, false)
+		addrs[i], err2 = address.New(s.Config, seed)
 		if err2 != nil {
 			t.Error(err2)
 		}

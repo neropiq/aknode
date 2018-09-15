@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/AidosKuneen/aklib"
@@ -69,6 +70,22 @@ func Run(setting *setting.Setting) {
 		"tformat": func(t time.Time) string {
 			return t.Format("2006-01-02 15:04:05 MST")
 		},
+		"add": func(a, b int) int {
+			return a + b
+		},
+		"duration": func(a time.Time) string {
+			dur := time.Now().Sub(a)
+			switch {
+			case dur < time.Minute:
+				return strconv.Itoa(int(dur.Seconds())) + " secs"
+			case dur < time.Hour:
+				return strconv.Itoa(int(dur.Minutes())) + " mins"
+			case dur < 24*time.Hour:
+				return strconv.Itoa(int(dur.Hours())) + " hours"
+			default:
+				return strconv.Itoa(int(dur.Hours()/24)) + " days"
+			}
+		},
 	}
 	tmpl.Funcs(funcMap)
 	box := packr.NewBox(filepath.Join(wwwPath, "templates"))
@@ -104,10 +121,14 @@ func Run(setting *setting.Setting) {
 	mux.HandleFunc("/qrcode/", func(w http.ResponseWriter, r *http.Request) {
 		qrHandle(setting, w, r)
 	})
-	for _, stat := range []string{"image", "css", "js"} {
+	for _, stat := range []string{"images", "css", "js", "icofont"} {
 		box := packr.NewBox(filepath.Join(wwwPath, stat))
 		mux.Handle("/"+stat+"/", http.StripPrefix("/"+stat+"/", http.FileServer(box)))
 	}
+	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		box := packr.NewBox(filepath.Join(wwwPath, "images/favicon.ico"))
+		mux.Handle("/favicon.ico", http.StripPrefix("/images/favicon,ico", http.FileServer(box)))
+	})
 
 	s := &http.Server{
 		Addr:              ipport,
@@ -143,13 +164,26 @@ func qrHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 
 //Handle handles api calls.
 func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+	type Statement struct {
+		Index        int
+		Time         time.Time
+		Transactions int
+		ADK          uint64
+	}
+	type Transaction struct {
+		ID   string
+		ADK  uint64
+		Time time.Time
+	}
 	info := struct {
-		Net     string
-		Version string
-		Peers   int
-		Time    time.Time
-		Txs     uint64
-		Leaves  int
+		Net          string
+		Version      string
+		Peers        int
+		Time         time.Time
+		Txs          uint64
+		Leaves       int
+		Statements   []Statement
+		Transactions []Transaction
 	}{
 		Net:     s.Config.Name,
 		Version: setting.Version,
@@ -189,6 +223,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	}
 
 	info := struct {
+		Net                string
 		TXID               string
 		Created            time.Time
 		Received           time.Time
@@ -208,24 +243,34 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		Parents            []tx.Hash
 		GetMultisigAddress func(*tx.MultiSigOut) string
 	}{
-		TXID:       id,
-		Created:    ti.Body.Time,
-		Received:   ti.Received,
-		Status:     ti.Status,
-		Inputs:     make([]*tx.Output, len(ti.Body.Inputs)),
-		MInputs:    make([]*tx.MultiSigOut, len(ti.Body.MultiSigIns)),
-		Signs:      make(map[string]bool),
-		Outputs:    ti.Body.Outputs,
-		MOutputs:   ti.Body.MultiSigOuts,
-		Message:    hex.EncodeToString(ti.Body.Message),
-		MessageStr: string(ti.Body.Message),
-		Nonce:      ti.Body.Nonce,
-		GNonce:     ti.Body.Gnonce,
-		LockTime:   ti.Body.LockTime,
-		Parents:    ti.Body.Parent,
+		Net:          s.Config.Name,
+		TXID:         id,
+		Created:      ti.Body.Time,
+		Received:     ti.Received,
+		Status:       ti.Status,
+		Inputs:       make([]*tx.Output, len(ti.Body.Inputs)),
+		MInputs:      make([]*tx.MultiSigOut, len(ti.Body.MultiSigIns)),
+		Signs:        make(map[string]bool),
+		Outputs:      ti.Body.Outputs,
+		MOutputs:     ti.Body.MultiSigOuts,
+		TicketOutput: ti.Body.TicketOutput.String(),
+		Message:      hex.EncodeToString(ti.Body.Message),
+		MessageStr:   string(ti.Body.Message),
+		Nonce:        ti.Body.Nonce,
+		GNonce:       ti.Body.Gnonce,
+		LockTime:     ti.Body.LockTime,
+		Parents:      ti.Body.Parent,
 		GetMultisigAddress: func(out *tx.MultiSigOut) string {
 			return out.Address(s.Config)
 		},
+	}
+	if ti.Body.TicketInput != nil {
+		ti, err := imesh.GetTxInfo(s.DB, ti.Body.TicketInput)
+		if err != nil {
+			renderError(w, err.Error())
+			return
+		}
+		info.TicketInput = ti.Body.TicketOutput.String()
 	}
 	for i, inp := range ti.Body.Inputs {
 		info.Inputs[i], err = imesh.PreviousOutput(s, inp)
@@ -277,14 +322,17 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	info := struct {
-		Address    string
-		Balance    uint64
-		UTXOs      []tx.Hash
-		MUTXOs     []tx.Hash
-		Inputs     []tx.Hash
-		MInputs    []tx.Hash
-		Ticketins  []tx.Hash
-		Ticketouts []tx.Hash
+		Address             string
+		Balance             uint64
+		Received            uint64
+		ReceivedUnconfirmed uint64
+		Send                uint64
+		UTXOs               []tx.Hash
+		MUTXOs              []tx.Hash
+		Inputs              []tx.Hash
+		MInputs             []tx.Hash
+		Ticketins           []tx.Hash
+		Ticketouts          []tx.Hash
 	}{
 		Address: id,
 	}
@@ -335,11 +383,13 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	info := struct {
-		Struct  *tx.MultisigStruct
-		Address string
-		Balance uint64
-		UTXOs   []tx.Hash
-		Inputs  []tx.Hash
+		Struct              *tx.MultisigStruct
+		Address             string
+		Balance             uint64
+		Received            uint64
+		ReceivedUnconfirmed uint64
+		UTXOs               []tx.Hash
+		Inputs              []tx.Hash
 	}{
 		Struct:  msig,
 		Address: id,
@@ -383,7 +433,7 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 func renderError(w http.ResponseWriter, str string) {
 	log.Println(str)
 	w.WriteHeader(http.StatusNotFound)
-	err := tmpl.ExecuteTemplate(w, "err", str)
+	err := tmpl.ExecuteTemplate(w, "404", str)
 	if err != nil {
 		log.Print(err)
 	}

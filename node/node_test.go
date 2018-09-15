@@ -59,7 +59,7 @@ func setup(t *testing.T) {
 	s.Port = 44134
 	s.MyHostPort = ":44134"
 	seed := address.GenerateSeed32()
-	a, err2 = address.NewFromSeed(s.Config, seed, false)
+	a, err2 = address.New(s.Config, seed)
 	if err2 != nil {
 		t.Error(err2)
 	}

@@ -55,7 +55,7 @@ func setup(t *testing.T) {
 	}
 	s.Config = aklib.DebugConfig
 	seed := address.GenerateSeed32()
-	a, err2 = address.NewFromSeed(s.Config, seed, false)
+	a, err2 = address.New(s.Config, seed)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -63,7 +63,7 @@ func setup(t *testing.T) {
 		a.Address58(s.Config): aklib.ADKSupply,
 	}
 	seed = address.GenerateSeed32()
-	b, err2 = address.NewFromSeed(s.Config, seed, false)
+	b, err2 = address.New(s.Config, seed)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -469,7 +469,7 @@ func TestImesh4(t *testing.T) {
 		t.Error("should be equal")
 	}
 	seed := address.GenerateSeed32()
-	a1, err2 := address.NewFromSeed(s.Config, seed, false)
+	a1, err2 := address.New(s.Config, seed)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -489,7 +489,7 @@ func TestImesh4(t *testing.T) {
 	}
 
 	seed = address.GenerateSeed32()
-	a2, err2 := address.NewFromSeed(s.Config, seed, false)
+	a2, err2 := address.New(s.Config, seed)
 	if err2 != nil {
 		t.Error(err2)
 	}
