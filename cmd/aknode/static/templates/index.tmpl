@@ -1,0 +1,231 @@
+{{define "index"}}
+<!DOCTYPE html>
+<html lang="en-US">
+	<head>
+		<meta charset="utf-8">
+		<meta name="keywords" content="key, words">
+		<meta name="description" content="description">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Aidos Mesh Explorer</title>
+
+		<link href="/css/style.css" rel="stylesheet" type="text/css">
+		<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700,800" rel="stylesheet">
+		<link rel="stylesheet" media="all" type="text/css" href="/icofont/icofont.min.css">
+		<link rel="icon" href="/favicon.ico" type="image/x-icon">
+
+		<!-- slick slider -->
+		<link rel="stylesheet" type="text/css" href="/css/slick.css"/>
+		<link rel="stylesheet" type="text/css" href="/css/slick-theme.css"/>
+	</head>
+
+	<body>
+		<!--Header-->
+		<header class="home-header">
+			<div class="container">
+				<div class="row header-top">
+					<div class="col-8">
+						<div class="logo">
+							<a href="/index.html"><img src="/images/logo.png" alt="Logo"> Aidos Mesh <span>Explorer {{if ne .Net "main"}}<span class="text-uppercase bg-danger text-white"> {{.Net}}net </span>{{end}}</span></a>
+						</div>
+					</div>
+				</div>
+				<div class="row header-banner">
+					<div class="col-12 col-md-7 search-mesh">
+						<h2>Search The Mesh  </h2>
+						<h5>Enter an address, transaction hash or multisig address. </h5>
+<form action="/search">
+						<div class="input-group">
+						  <input type="text" name="id" class="form-control" placeholder="Example: AKADRSM2SFXBcL8w7VqAtM7inbkbGc2tLrcwauEB5KBLEvtFcNySCREWG">
+						</div>
+						<button type="submit" class="btn btn-primary"><i class="icofont-search"></i> SEARCH</button>
+</form>
+					</div>
+				</div>
+			</div>
+		</header>
+		<!--Header END-->
+		<!--Content-->
+		<section id="content">
+			<div class="node-information">
+				<div class="container">
+					<div class="row">
+						<div class="col-12">
+							<h3>Node Information</h3>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="container">
+				<div class="row">
+					<div class="col-12">
+						<ul class="node-info">
+							<li>
+								<p>
+									Net
+									<span>{{.Net}}</span>
+								</p>
+							</li>
+							<li>
+								<p>
+									Total Supply
+									<span>25,000,000 ADK</span>
+								</p>
+							</li>
+							<li>
+								<p>
+									Application Version
+									<span>{{.Version}}</span>
+								</p>
+							</li>
+							<li>
+								<p>
+									Number of Peers
+									<span>{{.Peers}} </span>
+								</p>
+							</li>
+							<li>
+								<p>
+									Time
+									<span>{{.Time.UTC.Format "2006-01-02 15:04:15 MST"}}</span>
+								</p>
+							</li>
+							<li>
+								<p>
+									Number of Transactions / Leaves
+									<span>{{.Txs}} / {{.Leaves}}</span>
+								</p>
+							</li>
+						</ul>
+					</div>
+				</div>
+				<div class="row pt-5">
+					<div class="col-12 col-md-12 col-lg-6 latest-block-transaction">
+						<div class="card">
+							<div class="card-header">
+								<h3 class="text-uppercase">Latest Statement <a href="#">SEE MORE</a></h3>
+							</div>	
+						  	<div class="card-body p-0">
+						  		<div class="table-responsive">
+						  			<table class="table table-borderless">
+						  				<thead>
+						  					<tr>
+						  						<th>Index</th>
+						  						<th>Age</th>
+						  						<th>Transactions</th>
+						  						<th>Total Sent</th>
+						  					</tr>
+						  				</thead>
+						  				<tbody>
+{{range .Statements}}
+						  					<tr>
+						  						<td class="text-success">{{.Index}}</td>
+						  						<td>{{duration .Time}}</td>
+						  						<td>{{.Txs}}</td>
+						  						<td>{{toADK .ADK}} ADK</td>
+						  					</tr>
+{{end}}
+						  				</tbody>
+						  			</table>
+						  		</div>
+						  	</div>
+						</div>
+					</div>
+					<div class="col-12 col-md-12 col-lg-6 latest-block-transaction">
+						<div class="card">
+							<div class="card-header">
+								<h3 class="text-uppercase">Latest transactions</h3>
+							</div>	
+						  	<div class="card-body p-0">
+						  		<div class="table-responsive">
+						  			<table class="table table-borderless">
+						  				<thead>
+						  					<tr>
+						  						<th>Transaction ID</th>
+						  						<th>Output</th>						  						
+						  						<th>Time</th>
+						  					</tr>
+						  				</thead>
+						  				<tbody>
+{{range .Transactions}}
+						  					<tr>
+						  						<td class="text-success">{{.ID}}</td>
+						  						<td>{{toADK .ADK}} ADK</td>
+						  						<td>{{duration .Time}}</td>
+						  					</tr>
+{{end}}
+						  				</tbody>
+						  			</table>
+						  		</div>
+						  	</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+		<!--Content END-->
+		<!--Footer-->
+		<footer>
+			<div class="footer-bottom">
+				<div class="container">
+					<div class="row">
+						<div class="col-12">
+							<p>2018 © Aidos Explorer. All Rights Reserved.</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</footer>
+
+		<script type="text/javascript" src="js/jquery.min.js"></script>
+		<script type="text/javascript" src="js/popper.min.js"></script>
+		<script src="js/bootstrap.min.js"></script>
+		<script type="text/javascript" src="js/custom.js"></script>
+		<!-- slick slider -->
+		<script type="text/javascript" src="js/slick.min.js"></script>
+
+		<script>
+			$(document).ready(function(){
+				$('.node-info').slick({
+				  dots: true,
+				  infinite: false,
+				  speed: 300,
+				  slidesToShow: 4,
+				  slidesToScroll: 4,
+				  arrows:false,
+				  responsive: [
+				    {
+				      breakpoint: 1024,
+				      settings: {
+				        slidesToShow: 3,
+				        slidesToScroll: 3,
+				        infinite: true,
+				        dots: true
+				      }
+				    },
+				    {
+				      breakpoint: 700,
+				      settings: {
+				        slidesToShow: 2,
+				        slidesToScroll: 2
+				      }
+				    },
+				    {
+				      breakpoint: 480,
+				      settings: {
+				        slidesToShow: 1,
+				        slidesToScroll: 1
+				      }
+				    }
+				    // You can unslick at a given breakpoint now by adding:
+				    // settings: "unslick"
+				    // instead of a settings object
+				  ]
+				});
+			})
+		</script>
+
+		</script>
+	</body>
+</html>
+
+{{end}}

@@ -77,13 +77,13 @@ func Run(setting *setting.Setting) {
 			dur := time.Now().Sub(a)
 			switch {
 			case dur < time.Minute:
-				return strconv.Itoa(int(dur.Seconds())) + " secs"
+				return strconv.Itoa(int(dur.Seconds())) + " second(s)"
 			case dur < time.Hour:
-				return strconv.Itoa(int(dur.Minutes())) + " mins"
+				return strconv.Itoa(int(dur.Minutes())) + " minute(s)"
 			case dur < 24*time.Hour:
-				return strconv.Itoa(int(dur.Hours())) + " hours"
+				return strconv.Itoa(int(dur.Hours())) + " hour(s)"
 			default:
-				return strconv.Itoa(int(dur.Hours()/24)) + " days"
+				return strconv.Itoa(int(dur.Hours()/24)) + " day(s)"
 			}
 		},
 	}
@@ -125,10 +125,8 @@ func Run(setting *setting.Setting) {
 		box := packr.NewBox(filepath.Join(wwwPath, stat))
 		mux.Handle("/"+stat+"/", http.StripPrefix("/"+stat+"/", http.FileServer(box)))
 	}
-	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		box := packr.NewBox(filepath.Join(wwwPath, "images/favicon.ico"))
-		mux.Handle("/favicon.ico", http.StripPrefix("/images/favicon,ico", http.FileServer(box)))
-	})
+	ibox := packr.NewBox(filepath.Join(wwwPath, "images"))
+	mux.Handle("/favicon.ico", http.StripPrefix("/", http.FileServer(ibox)))
 
 	s := &http.Server{
 		Addr:              ipport,
@@ -243,26 +241,28 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		Parents            []tx.Hash
 		GetMultisigAddress func(*tx.MultiSigOut) string
 	}{
-		Net:          s.Config.Name,
-		TXID:         id,
-		Created:      ti.Body.Time,
-		Received:     ti.Received,
-		Status:       ti.Status,
-		Inputs:       make([]*tx.Output, len(ti.Body.Inputs)),
-		MInputs:      make([]*tx.MultiSigOut, len(ti.Body.MultiSigIns)),
-		Signs:        make(map[string]bool),
-		Outputs:      ti.Body.Outputs,
-		MOutputs:     ti.Body.MultiSigOuts,
-		TicketOutput: ti.Body.TicketOutput.String(),
-		Message:      hex.EncodeToString(ti.Body.Message),
-		MessageStr:   string(ti.Body.Message),
-		Nonce:        ti.Body.Nonce,
-		GNonce:       ti.Body.Gnonce,
-		LockTime:     ti.Body.LockTime,
-		Parents:      ti.Body.Parent,
+		Net:        s.Config.Name,
+		TXID:       id,
+		Created:    ti.Body.Time,
+		Received:   ti.Received,
+		Status:     ti.Status,
+		Inputs:     make([]*tx.Output, len(ti.Body.Inputs)),
+		MInputs:    make([]*tx.MultiSigOut, len(ti.Body.MultiSigIns)),
+		Signs:      make(map[string]bool),
+		Outputs:    ti.Body.Outputs,
+		MOutputs:   ti.Body.MultiSigOuts,
+		Message:    hex.EncodeToString(ti.Body.Message),
+		MessageStr: string(ti.Body.Message),
+		Nonce:      ti.Body.Nonce,
+		GNonce:     ti.Body.Gnonce,
+		LockTime:   ti.Body.LockTime,
+		Parents:    ti.Body.Parent,
 		GetMultisigAddress: func(out *tx.MultiSigOut) string {
 			return out.Address(s.Config)
 		},
+	}
+	if ti.Body.TicketOutput != nil {
+		info.TicketOutput = ti.Body.TicketOutput.String()
 	}
 	if ti.Body.TicketInput != nil {
 		ti, err := imesh.GetTxInfo(s.DB, ti.Body.TicketInput)
@@ -322,6 +322,7 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	info := struct {
+		Net                 string
 		Address             string
 		Balance             uint64
 		Received            uint64
@@ -334,6 +335,7 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		Ticketins           []tx.Hash
 		Ticketouts          []tx.Hash
 	}{
+		Net:     s.Config.Name,
 		Address: id,
 	}
 	for _, h := range hist {
@@ -383,14 +385,17 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	info := struct {
+		Net                 string
 		Struct              *tx.MultisigStruct
 		Address             string
 		Balance             uint64
 		Received            uint64
+		Send                uint64
 		ReceivedUnconfirmed uint64
 		UTXOs               []tx.Hash
 		Inputs              []tx.Hash
 	}{
+		Net:     s.Config.Name,
 		Struct:  msig,
 		Address: id,
 	}

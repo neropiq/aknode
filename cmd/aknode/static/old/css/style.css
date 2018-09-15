@@ -1,0 +1,89 @@
+/* Custom Stylesheet */
+/**
+ * Use this file to override Materialize files so you can update
+ * the core Materialize files in the future
+ *
+ * Made By MaterializeCSS.com
+ */
+
+.icon-block {
+  padding: 0 15px;
+}
+.icon-block .material-icons {
+	font-size: inherit;
+}
+
+.small-address {
+  font-size: 14px;
+}
+.amount {
+	font-weight: bold;
+	
+}
+
+.tx {
+	border: 1px solid #75757575;
+	max-width: 100%;
+ 	margin: 0 auto;
+	padding: 15px;
+	border-radius: 5px;
+  margin-top: 10px;
+}
+
+.confirmed{
+	font-size: 40px;
+	background-color: #008800;
+	color: white;
+	font-weight: bold;
+	font-style: italic;
+ 	margin: 0 auto;
+	padding: 5px;
+	border-radius: 5px;
+  margin-top: 10px;
+}
+
+.rejected{
+	font-size: 40px;
+	background-color: #880000;
+	color: white;
+	font-weight: bold;
+	font-style: italic;
+ 	margin: 0 auto;
+	padding: 5px;
+	border-radius: 5px;
+  margin-top: 10px;
+}
+
+.pending{
+	border: 1px solid #000000;
+	font-size: 40px;
+	background-color: #000000;
+	color: white;
+	font-weight: bold;
+	font-style: italic;
+ 	margin: 0 auto;
+	padding: 5px;
+	border-radius: 5px;
+  margin-top: 10px;
+}
+
+.balance{
+	font-size: 20px;
+	color: #008800;
+	font-weight: bold;
+	font-style: italic;
+	max-width: 100%;
+ 	margin: 0 auto;
+	padding: 10px;
+	border-radius: 5px;
+  margin-top: 10px;
+}  
+
+#nav-input:focus {
+	border-bottom: 1px solid #ffffff;
+	box-shadow: 0 1px 0 0 #ffffff;
+}
+#nav-input {
+	border-bottom: 1px solid #888888;
+	box-shadow: 0 1px 0 0 #888888;
+}

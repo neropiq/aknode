@@ -259,5 +259,6 @@ func TestExploere(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatal("should be OK", tr.Hash())
 	}
-	// time.Sleep(1000 * time.Hour)
+	t.Log("strl-C to stop")
+	time.Sleep(1000 * time.Hour)
 }

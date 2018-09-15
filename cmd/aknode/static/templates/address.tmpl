@@ -1,0 +1,199 @@
+{{define "address"}}
+<!DOCTYPE html>
+<html lang="en-US">
+	<head>
+		<meta charset="utf-8">
+		<meta name="keywords" content="key, words">
+		<meta name="description" content="description">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Aidos Mesh Explorer</title>
+
+		<link href="/css/style.css" rel="stylesheet" type="text/css">
+		<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700,800" rel="stylesheet">
+		<link rel="stylesheet" media="all" type="text/css" href="/icofont/icofont.min.css">
+		<link rel="icon" href="/favicon.ico" type="image/x-icon">
+
+	</head>
+
+	<body>
+		<!--Header-->
+		<header class="inner-header">
+			<div class="container">
+				<div class="row header-top">
+					<div class="col-8 col-md-5">
+						<div class="logo">
+							<a href="/index.html"><img src="/images/logo.png" alt="Logo"> Aidos Mesh <span>Explorer {{if ne .Net "main"}}<span class="text-uppercase bg-danger text-white"> {{.Net}}net </span>{{end}}</span></a>
+						</div>
+					</div>
+					<div class="col-4 col-md-7">
+<form action="/search">
+						<div class="inner-header-search">
+							<div class="input-group">
+							  <input type="text" name="id" class="form-control" placeholder="Example: AKADRSM2SFXBcL8w7VqAtM7inbkbGc2tLrcwauEB5KBLEvtFcNySCREWG">
+							</div>							
+							<button type="submit"><i class="icofont-search"></i></button>
+						</div>
+</form>
+					</div>
+				</div>
+				<div class="row header-banner">
+					<div class="col-8 search-mesh">
+						<h2>Aidos Kuneen Address</h2>
+						<h5>{{.Address}}</h5>						
+					</div>
+					<div class="col-4 qr-code">
+						<figure>
+							<img src="/qrcode?id={{.Address}}" alt="QR Code">
+							<a href="#" id="myImg">Click to Zoom</a>
+							<!-- The Modal -->
+							<div id="myModal" class="modal">
+							  <span class="close">&times;</span>
+							  <div class="modal-content">							  	
+							<img src="/qrcode?id={{.Address}}" alt="QR Code Big">
+							  	<div id="caption">QR Code</div>
+							  </div>
+							</div> 							
+ 						</figure>						
+					</div>
+				</div>
+			</div>
+		</header>
+		<!--Header END-->
+		<!--Content-->
+		<section id="content">			
+			<div class="container">
+				<div class="row transaction-address">
+					<div class="col-12 col-md-4">
+						<div class="card transaction-box">
+							<p>
+								Received
+								<span>{{toADK .Received}} ADK</span>
+							</p>
+						</div>
+					</div>
+					<div class="col-12 col-md-4">
+						<div class="card transaction-box">
+							<p>
+								Send
+								<span>{{toADK .Send}} ADK</span>
+							</p>
+						</div>
+					</div>
+					<div class="col-12 col-md-4">
+						<div class="card transaction-box">
+							<p>
+								Balance 
+								<span>{{toADK .Balance}} ADK</span>
+								<small>({{toADK .ReceivedUnconfirmed}} ADK unconfirmed) </small>
+							</p>
+						</div>
+					</div>
+				</div>				
+				<div class="row pt-5 pb-5 transaction-address">
+					<div class="col-12">						
+						<div class="card">
+							<div class="card-header">
+								<h3>Transactions</h3>
+							</div>
+							<div class="card-body p-0">
+								<div class="table-responsive">
+						  			<table class="table table-borderless">
+						  				<tbody>
+{{range $i,$tmp := .UTXOs}}
+						  					<tr>
+						  						<td>{{if eq $i 0}}UTXOs{{end}}</td>
+						  						<td><a href="/tx?id={{.}}">{{.}}</td>
+						  					</tr>
+{{end}}
+{{range $i,$tmp := .MUTXOs}}
+						  					<tr>
+						  						<td>{{if eq $i 0}}UTXOs(Multisig){{end}}</td>
+						  						<td><a href="/tx?id={{.}}">{{.}}</td>
+						  					</tr>
+{{end}}
+{{range $i,$tmp := .Inputs}}
+						  					<tr>
+						  						<td>{{if eq $i 0}}Spent Inputs{{end}}</td>
+						  						<td><a href="/tx?id={{.}}">{{.}}</td>
+						  					</tr>
+{{end}}
+{{range $i,$tmp := .MInputs}}
+						  					<tr>
+						  						<td>{{if eq $i 0}}Spent Inputs(Multisig){{end}}</td>
+						  						<td><a href="/tx?id={{.}}">{{.}}</td>
+						  					</tr>
+{{end}}
+{{range $i,$tmp := .Ticketouts}}
+						  					<tr>
+						  						<td>{{if eq $i 0}}Unspent Ticketout{{end}}</td>
+						  						<td><a href="/tx?id={{.}}">{{.}}</td>
+						  					</tr>
+{{end}}
+{{range $i,$tmp :=  .Ticketins}}
+						  					<tr>
+						  						<td>{{if eq $i 0}}Spent Ticket Inputs{{end}}</td>
+						  						<td><a href="/tx?id={{.Ticketins}}">{{.}}</td>
+						  					</tr>
+{{end}}
+						  				</tbody>
+									</table>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+		<!--Content END-->
+		<!--Footer-->
+		<footer>
+			<div class="footer-bottom">
+				<div class="container">
+					<div class="row">
+						<div class="col-12">
+							<p>2018 © Aidos Explorer. All Rights Reserved.</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</footer>
+		<!--Footer END-->
+
+		<script type="text/javascript" src="/js/jquery.min.js"></script>
+		<script type="text/javascript" src="/js/popper.min.js"></script>
+		<script src="/js/bootstrap.min.js"></script>
+		<script type="text/javascript" src="/js/custom.js"></script>
+		<script>
+			// $(document).ready(function() {
+			// 	$(".advance-details-table").hide();
+			// 	$("#advance-details").click(function(){
+			// 	    $(".advance-details-table").slideToggle();
+			// 	});
+			// });
+
+
+			// Get the modal
+			var modal = document.getElementById('myModal');
+
+			// Get the image and insert it inside the modal - use its "alt" text as a caption
+			var img = document.getElementById('myImg');
+			var modalImg = document.getElementById("img01");
+			var captionText = document.getElementById("caption");
+			img.onclick = function(){
+			    modal.style.display = "block";
+			    modalImg.src = this.src;
+			    captionText.innerHTML = this.alt;
+			}
+
+			// Get the <span> element that closes the modal
+			var span = document.getElementsByClassName("close")[0];
+
+			// When the user clicks on <span> (x), close the modal
+			span.onclick = function() { 
+			    modal.style.display = "none";
+			}
+		</script>
+
+	</body>
+</html>
+{{end}}
