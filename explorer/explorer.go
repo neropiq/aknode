@@ -67,6 +67,10 @@ func Run(setting *setting.Setting) {
 			p := message.NewPrinter(language.English)
 			return p.Sprintf("%.8f", float64(amount)/aklib.ADK)
 		},
+		"toADKi": func(amount int64) string {
+			p := message.NewPrinter(language.English)
+			return p.Sprintf("%.8f", float64(amount)/aklib.ADK)
+		},
 		"tformat": func(t time.Time) string {
 			return t.Format("2006-01-02 15:04:05 MST")
 		},
@@ -320,6 +324,14 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type tinfo struct {
+	Hash   tx.Hash
+	Amount int64
+	Time   time.Time
+	Status imesh.TxStatus
+	Spent  bool
+}
+
 func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id := q.Get("id")
@@ -328,23 +340,25 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		renderError(w, err.Error())
 		return
 	}
-	hist, err := imesh.GetHisoty(s, id, true)
+	hist, err := imesh.GetHisoty(s, id, false)
 	if err != nil {
 		renderError(w, notFound)
 		return
 	}
+
 	info := struct {
-		Net        string
-		Address    string
-		Balance    uint64
-		Received   uint64
-		Send       uint64
-		UTXOs      []tx.Hash
-		MUTXOs     []tx.Hash
-		Inputs     []tx.Hash
-		MInputs    []tx.Hash
-		Ticketins  []tx.Hash
-		Ticketouts []tx.Hash
+		Net                 string
+		Address             string
+		Balance             uint64
+		BalanceUnconfirmed  int64
+		Received            uint64
+		ReceivedUnconfirmed uint64
+		Send                uint64
+		SendUnconfirmed     uint64
+		Outputs             []*tinfo
+		Inputs              []*tinfo
+		Ticketins           []*tinfo
+		Ticketouts          []*tinfo
 	}{
 		Net:     s.Config.Name,
 		Address: id,
@@ -355,6 +369,11 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 			renderError(w, err.Error())
 			return
 		}
+		t := &tinfo{
+			Hash:   h.Hash,
+			Time:   ti.Received,
+			Status: ti.Status,
+		}
 		switch h.Type {
 		case tx.TypeIn:
 			ins, err := imesh.PreviousOutput(s, ti.Body.Inputs[h.Index])
@@ -362,22 +381,38 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 				renderError(w, err.Error())
 				return
 			}
-			info.Send += ins.Value
-			info.Inputs = append(info.Inputs, h.Hash)
-		case tx.TypeMulin:
-			info.MInputs = append(info.MInputs, h.Hash)
+			switch ti.Status {
+			case imesh.StatusPending:
+				info.SendUnconfirmed += ins.Value
+			case imesh.StatusConfirmed:
+				info.Send += ins.Value
+			}
+			t.Amount = -int64(ins.Value)
+			info.Inputs = append(info.Inputs, t)
 		case tx.TypeOut:
-			info.Balance += ti.Body.Outputs[h.Index].Value
-			info.UTXOs = append(info.UTXOs, h.Hash)
-		case tx.TypeMulout:
-			info.MUTXOs = append(info.MUTXOs, h.Hash)
+			v := ti.Body.Outputs[h.Index].Value
+			switch ti.Status {
+			case imesh.StatusPending:
+				info.ReceivedUnconfirmed += v
+			case imesh.StatusConfirmed:
+				info.Received += v
+			}
+			t.Amount = int64(v)
+			if ti.OutputStatus[0][h.Index].IsReferred {
+				t.Spent = true
+			}
+			info.Outputs = append(info.Outputs, t)
 		case tx.TypeTicketin:
-			info.Ticketins = append(info.Ticketins, h.Hash)
+			info.Ticketins = append(info.Ticketins, t)
 		case tx.TypeTicketout:
-			info.Ticketouts = append(info.Ticketouts, h.Hash)
+			info.Ticketouts = append(info.Ticketouts, t)
+			if ti.OutputStatus[2][h.Index].IsReferred {
+				t.Spent = true
+			}
 		}
 	}
-	info.Received = info.Balance + info.Send
+	info.Balance = info.Received - info.Send
+	info.BalanceUnconfirmed = int64(info.ReceivedUnconfirmed) - int64(info.SendUnconfirmed)
 
 	err = tmpl.ExecuteTemplate(w, "address", &info)
 	if err != nil {
@@ -408,25 +443,33 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 		Struct              *tx.MultisigStruct
 		Address             string
 		Balance             uint64
+		BalanceUnconfirmed  int64
 		Received            uint64
-		Send                uint64
 		ReceivedUnconfirmed uint64
-		UTXOs               []tx.Hash
-		Inputs              []tx.Hash
+		Send                uint64
+		SendUnconfirmed     uint64
+		Outputs             []*tinfo
+		Inputs              []*tinfo
 	}{
 		Net:     s.Config.Name,
 		Struct:  msig,
 		Address: id,
 	}
+
 	for _, h := range hist {
+		tr, err := imesh.GetTxInfo(s.DB, h.Hash)
+		if err != nil {
+			renderError(w, err.Error())
+			return
+		}
+		t := &tinfo{
+			Hash:   h.Hash,
+			Time:   tr.Received,
+			Status: tr.Status,
+		}
 		switch h.Type {
 		case tx.TypeMulin:
-			tr, err := imesh.GetTx(s.DB, h.Hash)
-			if err != nil {
-				renderError(w, err.Error())
-				return
-			}
-			mout, err := imesh.PreviousMultisigOutput(s, tr.MultiSigIns[h.Index])
+			mout, err := imesh.PreviousMultisigOutput(s, tr.Body.MultiSigIns[h.Index])
 			if err != nil {
 				renderError(w, err.Error())
 				return
@@ -434,23 +477,35 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 			if !bytes.Equal(madr, mout.AddressByte(s.Config)) {
 				continue
 			}
-			info.Send += mout.Value
-			info.Inputs = append(info.Inputs, h.Hash)
-		case tx.TypeMulout:
-			tr, err := imesh.GetTx(s.DB, h.Hash)
-			if err != nil {
-				renderError(w, err.Error())
-				return
+			switch tr.Status {
+			case imesh.StatusPending:
+				info.SendUnconfirmed += mout.Value
+			case imesh.StatusConfirmed:
+				info.Send += mout.Value
 			}
+			t.Amount = -int64(mout.Value)
+			info.Inputs = append(info.Inputs, t)
+		case tx.TypeMulout:
 			mout := tr.Body.MultiSigOuts[h.Index]
 			if !bytes.Equal(madr, mout.AddressByte(s.Config)) {
 				continue
 			}
-			info.Balance += mout.Value
-			info.UTXOs = append(info.UTXOs, h.Hash)
+			switch tr.Status {
+			case imesh.StatusPending:
+				info.ReceivedUnconfirmed += mout.Value
+			case imesh.StatusConfirmed:
+				info.Received += mout.Value
+			}
+			t.Amount = int64(mout.Value)
+			if tr.OutputStatus[1][h.Index].IsReferred {
+				t.Spent = true
+			}
+			info.Outputs = append(info.Outputs, t)
 		}
 	}
-	info.Received = info.Balance + info.Send
+	info.Balance = info.Received - info.Send
+	info.BalanceUnconfirmed = int64(info.ReceivedUnconfirmed) - int64(info.SendUnconfirmed)
+
 	err = tmpl.ExecuteTemplate(w, "maddress", &info)
 	if err != nil {
 		renderError(w, err.Error())

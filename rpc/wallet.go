@@ -302,7 +302,9 @@ func getUTXO102(s *setting.Setting, isPublic bool) ([]*tx.UTXO, uint64, error) {
 				if err != nil {
 					return nil, 0, err
 				}
-				if tr.Status != imesh.StatusConfirmed {
+				outstat := tr.OutputStatus[0][h.Index]
+				if tr.Status != imesh.StatusConfirmed ||
+					(outstat.IsReferred || outstat.IsSpent || outstat.UsedByMinable != nil) {
 					continue
 				}
 				u := &tx.UTXO{

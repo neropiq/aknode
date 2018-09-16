@@ -109,6 +109,16 @@ func main() {
 		}
 	}
 
+	info, err := os.Stat(fname)
+	if err != nil {
+		log.Fatal(err)
+	}
+	m := info.Mode()
+	if m&0177 != 0 {
+		fmt.Println("setting file must not be readable by others (must be permission 0600) for security")
+		os.Exit(1)
+	}
+
 	f, err2 := ioutil.ReadFile(fname)
 	if err2 != nil {
 		fmt.Println(err2)

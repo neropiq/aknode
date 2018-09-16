@@ -68,6 +68,7 @@
 							<p>
 								Received
 								<span>{{toADK .Received}} ADK</span>
+								<small>({{toADK .ReceivedUnconfirmed}} ADK unconfirmed) </small>
 							</p>
 						</div>
 					</div>
@@ -76,6 +77,7 @@
 							<p>
 								Send
 								<span>{{toADK .Send}} ADK</span>
+								<small>({{toADK .SendUnconfirmed}} ADK unconfirmed) </small>
 							</p>
 						</div>
 					</div>
@@ -84,11 +86,12 @@
 							<p>
 								Balance 
 								<span>{{toADK .Balance}} ADK</span>
+								<small>({{toADKi .BalanceUnconfirmed}} ADK unconfirmed) </small>
 							</p>
 						</div>
 					</div>
 				</div>				
-				<div class="row pt-5 pb-5 transaction-address">
+				<div class="row pt-5 pb-5 related-transaction">
 					<div class="col-12">						
 						<div class="card">
 							<div class="card-header">
@@ -97,41 +100,84 @@
 							<div class="card-body p-0">
 								<div class="table-responsive">
 						  			<table class="table table-borderless">
+						  				<thead>
+						  					<tr>
+						  						<th>Transaction ID</th>
+						  						<th>Amount</th>
+						  						<th>Timestamp</th>
+						  						<th>Status</th>
+						  					</tr>
+						  				</thead>
 						  				<tbody>
-{{range $i,$tmp := .UTXOs}}
+{{range .Inputs}}
 						  					<tr>
-						  						<td>{{if eq $i 0}}UTXOs{{end}}</td>
-						  						<td><a href="/tx?id={{.}}">{{.}}</td>
+						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
+						  						<td>{{.Amount}} ADK</td>
+						  						<td>{{duration .Time}}</td>
+												  {{if eq .Status 0 }}
+						  						<td>Pending</td>
+												  {{end}}
+												  {{if eq .Status 1 }}
+						  						<td>Confirmed</td>
+												  {{end}}
+												  {{if eq .Status 2 }}
+						  						<td>Rejected</td>
+												  {{end}}
 						  					</tr>
 {{end}}
-{{range $i,$tmp := .MUTXOs}}
+{{range .Outputs}}
 						  					<tr>
-						  						<td>{{if eq $i 0}}UTXOs(Multisig){{end}}</td>
-						  						<td><a href="/tx?id={{.}}">{{.}}</td>
+						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
+						  						<td>{{.Amount}} ADK</td>
+						  						<td>{{duration .Time}}</td>
+												  {{if eq .Status 0 }}
+						  						<td>Pending 
+												  {{end}}
+												  {{if eq .Status 1 }}
+						  						<td>Confirmed  
+												  {{end}}
+												  {{if eq .Status 2 }}
+						  						<td>Rejected 
+												  {{end}}
+												  {{if .Spent }}
+												  (Spent)
+												  {{end}}
+												  </td>
 						  					</tr>
 {{end}}
-{{range $i,$tmp := .Inputs}}
+{{range .Ticketins}}
 						  					<tr>
-						  						<td>{{if eq $i 0}}Spent Inputs{{end}}</td>
-						  						<td><a href="/tx?id={{.}}">{{.}}</td>
+						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
+						  						<td></td>
+						  						<td>{{duration .Time}}</td>
+												  {{if eq .Status 0 }}
+						  						<td>Pending</td>
+												  {{end}}
+												  {{if eq .Status 1 }}
+						  						<td>Confirmed</td>
+												  {{end}}
+												  {{if eq .Status 2 }}
+						  						<td>Rejected</td>
+												  {{end}}
 						  					</tr>
 {{end}}
-{{range $i,$tmp := .MInputs}}
+{{range .Ticketouts}}
 						  					<tr>
-						  						<td>{{if eq $i 0}}Spent Inputs(Multisig){{end}}</td>
-						  						<td><a href="/tx?id={{.}}">{{.}}</td>
-						  					</tr>
-{{end}}
-{{range $i,$tmp := .Ticketouts}}
-						  					<tr>
-						  						<td>{{if eq $i 0}}Unspent Ticketout{{end}}</td>
-						  						<td><a href="/tx?id={{.}}">{{.}}</td>
-						  					</tr>
-{{end}}
-{{range $i,$tmp :=  .Ticketins}}
-						  					<tr>
-						  						<td>{{if eq $i 0}}Spent Ticket Inputs{{end}}</td>
-						  						<td><a href="/tx?id={{.Ticketins}}">{{.}}</td>
+						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
+						  						<td></td>
+						  						<td>{{duration .Time}}</td>
+												  {{if eq .Status 0 }}
+						  						<td>Pending 
+												  {{end}}
+												  {{if eq .Status 1 }}
+						  						<td>Confirmed 
+												  {{end}}
+												  {{if eq .Status 2 }}
+						  						<td>Rejected 
+												  {{end}}
+												  {{if .Spent }}
+												  (Spent)
+												  {{end}}
 						  					</tr>
 {{end}}
 						  				</tbody>

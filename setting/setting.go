@@ -75,7 +75,9 @@ type Setting struct {
 	RPCAllowPublicPoW bool   `json:"rpc_allow_public_pow"`
 	WalletNotify      string `json:"wallet_notify"`
 
-	RunValidator bool `json:"run_validator"`
+	RunValidator    bool     `json:"run_validator"`
+	ValidatorSecret string   `json:"validator_secret"`
+	TrustedNodes    []string `json:"trusted_nodes"`
 
 	RunExplorer            bool   `json:"run_explore"`
 	ExplorerBind           string `json:"explorer_bind"`
@@ -88,9 +90,11 @@ type Setting struct {
 	RunTicketIssuer bool    `json:"run_ticket_issuer"`
 	MinerAddress    string  `json:"miner_address"`
 
-	DB     *badger.DB    `json:"-"`
-	Config *aklib.Config `json:"-"`
-	Stop   chan struct{} `json:"-"`
+	DB                 *badger.DB      `json:"-"`
+	Config             *aklib.Config   `json:"-"`
+	Stop               chan struct{}   `json:"-"`
+	ValidatorSeedBytes address.Bytes   `json:"-"`
+	TrustedNodeBytes   []address.Bytes `json:"-"`
 }
 
 //Load parse a json file fname , open DB and returns Settings struct .
@@ -173,6 +177,34 @@ func Load(s []byte) (*Setting, error) {
 		if _, _, err := address.ParseAddress58(se.Config, se.MinerAddress); err != nil {
 			return nil, err
 		}
+	}
+
+	if se.RunValidator && se.ValidatorSecret == "" {
+		return nil, errors.New("You must spcrify validator_secret")
+	}
+	if len(se.TrustedNodes) == 0 {
+		return nil, errors.New("You must spcrify trusted_nodes")
+	}
+	if se.ValidatorSecret != "" {
+		b, typ, err := address.HDFrom58(se.Config, se.ValidatorSecret, []byte(""))
+		if err != nil {
+			return nil, err
+		}
+		if typ != true {
+			return nil, errors.New("invalid validator_seed")
+		}
+		se.ValidatorSeedBytes = b
+	}
+	se.TrustedNodeBytes = make([]address.Bytes, len(se.ValidatorSecret))
+	for i, a := range se.TrustedNodes {
+		ta, typ, err := address.ParseAddress58(se.Config, a)
+		if err != nil {
+			return nil, err
+		}
+		if typ != true {
+			return nil, errors.New("invalid trusted_nodes")
+		}
+		se.TrustedNodeBytes[i] = ta
 	}
 
 	dbDir := filepath.Join(se.BaseDir(), "db")

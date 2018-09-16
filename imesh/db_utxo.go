@@ -20,8 +20,6 @@
 
 package imesh
 
-//TODO: store unused outputs for each addresses after txs are confirmed
-
 import (
 	"bytes"
 	"encoding/hex"
