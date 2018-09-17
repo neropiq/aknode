@@ -62,6 +62,7 @@
 		<!--Content-->
 		<section id="content">			
 			<div class="container">
+
 				<div class="row transaction-address">
 					<div class="col-12 col-md-4">
 						<div class="card transaction-box">
@@ -75,7 +76,7 @@
 					<div class="col-12 col-md-4">
 						<div class="card transaction-box">
 							<p>
-								Send
+								Sent
 								<span>{{toADK .Send}} ADK</span>
 								<small>({{toADK .SendUnconfirmed}} ADK unconfirmed) </small>
 							</p>
@@ -90,7 +91,21 @@
 							</p>
 						</div>
 					</div>
-				</div>				
+				</div>
+				<div class="row msig-address">
+					<div class="col-12">						
+						<div class="card msig-box" ">
+								<p>{{.Struct.M}} out of {{len .Struct.Addresses}} Multisig</p>
+							<div class="card-body p-0">
+							<p>
+								{{range .Struct.Addresses}}
+								<p><small class="text-success text-truncate d-inline-block" style="max-width:100%"><a href="/address?id={{.String}}">{{.String}}</a></small></p>
+								{{end}}
+							</p>
+							</div>
+						</div>
+					</div>
+				</div>
 				<div class="row pt-5 pb-5 related-transaction">
 					<div class="col-12">						
 						<div class="card">
@@ -102,6 +117,7 @@
 						  			<table class="table table-borderless">
 						  				<thead>
 						  					<tr>
+  						  						<th>Received/Sent</th>
 						  						<th>Transaction ID</th>
 						  						<th>Amount</th>
 						  						<th>Timestamp</th>
@@ -111,6 +127,7 @@
 						  				<tbody>
 {{range .Inputs}}
 						  					<tr>
+											    <td>Sent</td>
 						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
 						  						<td>{{.Amount}} ADK</td>
 						  						<td>{{duration .Time}}</td>
@@ -127,20 +144,23 @@
 {{end}}
 {{range .Outputs}}
 						  					<tr>
+											    <td>Received</td>
 						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
 						  						<td>{{.Amount}} ADK</td>
 						  						<td>{{duration .Time}}</td>
 												  {{if eq .Status 0 }}
-						  						<td>Pending
+						  						<td>Pending / 
 												  {{end}}
 												  {{if eq .Status 1 }}
-						  						<td>Confirmed 
+						  						<td>Confirmed  /
 												  {{end}}
 												  {{if eq .Status 2 }}
-						  						<td>Rejected
+						  						<td>Rejected /
 												  {{end}}
 												  {{if .Spent }}
-												  (Spent)
+												  Spent
+												  {{else}}
+												  Unspent
 												  {{end}}
 												  </td>
 						  					</tr>

@@ -85,7 +85,7 @@ func setup(t *testing.T) {
 		t.Error(err)
 	}
 	s.RunExplorer = true
-	s.ExplorerBind = "127.0.0.1"
+	s.ExplorerBind = "0.0.0.0"
 	s.ExplorerPort = 8080
 	Run(&s)
 }

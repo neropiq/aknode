@@ -75,7 +75,7 @@
 					<div class="col-12 col-md-4">
 						<div class="card transaction-box">
 							<p>
-								Send
+								Sent
 								<span>{{toADK .Send}} ADK</span>
 								<small>({{toADK .SendUnconfirmed}} ADK unconfirmed) </small>
 							</p>
@@ -102,6 +102,7 @@
 						  			<table class="table table-borderless">
 						  				<thead>
 						  					<tr>
+						  						<th>Received/Sent</th>
 						  						<th>Transaction ID</th>
 						  						<th>Amount</th>
 						  						<th>Timestamp</th>
@@ -111,6 +112,7 @@
 						  				<tbody>
 {{range .Inputs}}
 						  					<tr>
+						  						<td>Sent</td>
 						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
 						  						<td>{{.Amount}} ADK</td>
 						  						<td>{{duration .Time}}</td>
@@ -127,26 +129,30 @@
 {{end}}
 {{range .Outputs}}
 						  					<tr>
+  						  						<td>Received</td>
 						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
 						  						<td>{{.Amount}} ADK</td>
 						  						<td>{{duration .Time}}</td>
 												  {{if eq .Status 0 }}
-						  						<td>Pending 
+						  						<td>Pending /
 												  {{end}}
 												  {{if eq .Status 1 }}
-						  						<td>Confirmed  
+						  						<td>Confirmed /  
 												  {{end}}
 												  {{if eq .Status 2 }}
-						  						<td>Rejected 
+						  						<td>Rejected /
 												  {{end}}
 												  {{if .Spent }}
-												  (Spent)
+												  Spent
+												  {{else}}
+												  Unspent
 												  {{end}}
 												  </td>
 						  					</tr>
 {{end}}
 {{range .Ticketins}}
 						  					<tr>
+   						  						<td>Sent Ticket</td>
 						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
 						  						<td></td>
 						  						<td>{{duration .Time}}</td>
@@ -163,20 +169,23 @@
 {{end}}
 {{range .Ticketouts}}
 						  					<tr>
+   						  						<td>Received Ticket</td>
 						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
 						  						<td></td>
 						  						<td>{{duration .Time}}</td>
 												  {{if eq .Status 0 }}
-						  						<td>Pending 
+						  						<td>Pending / 
 												  {{end}}
 												  {{if eq .Status 1 }}
-						  						<td>Confirmed 
+						  						<td>Confirmed / 
 												  {{end}}
 												  {{if eq .Status 2 }}
-						  						<td>Rejected 
+						  						<td>Rejected / 
 												  {{end}}
 												  {{if .Spent }}
-												  (Spent)
+												  Spent
+												  {{else}}
+												  Unspent
 												  {{end}}
 						  					</tr>
 {{end}}

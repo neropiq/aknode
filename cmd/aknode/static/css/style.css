@@ -107,6 +107,14 @@ footer .logo{margin-bottom: 20px;}
 .status.pending{font-size:50px;}
 
 
+
+.msig-box{box-shadow: rgba(92,184,92,0.18) 0 10px 18px;text-align:center;padding: 20px;margin-top: 40px;justify-content: center;height: 150px;}
+.msig-box p{font-size:18px;color:#444444;}
+.msig-address{position: relative;}
+.msig-address .card-body{padding: 30px 30px 40px;}
+.msig-address .msig-box{border: 2px solid #5cb85c;}
+
+
 .transaction-address{position: relative;}
 .transaction-address .card-header{background:#32333d;border-radius: .25rem .25rem 0 0;padding: 20px 30px;}
 .transaction-address .card-header h3{color:#ffffff;font-size:20px;text-transform: uppercase;}
