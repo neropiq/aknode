@@ -129,7 +129,7 @@
 						  					<tr>
 											    <td>Sent</td>
 						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
-						  						<td>{{.Amount}} ADK</td>
+						  						<td>{{toADKi .Amount}} ADK</td>
 						  						<td>{{duration .Time}}</td>
 												  {{if eq .Status 0 }}
 						  						<td>Pending</td>
@@ -146,7 +146,7 @@
 						  					<tr>
 											    <td>Received</td>
 						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
-						  						<td>{{.Amount}} ADK</td>
+						  						<td>{{toADKi .Amount}} ADK</td>
 						  						<td>{{duration .Time}}</td>
 												  {{if eq .Status 0 }}
 						  						<td>Pending / 
@@ -180,7 +180,7 @@
 				<div class="container">
 					<div class="row">
 						<div class="col-12">
-							<p>2018 © Aidos Explorer. All Rights Reserved.</p>
+							<p>2018 © Aidos Developer / Aidos Foundation. All Rights Reserved.</p>
 						</div>
 					</div>
 				</div>
