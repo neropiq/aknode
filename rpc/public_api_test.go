@@ -270,8 +270,8 @@ func testsendrawtx(t *testing.T, tr *tx.Transaction, typ tx.Type) {
 	}
 
 	var resp Response
-	if err := sendrawtx(&s, req, &resp); err != nil {
-		t.Error(err, typ)
+	if err2 := sendrawtx(&s, req, &resp); err2 != nil {
+		t.Error(err2, typ)
 	}
 	if resp.Error != nil {
 		t.Error(resp.Error)

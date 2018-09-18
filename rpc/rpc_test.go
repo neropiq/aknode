@@ -32,14 +32,12 @@ import (
 	"net/http"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/AidosKuneen/aidosd/aidos"
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
-	"github.com/AidosKuneen/aknode/consensus"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/node"
@@ -54,10 +52,12 @@ var tdir string
 
 func setup(t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	var err error
-	tdir, err = ioutil.TempDir("", "gotest")
-	if err != nil {
-		t.Fatal(err)
+	{
+		var err error
+		tdir, err = ioutil.TempDir("", "gotest")
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	var err2 error
 	if err := os.RemoveAll("./test_db"); err != nil {
@@ -106,7 +106,7 @@ func setup(t *testing.T) {
 	s1.MaxConnections = 1
 	s1.Port = 2345
 	s1.MyHostPort = ":2345"
-
+	var err error
 	l, err = node.Start(&s, true)
 	if err != nil {
 		t.Error(err)
@@ -198,75 +198,6 @@ func TestAPIFee(t *testing.T) {
 	}
 	if resp.ID != "curltest" {
 		t.Error("id must be curltest")
-	}
-}
-
-func TestSig(t *testing.T) {
-	setup(t)
-	defer teardown(t)
-
-	pwd = []byte("pwd")
-	if err := New(&s, pwd); err != nil {
-		t.Error(err)
-	}
-	_, err := wallet.DecryptSeed(pwd)
-	if err != nil {
-		t.Error(err)
-	}
-	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
-	adrs := newAddressT(t, "")
-	tr := tx.New(s.Config, genesis)
-	tr.AddInput(genesis, 0)
-	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply-10*aklib.ADK); err != nil {
-		t.Error(err)
-	}
-	if err := tr.AddOutput(s.Config, adrs[0], 10*aklib.ADK); err != nil {
-		t.Error(err)
-	}
-	if err := tr.Sign(a); err != nil {
-		t.Error(err)
-	}
-	if err := tr.PoW(); err != nil {
-		t.Error(err)
-	}
-	if err := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
-		t.Fatal(err)
-	}
-	node.Resolve()
-	time.Sleep(6 * time.Second)
-	confirmAll(t, nil, true)
-	txid := testsendtoaddress2(t, adrs[0], 0.2)
-	confirmAll(t, nil, true)
-	aa, err := wallet.GetAddress(&s.DBConfig, adrs[0], pwd)
-	if err != nil {
-		t.Error(err)
-	}
-	tr = tx.New(s.Config, genesis)
-	tr.AddInput(txid, 0)
-	if err := tr.AddOutput(s.Config, a.Address58(s.Config), (0.2-0.1)*aklib.ADK); err != nil {
-		t.Error(err)
-	}
-	if err := tr.AddOutput(s.Config, adrs[0], 0.1*aklib.ADK); err != nil {
-		t.Error(err)
-	}
-	if err := tr.Sign(aa.Address); err != nil {
-		t.Fatal(err)
-	}
-	if err := tr.PoW(); err != nil {
-		t.Error(err)
-	}
-	if err := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
-		t.Fatal(err)
-	}
-	node.Resolve()
-	time.Sleep(6 * time.Second)
-
-	confirmAll(t, nil, true)
-	testsendtoaddress2(t, adrs[1], 9.9)
-	confirmAll(t, nil, true)
-	aa, err = wallet.GetAddress(&s.DBConfig, adrs[0], pwd)
-	if err != nil {
-		t.Error(err)
 	}
 }
 

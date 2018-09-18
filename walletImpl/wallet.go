@@ -62,12 +62,12 @@ const poolSize = 20 //FIXME
 
 //FillPool fills the pool.
 func (w *Wallet) FillPool(s *setting.DBConfig, pwdd []byte) error {
-	seed, err := address.DecryptSeed(w.EncSeed, pwdd)
+	master, err := address.DecryptSeed(w.EncSeed, pwdd)
 	if err != nil {
 		return err
 	}
 	for i := len(w.Pool.Address); i < poolSize; i++ {
-		seed := address.HDseed(seed, 0, w.Pool.Index)
+		seed := address.HDseed(master, 0, w.Pool.Index)
 		a, err := address.New(s.Config, seed)
 		if err != nil {
 			return err

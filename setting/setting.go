@@ -191,22 +191,22 @@ func Load(s []byte) (*Setting, error) {
 		return nil, errors.New("You must spcrify trusted_nodes")
 	}
 	if se.ValidatorSecret != "" {
-		b, typ, err := address.HDFrom58(se.Config, se.ValidatorSecret, []byte(""))
+		b, isNode, err := address.HDFrom58(se.Config, se.ValidatorSecret, []byte(""))
 		if err != nil {
 			return nil, err
 		}
-		if typ != true {
+		if !isNode {
 			return nil, errors.New("invalid validator_seed")
 		}
 		se.ValidatorSeedBytes = b
 	}
 	se.TrustedNodeBytes = make([]address.Bytes, len(se.TrustedNodes))
 	for i, a := range se.TrustedNodes {
-		ta, typ, err := address.ParseAddress58(se.Config, a)
+		ta, isNode, err := address.ParseAddress58(se.Config, a)
 		if err != nil {
 			return nil, err
 		}
-		if typ != true {
+		if !isNode {
 			return nil, errors.New("invalid trusted_nodes")
 		}
 		se.TrustedNodeBytes[i] = ta

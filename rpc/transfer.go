@@ -61,11 +61,10 @@ func (w *trWallet) GetUTXO(outtotal uint64) ([]*tx.UTXO, error) {
 		return nil, err
 	}
 	if outtotal > total {
-		u, bal, err := wallet.GetUTXO(&w.conf.DBConfig, pwd, true)
+		u, _, err := wallet.GetUTXO(&w.conf.DBConfig, pwd, true)
 		if err != nil {
 			return nil, err
 		}
-		total += bal
 		utxos = append(utxos, u...)
 	}
 	return utxos, nil

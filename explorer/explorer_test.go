@@ -48,10 +48,10 @@ var a *address.Address
 
 func setup(t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	var err error
 	if err := os.RemoveAll("./test_db"); err != nil {
 		log.Println(err)
 	}
+	var err error
 	s.DB, err = db.Open("./test_db")
 	if err != nil {
 		panic(err)
@@ -72,7 +72,7 @@ func setup(t *testing.T) {
 		a.Address58(s.Config): aklib.ADKSupply,
 	}
 	leaves.Init(&s)
-	if err := imesh.Init(&s); err != nil {
+	if err = imesh.Init(&s); err != nil {
 		t.Error(err)
 	}
 	gs := leaves.Get(1)
@@ -152,20 +152,20 @@ func TestExploere(t *testing.T) {
 			t.Fatal(v)
 		}
 		remain -= v
-		if err := tr.AddOutput(s.Config, a.Address58(s.Config), remain); err != nil {
-			t.Error(err)
+		if err2 := tr.AddOutput(s.Config, a.Address58(s.Config), remain); err2 != nil {
+			t.Error(err2)
 		}
-		if err := tr.AddOutput(s.Config, adr, v); err != nil {
-			t.Error(err)
+		if err2 := tr.AddOutput(s.Config, adr, v); err2 != nil {
+			t.Error(err2)
 		}
-		if err := tr.Sign(a); err != nil {
-			t.Error(err)
+		if err2 := tr.Sign(a); err2 != nil {
+			t.Error(err2)
 		}
-		if err := tr.PoW(); err != nil {
-			t.Error(err)
+		if err2 := tr.PoW(); err2 != nil {
+			t.Error(err2)
 		}
-		if err := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
-			t.Fatal(err)
+		if err2 := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err2 != nil {
+			t.Fatal(err2)
 		}
 		h = tr.Hash()
 		log.Println(h)
@@ -174,24 +174,24 @@ func TestExploere(t *testing.T) {
 	tr = tx.New(s.Config, genesis, h)
 	tr.AddInput(h, 0)
 	remain -= 10
-	if err := tr.AddOutput(s.Config, a.Address58(s.Config), remain); err != nil {
-		t.Error(err)
+	if err2 := tr.AddOutput(s.Config, a.Address58(s.Config), remain); err2 != nil {
+		t.Error(err2)
 	}
-	if err := tr.AddOutput(s.Config, adrs, 1); err != nil {
-		t.Error(err)
+	if err2 := tr.AddOutput(s.Config, adrs, 1); err2 != nil {
+		t.Error(err2)
 	}
-	if err := tr.AddMultisigOut(s.Config, 2, 9,
-		addrs[0].Address58(s.Config), addrs[1].Address58(s.Config), addrs[2].Address58(s.Config)); err != nil {
-		t.Error(err)
+	if err2 := tr.AddMultisigOut(s.Config, 2, 9,
+		addrs[0].Address58(s.Config), addrs[1].Address58(s.Config), addrs[2].Address58(s.Config)); err2 != nil {
+		t.Error(err2)
 	}
-	if err := tr.Sign(a); err != nil {
-		t.Error(err)
+	if err2 := tr.Sign(a); err2 != nil {
+		t.Error(err2)
 	}
-	if err := tr.PoW(); err != nil {
-		t.Error(err)
+	if err2 := tr.PoW(); err2 != nil {
+		t.Error(err2)
 	}
-	if err := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
-		t.Fatal(err)
+	if err2 := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err2 != nil {
+		t.Fatal(err2)
 	}
 	h = tr.Hash()
 	log.Println(h)
@@ -201,30 +201,30 @@ func TestExploere(t *testing.T) {
 	tr.AddMultisigIn(h, 0)
 	remain += 9
 	remain -= 10
-	if err := tr.AddOutput(s.Config, a.Address58(s.Config), remain); err != nil {
-		t.Error(err)
+	if err2 := tr.AddOutput(s.Config, a.Address58(s.Config), remain); err2 != nil {
+		t.Error(err2)
 	}
-	if err := tr.AddOutput(s.Config, adrs, 1); err != nil {
-		t.Error(err)
+	if err2 := tr.AddOutput(s.Config, adrs, 1); err2 != nil {
+		t.Error(err2)
 	}
-	if err := tr.AddMultisigOut(s.Config, 2, 9,
-		addrs[0].Address58(s.Config), addrs[1].Address58(s.Config), addrs[2].Address58(s.Config)); err != nil {
-		t.Error(err)
+	if err2 := tr.AddMultisigOut(s.Config, 2, 9,
+		addrs[0].Address58(s.Config), addrs[1].Address58(s.Config), addrs[2].Address58(s.Config)); err2 != nil {
+		t.Error(err2)
 	}
-	if err := tr.Sign(a); err != nil {
-		t.Error(err)
+	if err2 := tr.Sign(a); err2 != nil {
+		t.Error(err2)
 	}
-	if err := tr.Sign(addrs[0]); err != nil {
-		t.Error(err)
+	if err2 := tr.Sign(addrs[0]); err2 != nil {
+		t.Error(err2)
 	}
-	if err := tr.Sign(addrs[1]); err != nil {
-		t.Error(err)
+	if err2 := tr.Sign(addrs[1]); err2 != nil {
+		t.Error(err2)
 	}
-	if err := tr.PoW(); err != nil {
-		t.Error(err)
+	if err2 := tr.PoW(); err2 != nil {
+		t.Error(err2)
 	}
-	if err := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err != nil {
-		t.Fatal(err)
+	if err2 := imesh.CheckAddTx(&s, tr, tx.TypeNormal); err2 != nil {
+		t.Fatal(err2)
 	}
 	h = tr.Hash()
 	log.Println(h)
@@ -242,6 +242,9 @@ func TestExploere(t *testing.T) {
 	resp, err = cl.Get(fmt.Sprintf("http://localhost:%d/address?id=%s", s.ExplorerPort, adrs))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Error("should be OK")
 	}
 	madr := tr.Body.MultiSigOuts[0].Address(s.Config)
 	t.Log(madr)

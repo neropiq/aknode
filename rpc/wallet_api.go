@@ -434,8 +434,7 @@ func getaccount(conf *setting.Setting, req *Request, res *Response) error {
 	}
 	mutex.RLock()
 	defer mutex.RUnlock()
-	var ok bool
-	ok = wallet.FindAddress(adr)
+	ok := wallet.FindAddress(adr)
 	if !ok {
 		return errors.New("address not found")
 	}

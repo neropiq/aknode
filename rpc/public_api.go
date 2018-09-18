@@ -255,6 +255,9 @@ func gettxsstatus(conf *setting.Setting, req *Request, res *Response) error {
 	r := make([]int, 0, len(data))
 	for _, txid := range data {
 		tid, err := hex.DecodeString(txid)
+		if err != nil {
+			return err
+		}
 		ok, err := imesh.Has(conf, tid)
 		if err != nil {
 			return err

@@ -40,14 +40,18 @@ func TestSendAPI(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 	pwdd := []byte("pwd")
-	if err := New(&s, pwdd); err != nil {
-		t.Error(err)
+	{
+		if err := New(&s, pwdd); err != nil {
+			t.Error(err)
+		}
 	}
 	ni2 := testgetnodeinfo(t)
 	t.Log(ni2.TxNo)
-	_, err := wallet.DecryptSeed(pwdd)
-	if err != nil {
-		t.Error(err)
+	{
+		_, err := wallet.DecryptSeed(pwdd)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 	pwd = nil
 	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)

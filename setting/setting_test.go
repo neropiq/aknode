@@ -26,13 +26,13 @@ import (
 )
 
 func TestSetting(t *testing.T) {
-	s, err2 := Load([]byte(`{
+	_, err2 := Load([]byte(`{
 		"trusted_nodes":["AKNODEM4ZJ9YsjnCQV6sxJ1mcgJ3x7NxvgnmVsm9Nb7kRq32hLgXMHadX"]
 	}`))
 	if err2 == nil {
 		t.Error("should be error")
 	}
-	s, err2 = Load([]byte(`{
+	s, err2 := Load([]byte(`{
 		"trusted_nodes":["AKNODEM4ZJ9YsjnCQV6sxJ1mcgJ3x7NxvgnmVsm9Nb7kRq32hLgXMHadb"]
 	}`))
 	if err2 != nil {

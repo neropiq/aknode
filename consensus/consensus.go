@@ -37,9 +37,7 @@ func Confirm(s *setting.Setting) ([]tx.Hash, error) {
 
 	if notify != nil {
 		txs := make([]tx.Hash, len(tr))
-		for i := range tr {
-			txs[i] = tr[i]
-		}
+		copy(txs, tr)
 		notify <- txs
 	}
 	return tr, nil

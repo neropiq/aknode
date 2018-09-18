@@ -78,7 +78,7 @@ func Run(setting *setting.Setting) {
 			return a + b
 		},
 		"duration": func(a time.Time) string {
-			dur := time.Now().Sub(a)
+			dur := time.Since(a)
 			switch {
 			case dur < time.Minute:
 				return strconv.Itoa(int(dur.Seconds())) + " second(s)"
@@ -281,12 +281,12 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		info.TicketOutput = ti.Body.TicketOutput.String()
 	}
 	if ti.Body.TicketInput != nil {
-		ti, err := imesh.GetTxInfo(s.DB, ti.Body.TicketInput)
-		if err != nil {
-			renderError(w, err.Error())
+		ti2, err2 := imesh.GetTxInfo(s.DB, ti.Body.TicketInput)
+		if err2 != nil {
+			renderError(w, err2.Error())
 			return
 		}
-		info.TicketInput = ti.Body.TicketOutput.String()
+		info.TicketInput = ti2.Body.TicketOutput.String()
 	}
 	for i, inp := range ti.Body.Inputs {
 		info.Inputs[i], err = imesh.PreviousOutput(s, inp)
@@ -296,24 +296,24 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for i, inp := range ti.Body.MultiSigIns {
-		ti, err := imesh.GetTxInfo(s.DB, inp.PreviousTX)
-		if err != nil {
-			renderError(w, err.Error())
+		ti2, err2 := imesh.GetTxInfo(s.DB, inp.PreviousTX)
+		if err2 != nil {
+			renderError(w, err2.Error())
 			return
 		}
-		info.MInputs[i] = ti.Body.MultiSigOuts[inp.Index]
+		info.MInputs[i] = ti2.Body.MultiSigOuts[inp.Index]
 	}
 	if len(ti.Body.MultiSigIns) != 0 {
-		tr, err := imesh.GetTx(s.DB, txid)
-		if err != nil {
-			renderError(w, err.Error())
+		tr, err2 := imesh.GetTx(s.DB, txid)
+		if err2 != nil {
+			renderError(w, err2.Error())
 			return
 		}
 		for _, sig := range tr.Signatures {
 			sigadr := sig.Address(s.Config, false)
-			adr, err := address.Address58(s.Config, sigadr)
-			if err != nil {
-				renderError(w, err.Error())
+			adr, err2 := address.Address58(s.Config, sigadr)
+			if err2 != nil {
+				renderError(w, err2.Error())
 			}
 			info.Signs[adr] = true
 		}
@@ -364,9 +364,9 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		Address: id,
 	}
 	for _, h := range hist {
-		ti, err := imesh.GetTxInfo(s.DB, h.Hash)
-		if err != nil {
-			renderError(w, err.Error())
+		ti, err2 := imesh.GetTxInfo(s.DB, h.Hash)
+		if err2 != nil {
+			renderError(w, err2.Error())
 			return
 		}
 		t := &tinfo{
@@ -376,9 +376,9 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		}
 		switch h.Type {
 		case tx.TypeIn:
-			ins, err := imesh.PreviousOutput(s, ti.Body.Inputs[h.Index])
-			if err != nil {
-				renderError(w, err.Error())
+			ins, err2 := imesh.PreviousOutput(s, ti.Body.Inputs[h.Index])
+			if err2 != nil {
+				renderError(w, err2.Error())
 				return
 			}
 			switch ti.Status {
@@ -457,9 +457,9 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 	}
 
 	for _, h := range hist {
-		tr, err := imesh.GetTxInfo(s.DB, h.Hash)
-		if err != nil {
-			renderError(w, err.Error())
+		tr, err2 := imesh.GetTxInfo(s.DB, h.Hash)
+		if err2 != nil {
+			renderError(w, err2.Error())
 			return
 		}
 		t := &tinfo{
@@ -469,9 +469,9 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 		}
 		switch h.Type {
 		case tx.TypeMulin:
-			mout, err := imesh.PreviousMultisigOutput(s, tr.Body.MultiSigIns[h.Index])
-			if err != nil {
-				renderError(w, err.Error())
+			mout, err2 := imesh.PreviousMultisigOutput(s, tr.Body.MultiSigIns[h.Index])
+			if err2 != nil {
+				renderError(w, err2.Error())
 				return
 			}
 			if !bytes.Equal(madr, mout.AddressByte(s.Config)) {

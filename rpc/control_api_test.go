@@ -248,6 +248,9 @@ func testdumpseed(t *testing.T) {
 		t.Error(err)
 	}
 	se, err := wallet.DecryptSeed(pwd)
+	if err != nil {
+		t.Error(err)
+	}
 	if !bytes.Equal(r, se) {
 		t.Error("invalid dumpseed")
 	}
