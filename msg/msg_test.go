@@ -30,7 +30,9 @@ import (
 
 func TestMsg(t *testing.T) {
 	s := &setting.Setting{
-		Config: aklib.TestConfig,
+		DBConfig: setting.DBConfig{
+			Config: aklib.TestConfig,
+		},
 	}
 	var buf bytes.Buffer
 	var nonce Nonce
@@ -58,8 +60,9 @@ func TestMsg(t *testing.T) {
 
 func TestMsgErr(t *testing.T) {
 	s := &setting.Setting{
-		Config: aklib.TestConfig,
-	}
+		DBConfig: setting.DBConfig{
+			Config: aklib.TestConfig,
+		}}
 	var buf bytes.Buffer
 	var nonce Nonce
 	for i := range nonce {

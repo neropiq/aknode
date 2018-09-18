@@ -26,7 +26,15 @@ import (
 )
 
 func TestSetting(t *testing.T) {
-	s, err2 := Load([]byte(`{}`))
+	s, err2 := Load([]byte(`{
+		"trusted_nodes":["AKNODEM4ZJ9YsjnCQV6sxJ1mcgJ3x7NxvgnmVsm9Nb7kRq32hLgXMHadX"]
+	}`))
+	if err2 == nil {
+		t.Error("should be error")
+	}
+	s, err2 = Load([]byte(`{
+		"trusted_nodes":["AKNODEM4ZJ9YsjnCQV6sxJ1mcgJ3x7NxvgnmVsm9Nb7kRq32hLgXMHadb"]
+	}`))
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -36,6 +44,7 @@ func TestSetting(t *testing.T) {
 	}
 
 	s, err2 = Load([]byte(`{
+		"trusted_nodes":["AKNODET37nrsiTKPv7v7xBS6WBveuYz9HfEJ7MiVXtnn3eSqLgm7vQLxk"],
 		"testnet":1,
 		"blacklists":["www.google.com"],
 		"default_nodes":["www.google.com:80"]
@@ -52,6 +61,7 @@ func TestSetting(t *testing.T) {
 	}
 
 	s, err2 = Load([]byte(`{
+		"trusted_nodes":["AKNODET37nrsiTKPv7v7xBS6WBveuYz9HfEJ7MiVXtnn3eSqLgm7vQLxk"],
 		"testnet":1,
 		"blacklists":["123.24.11.12"],
 		"default_nodes":["1.2.3.4:80"]
@@ -73,6 +83,7 @@ func TestSetting(t *testing.T) {
 	}
 
 	_, err2 = Load([]byte(`{
+		"trusted_nodes":["AKNODET37nrsiTKPv7v7xBS6WBveuYz9HfEJ7MiVXtnn3eSqLgm7vQLxk"],
 		"testnet":1,
 		"blacklists":["1323.24.11.12"],
 		}`))

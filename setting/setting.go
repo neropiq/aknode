@@ -200,7 +200,7 @@ func Load(s []byte) (*Setting, error) {
 		}
 		se.ValidatorSeedBytes = b
 	}
-	se.TrustedNodeBytes = make([]address.Bytes, len(se.ValidatorSecret))
+	se.TrustedNodeBytes = make([]address.Bytes, len(se.TrustedNodes))
 	for i, a := range se.TrustedNodes {
 		ta, typ, err := address.ParseAddress58(se.Config, a)
 		if err != nil {
