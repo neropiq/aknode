@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"github.com/AidosKuneen/aknode/imesh"
+	"github.com/AidosKuneen/aknode/walletImpl"
 
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
@@ -56,7 +57,7 @@ func getnewaddress(conf *setting.Setting, req *Request, res *Response) error {
 			return errors.New("invalid accout name")
 		}
 	}
-	res.Result, err = newPublicAddress(conf)
+	res.Result, err = wallet.NewPublicAddressFromPool(&conf.DBConfig)
 	return err
 }
 
@@ -66,14 +67,14 @@ func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) er
 	var result [][][]interface{}
 	var r0 [][]interface{}
 	us := make(map[string]uint64)
-	utxos, _, err := getUTXO(conf)
+	utxos, _, err := wallet.GetUTXO(&conf.DBConfig, pwd, true)
 	if err != nil {
 		return err
 	}
 	for _, utxo := range utxos {
 		us[utxo.Address.String()] = utxo.Value
 	}
-	for _, adr := range allAddress() {
+	for _, adr := range wallet.AllAddress() {
 		r1 := make([]interface{}, 0, 3)
 		r1 = append(r1, adr)
 		r1 = append(r1, float64(us[adr])/aklib.ADK)
@@ -105,7 +106,7 @@ func getbalance(conf *setting.Setting, req *Request, res *Response) error {
 	if accstr != "*" && wallet.AccountName != accstr {
 		return errors.New("invalid accout name")
 	}
-	_, bal, err := getUTXO(conf)
+	_, bal, err := wallet.GetAllUTXO(&conf.DBConfig, pwd)
 	res.Result = float64(bal) / 100000000
 	return err
 }
@@ -114,7 +115,7 @@ func listaccounts(conf *setting.Setting, req *Request, res *Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 	result := make(map[string]float64)
-	_, ba, err := getUTXO(conf)
+	_, ba, err := wallet.GetAllUTXO(&conf.DBConfig, pwd)
 	if err != nil {
 		return err
 	}
@@ -153,7 +154,7 @@ func validateaddress(conf *setting.Setting, req *Request, res *Response) error {
 	}
 	mutex.RLock()
 	defer mutex.RUnlock()
-	isMine := findAddress(adrstr)
+	isMine := wallet.FindAddress(adrstr)
 	infoi := Info{
 		IsValid: valid,
 		Address: adrstr,
@@ -344,7 +345,7 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 	}
 	mutex.RLock()
 	defer mutex.RUnlock()
-	hist, err := getHistory(conf)
+	hist, err := walletImpl.GetHistory(&conf.DBConfig)
 	if err != nil {
 		return err
 	}
@@ -361,7 +362,7 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 		if err != nil {
 			return err
 		}
-		out, err := h.GetOutput(conf)
+		out, err := GetOutput(conf, h)
 		if err != nil {
 			return err
 		}
@@ -384,7 +385,7 @@ func newTransaction(conf *setting.Setting, tr *imesh.TxInfo, out *tx.Output, vou
 	if err != nil {
 		return nil, err
 	}
-	ok := findAddress(adr)
+	ok := wallet.FindAddress(adr)
 	f := false
 	emp := ""
 	var zero int64
@@ -434,7 +435,7 @@ func getaccount(conf *setting.Setting, req *Request, res *Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 	var ok bool
-	ok = findAddress(adr)
+	ok = wallet.FindAddress(adr)
 	if !ok {
 		return errors.New("address not found")
 	}

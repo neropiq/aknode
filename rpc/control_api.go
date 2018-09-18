@@ -29,6 +29,7 @@ import (
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/setting"
+	"github.com/AidosKuneen/aknode/walletImpl"
 )
 
 func listpeer(conf *setting.Setting, req *Request, res *Response) error {
@@ -38,10 +39,14 @@ func listpeer(conf *setting.Setting, req *Request, res *Response) error {
 func dumpprivkey(conf *setting.Setting, req *Request, res *Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
-	if wallet.Secret.seed == nil || wallet.Secret.pwd == nil {
+	if pwd == nil {
 		return errors.New("call walletpassphrase first")
 	}
-	res.Result = address.HDSeed58(conf.Config, wallet.Secret.seed, wallet.Secret.pwd, false)
+	seed, err := wallet.DecryptSeed(pwd)
+	if err != nil {
+		return err
+	}
+	res.Result = address.HDSeed58(conf.Config, seed, pwd, false)
 	return nil
 }
 
@@ -76,9 +81,9 @@ func stop(conf *setting.Setting, req *Request, res *Response) error {
 
 //Dump is a struct for dumpwallet RPC.
 type Dump struct {
-	Wallet  *Wallet             `json:"wallet"`
-	Hist    []*History          `json:"history"`
-	Address map[string]*Address `json:"address"`
+	Wallet  *walletImpl.Wallet             `json:"wallet"`
+	Hist    []*walletImpl.History          `json:"history"`
+	Address map[string]*walletImpl.Address `json:"address"`
 }
 
 func dumpwallet(conf *setting.Setting, req *Request, res *Response) error {
@@ -94,16 +99,16 @@ func dumpwallet(conf *setting.Setting, req *Request, res *Response) error {
 	log.Println(fname)
 	mutex.RLock()
 	defer mutex.RUnlock()
-	h, err := getHistory(conf)
+	h, err := walletImpl.GetHistory(&conf.DBConfig)
 	if err != nil {
 		return err
 	}
-	adrs, err := getAllAddress(conf)
+	adrs, err := walletImpl.GetAllAddress(&conf.DBConfig)
 	if err != nil {
 		return err
 	}
 	d := &Dump{
-		Wallet:  &wallet,
+		Wallet:  wallet,
 		Hist:    h,
 		Address: adrs,
 	}
@@ -133,12 +138,12 @@ func importwallet(conf *setting.Setting, req *Request, res *Response) error {
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
-	wallet = *d.Wallet
-	if err := putHistory(conf, d.Hist); err != nil {
+	*wallet = *d.Wallet
+	if err := walletImpl.PutHistory(&conf.DBConfig, d.Hist); err != nil {
 		return err
 	}
 	for _, adr := range d.Address {
-		if err := putAddress(conf, adr); err != nil {
+		if err := wallet.PutAddress(&conf.DBConfig, pwd, adr, false); err != nil {
 			return err
 		}
 	}

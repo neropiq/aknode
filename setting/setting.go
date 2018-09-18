@@ -48,6 +48,12 @@ type Address struct {
 	Port    uint16 `json:"port"`
 }
 
+//DBConfig is a set of config for db.
+type DBConfig struct {
+	DB     *badger.DB    `json:"-"`
+	Config *aklib.Config `json:"-"`
+}
+
 //Setting is  a aknode setting.
 type Setting struct {
 	Version    string
@@ -90,8 +96,7 @@ type Setting struct {
 	RunTicketIssuer bool    `json:"run_ticket_issuer"`
 	MinerAddress    string  `json:"miner_address"`
 
-	DB                 *badger.DB      `json:"-"`
-	Config             *aklib.Config   `json:"-"`
+	DBConfig
 	Stop               chan struct{}   `json:"-"`
 	ValidatorSeedBytes address.Bytes   `json:"-"`
 	TrustedNodeBytes   []address.Bytes `json:"-"`

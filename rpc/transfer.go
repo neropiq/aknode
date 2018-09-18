@@ -40,28 +40,28 @@ type trWallet struct {
 
 //NewChangeAddress returns a new address for change.
 func (w *trWallet) NewChangeAddress() (*address.Address, error) {
-	adrstr, err := newChangeAddress(w.conf)
+	adrstr, err := wallet.NewAddress(&w.conf.DBConfig, pwd, false)
 	if err != nil {
 		return nil, err
 	}
-	adr, err := getAddress(w.conf, adrstr)
+	adr, err := wallet.GetAddress(&w.conf.DBConfig, adrstr.Address58(w.conf.Config), pwd)
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
-	return adr.address, nil
+	return adr.Address, nil
 }
 
 //GetUTXO returns UTXOs whose total is over outtotal.
 func (w *trWallet) GetUTXO(outtotal uint64) ([]*tx.UTXO, error) {
 	var utxos []*tx.UTXO
 	var total uint64
-	utxos, total, err := getUTXO102(w.conf, false)
+	utxos, total, err := wallet.GetUTXO(&w.conf.DBConfig, pwd, false)
 	if err != nil {
 		return nil, err
 	}
 	if outtotal > total {
-		u, bal, err := getUTXO102(w.conf, true)
+		u, bal, err := wallet.GetUTXO(&w.conf.DBConfig, pwd, true)
 		if err != nil {
 			return nil, err
 		}

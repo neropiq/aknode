@@ -26,31 +26,30 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AidosKuneen/aknode/consensus"
-	"github.com/AidosKuneen/aknode/imesh/leaves"
-
-	"github.com/AidosKuneen/aknode/msg"
-	"github.com/AidosKuneen/aknode/setting"
-
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/consensus"
 	"github.com/AidosKuneen/aknode/imesh"
+	"github.com/AidosKuneen/aknode/imesh/leaves"
+	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/node"
+	"github.com/AidosKuneen/aknode/setting"
 )
 
 func TestSendAPI(t *testing.T) {
 	setup(t)
 	defer teardown(t)
+	pwdd := []byte("pwd")
+	if err := New(&s, pwdd); err != nil {
+		t.Error(err)
+	}
 	ni2 := testgetnodeinfo(t)
 	t.Log(ni2.TxNo)
-	pwd := []byte("pwd")
-	if err := InitSecret(&s, pwd); err != nil {
+	_, err := wallet.DecryptSeed(pwdd)
+	if err != nil {
 		t.Error(err)
 	}
-	if err := decryptSecret(&s, pwd); err != nil {
-		t.Error(err)
-	}
-	clearSecret()
+	pwd = nil
 	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
 	acs := []string{""}
 	adr2ac := make(map[string]string)
@@ -106,15 +105,16 @@ func TestSendAPI(t *testing.T) {
 	if testwalletpassphrase1(string("aa"), 0); err == nil {
 		t.Error("should be error")
 	}
-	testwalletpassphrase2(t, string(pwd))
+	testwalletpassphrase2(t, string(pwdd))
 	testsendmany(t, true, "", "", adr2ac)
+
 	confirmAll(t, nil, true)
 	if err := walletlock(&s, nil, nil); err != nil {
 		t.Error(err)
 	}
 	testsendmany(t, true, "", "", adr2ac)
 
-	testwalletpassphrase2(t, string(pwd))
+	testwalletpassphrase2(t, string(pwdd))
 	testsendmany(t, false, outadrs[0], outadrs[1], adr2ac)
 	testsendfrom(t, outadrs[2], adr2ac)
 	testsendtoaddress(t, outadrs0[0], 0.2)
@@ -253,7 +253,7 @@ func checkResponse(t *testing.T, diff map[string]int64,
 		if out.Value != uint64(-v) {
 			t.Error("invalid value")
 		}
-		if ok := findAddress(out.Address.String()); !ok {
+		if ok := wallet.FindAddress(out.Address.String()); !ok {
 			t.Error("invalid account", out.Address)
 		}
 	}
@@ -262,7 +262,11 @@ func checkResponse(t *testing.T, diff map[string]int64,
 	}
 	if isConf {
 		if len(tx.Outputs)+len(tx.Inputs) != len(diff) {
-			t.Error("invalid number of diff")
+			t.Log(len(tx.Outputs), len(tx.Inputs), len(diff))
+			for k, v := range diff {
+				t.Log(k, v)
+			}
+			t.Fatal("invalid number of diff")
 		}
 	}
 	return txid
@@ -284,13 +288,13 @@ func testwalletpassphrase1(pwd string, t float64) error {
 	return walletpassphrase(&s, req, &resp)
 }
 
-func testwalletpassphrase2(t *testing.T, pwd string) {
+func testwalletpassphrase2(t *testing.T, pwdd string) {
 	req := &Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "walletpassphrase",
 	}
-	params := []interface{}{pwd, uint(6000)}
+	params := []interface{}{pwdd, uint(6000)}
 	var err error
 	req.Params, err = json.Marshal(params)
 	if err != nil {
@@ -298,7 +302,8 @@ func testwalletpassphrase2(t *testing.T, pwd string) {
 	}
 	var resp Response
 	if err := walletpassphrase(&s, req, &resp); err != nil {
-		t.Error(err)
+		t.Log(string(pwd))
+		t.Fatal(err)
 	}
 	if resp.Error != nil {
 		t.Error(resp.Error)
@@ -326,7 +331,7 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 		t.Error(err)
 	}
 	var resp Response
-	utxo0, _, err := getUTXO(&s)
+	utxo0, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)
 	}
@@ -340,20 +345,20 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 	if err != nil {
 		t.Error(err)
 	}
-	t.Log(wallet.Secret.pwd)
-	t.Log(wallet.Secret.seed)
-
-	utxo1, _, err := getUTXO(&s)
+	t.Log(pwd)
+	//
+	utxo1, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)
 	}
 	diff := getDiff(t, utxo0, utxo1)
+	//
 	checkResponse(t, diff, &resp, map[string]uint64{
 		adr1: uint64(0.2 * aklib.ADK),
 		adr2: uint64(0.3 * aklib.ADK),
 	}, false)
 	confirmAll(t, nil, true)
-	utxo2, _, err := getUTXO(&s)
+	utxo2, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)
 	}
@@ -378,7 +383,7 @@ func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 		t.Error(err)
 	}
 	var resp Response
-	utxo0, _, err := getUTXO(&s)
+	utxo0, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)
 	}
@@ -386,7 +391,7 @@ func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 	if err != nil {
 		t.Error(err)
 	}
-	utxo1, _, err := getUTXO(&s)
+	utxo1, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)
 	}
@@ -396,7 +401,7 @@ func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 		adr1: uint64(0.2 * aklib.ADK),
 	}, false)
 	confirmAll(t, nil, true)
-	utxo2, _, err := getUTXO(&s)
+	utxo2, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)
 	}
@@ -419,7 +424,7 @@ func testsendfrom(t *testing.T, adr1 string, adr2ac map[string]string) {
 		t.Error(err)
 	}
 	var resp Response
-	utxo0, _, err := getUTXO(&s)
+	utxo0, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)
 	}
@@ -427,7 +432,7 @@ func testsendfrom(t *testing.T, adr1 string, adr2ac map[string]string) {
 	if err != nil {
 		t.Error(err)
 	}
-	utxo1, _, err := getUTXO(&s)
+	utxo1, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)
 	}
@@ -436,7 +441,7 @@ func testsendfrom(t *testing.T, adr1 string, adr2ac map[string]string) {
 		adr1: uint64(0.2 * aklib.ADK),
 	}, false)
 	confirmAll(t, nil, true)
-	utxo2, _, err := getUTXO(&s)
+	utxo2, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)
 	}

@@ -27,7 +27,6 @@ import (
 	"log"
 	"sort"
 
-	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
@@ -151,17 +150,17 @@ func putAddressToTx(txn *badger.Txn, tr *tx.Transaction) error {
 
 //GetHisoty returns utxo (or all outputs) and input hashes associated with  address adr.
 func GetHisoty(s *setting.Setting, adrstr string, utxoOnly bool) ([]*tx.InoutHash, error) {
-	return GetHisoty2(s.DB, s.Config, adrstr, utxoOnly)
+	return GetHisoty2(&s.DBConfig, adrstr, utxoOnly)
 }
 
 //GetHisoty2 returns utxo (or all outputs) and input hashes associated with  address adr.
-func GetHisoty2(akdb *badger.DB, cfg *aklib.Config, adrstr string, utxoOnly bool) ([]*tx.InoutHash, error) {
-	adrbyte, _, err := address.ParseAddress58(cfg, adrstr)
+func GetHisoty2(s *setting.DBConfig, adrstr string, utxoOnly bool) ([]*tx.InoutHash, error) {
+	adrbyte, _, err := address.ParseAddress58(s.Config, adrstr)
 	if err != nil {
 		return nil, err
 	}
 	var hashes [][]byte
-	err = akdb.View(func(txn *badger.Txn) error {
+	err = s.DB.View(func(txn *badger.Txn) error {
 		err2 := db.Get(txn, adrbyte, &hashes, db.HeaderAddressToTx)
 		if err2 == badger.ErrKeyNotFound {
 			return nil
@@ -186,7 +185,7 @@ func GetHisoty2(akdb *badger.DB, cfg *aklib.Config, adrstr string, utxoOnly bool
 			if ih.Type == tx.TypeOut || ih.Type == tx.TypeMulout || ih.Type == tx.TypeTicketout {
 				continue
 			}
-			tr, err := GetTxInfo(akdb, ih.Hash)
+			tr, err := GetTxInfo(s.DB, ih.Hash)
 			if err != nil {
 				return nil, err
 			}

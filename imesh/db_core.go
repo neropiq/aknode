@@ -27,7 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/rand"
 	"github.com/AidosKuneen/aklib/tx"
@@ -178,13 +177,13 @@ func GetTx(akdb *badger.DB, hash []byte) (*tx.Transaction, error) {
 }
 
 //PutTxDirect puts a transaction  into db without checking tx relation..
-func PutTxDirect(s *aklib.Config, akdb *badger.DB, tr *tx.Transaction) error {
+func PutTxDirect(s *setting.DBConfig, tr *tx.Transaction) error {
 	ti := TxInfo{
 		Hash:     tr.Hash(),
 		Body:     tr.Body,
 		Received: time.Now().Truncate(time.Second),
 	}
-	return akdb.Update(func(txn *badger.Txn) error {
+	return s.DB.Update(func(txn *badger.Txn) error {
 		if err := ti.nextTxNo(txn); err != nil {
 			return err
 		}
@@ -194,7 +193,7 @@ func PutTxDirect(s *aklib.Config, akdb *badger.DB, tr *tx.Transaction) error {
 		if err := putAddressToTx(txn, tr); err != nil {
 			return err
 		}
-		if err := updateMulsigAddress(s, txn, tr); err != nil {
+		if err := updateMulsigAddress(s.Config, txn, tr); err != nil {
 			return err
 		}
 		latestTxs.Lock()

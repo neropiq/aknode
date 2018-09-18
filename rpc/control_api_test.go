@@ -40,6 +40,7 @@ import (
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/node"
+	"github.com/AidosKuneen/aknode/walletImpl"
 
 	"github.com/dgraph-io/badger"
 )
@@ -48,11 +49,12 @@ func TestControlAPI(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	pwd := []byte("pwd")
-	if err := InitSecret(&s, pwd); err != nil {
+	pwd = []byte("pwd")
+	if err := New(&s, pwd); err != nil {
 		t.Error(err)
 	}
-	if err := decryptSecret(&s, pwd); err != nil {
+	_, err := wallet.DecryptSeed(pwd)
+	if err != nil {
 		t.Error(err)
 	}
 	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
@@ -241,11 +243,12 @@ func testdumpseed(t *testing.T) {
 	if !ok {
 		t.Error("invalid return")
 	}
-	r, _, err := address.HDFrom58(s.Config, seed, wallet.Secret.pwd)
+	r, _, err := address.HDFrom58(s.Config, seed, pwd)
 	if err != nil {
 		t.Error(err)
 	}
-	if !bytes.Equal(r, wallet.Secret.seed) {
+	se, err := wallet.DecryptSeed(pwd)
+	if !bytes.Equal(r, se) {
 		t.Error("invalid dumpseed")
 	}
 }
@@ -297,15 +300,15 @@ func testdumpwallet(t *testing.T) {
 	}
 }
 
-func testimportwallet(t *testing.T, pwd []byte) {
+func testimportwallet(t *testing.T, pwdd []byte) {
 	wdat := filepath.Join(tdir, "tmp.dat")
 	bu := wallet
-	wallet = Wallet{
+	wallet = &walletImpl.Wallet{
 		AddressChange: make(map[string]struct{}),
 		AddressPublic: make(map[string]struct{}),
 	}
-	wallet.Secret.pwd = pwd
-	hist, err := getHistory(&s)
+	pwd = pwdd
+	hist, err := walletImpl.GetHistory(&s.DBConfig)
 	if err != nil {
 		t.Error(err)
 	}
@@ -348,7 +351,7 @@ func testimportwallet(t *testing.T, pwd []byte) {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	if !bytes.Equal(bu.Secret.EncSeed, wallet.Secret.EncSeed) {
+	if !bytes.Equal(bu.EncSeed, wallet.EncSeed) {
 		t.Error("invalid encseed")
 	}
 	if bu.Pool.Index != wallet.Pool.Index {
@@ -379,7 +382,7 @@ func testimportwallet(t *testing.T, pwd []byte) {
 		}
 	}
 
-	hist2, err := getHistory(&s)
+	hist2, err := walletImpl.GetHistory(&s.DBConfig)
 	if err != nil {
 		t.Error(err)
 	}

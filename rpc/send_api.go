@@ -32,10 +32,11 @@ import (
 )
 
 func walletpassphrase(conf *setting.Setting, req *Request, res *Response) error {
-	var pwd string
+	var spwd string
 	var sec uint
-	n, err := req.parseParam(&pwd, &sec)
+	n, err := req.parseParam(&spwd, &sec)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	if n != 2 {
@@ -43,16 +44,17 @@ func walletpassphrase(conf *setting.Setting, req *Request, res *Response) error 
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
-	if wallet.Secret.pwd != nil {
+	if pwd != nil {
 		return errors.New("wallet is already unlocked")
 	}
-	if err := decryptSecret(conf, []byte(pwd)); err != nil {
+	if err := wallet.FillPool(&conf.DBConfig, []byte(spwd)); err != nil {
 		return err
 	}
+	pwd = []byte(spwd)
 	go func() {
 		time.Sleep(time.Second * time.Duration(sec))
 		mutex.Lock()
-		clearSecret()
+		pwd = nil
 		mutex.Unlock()
 	}()
 	return nil
@@ -61,7 +63,7 @@ func walletpassphrase(conf *setting.Setting, req *Request, res *Response) error 
 func walletlock(conf *setting.Setting, req *Request, res *Response) error {
 	mutex.Lock()
 	defer mutex.Unlock()
-	clearSecret()
+	pwd = nil
 	return nil
 }
 
@@ -77,7 +79,7 @@ func sendmany(conf *setting.Setting, req *Request, res *Response) error {
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
-	if wallet.Secret.pwd == nil {
+	if pwd == nil {
 		return errors.New("not priviledged")
 	}
 	trs := make([]*tx.RawOutput, len(target))
@@ -108,7 +110,7 @@ func sendfrom(conf *setting.Setting, req *Request, res *Response) error {
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
-	if wallet.Secret.pwd == nil {
+	if pwd == nil {
 		return errors.New("not priviledged")
 	}
 	if acc != wallet.AccountName {
@@ -135,7 +137,7 @@ func sendtoaddress(conf *setting.Setting, req *Request, res *Response) error {
 
 	mutex.Lock()
 	defer mutex.Unlock()
-	if wallet.Secret.pwd == nil {
+	if pwd == nil {
 		return errors.New("not priviledged")
 	}
 	res.Result, err = Send(conf, []byte(conf.RPCTxTag), &tx.RawOutput{

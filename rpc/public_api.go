@@ -97,7 +97,7 @@ func getnodeinfo(conf *setting.Setting, req *Request, res *Response) error {
 	if conf.RPCUser != "" {
 		mutex.Lock()
 		defer mutex.Unlock()
-		_, total, err := getUTXO(conf)
+		_, total, err := wallet.GetAllUTXO(&conf.DBConfig, nil)
 		if err != nil {
 			return err
 		}

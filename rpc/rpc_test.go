@@ -111,14 +111,6 @@ func setup(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	wallet.AccountName = ""
-	wallet.Secret.seed = nil
-	wallet.Secret.pwd = nil
-	wallet.Secret.EncSeed = nil
-	wallet.Pool.Address = nil
-	wallet.Pool.Index = 0
-	wallet.AddressChange = make(map[string]struct{})
-	wallet.AddressPublic = make(map[string]struct{})
 	t.Log(imesh.GetTxNo())
 	Init(&s)
 }
@@ -213,11 +205,12 @@ func TestSig(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	pwd := []byte("pwd")
-	if err := InitSecret(&s, pwd); err != nil {
+	pwd = []byte("pwd")
+	if err := New(&s, pwd); err != nil {
 		t.Error(err)
 	}
-	if err := decryptSecret(&s, pwd); err != nil {
+	_, err := wallet.DecryptSeed(pwd)
+	if err != nil {
 		t.Error(err)
 	}
 	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
@@ -244,8 +237,7 @@ func TestSig(t *testing.T) {
 	confirmAll(t, nil, true)
 	txid := testsendtoaddress2(t, adrs[0], 0.2)
 	confirmAll(t, nil, true)
-	wallet.Secret.pwd = pwd
-	aa, err := getAddress(&s, adrs[0])
+	aa, err := wallet.GetAddress(&s.DBConfig, adrs[0], pwd)
 	if err != nil {
 		t.Error(err)
 	}
@@ -257,7 +249,7 @@ func TestSig(t *testing.T) {
 	if err := tr.AddOutput(s.Config, adrs[0], 0.1*aklib.ADK); err != nil {
 		t.Error(err)
 	}
-	if err := tr.Sign(aa.address); err != nil {
+	if err := tr.Sign(aa.Address); err != nil {
 		t.Fatal(err)
 	}
 	if err := tr.PoW(); err != nil {
@@ -272,7 +264,7 @@ func TestSig(t *testing.T) {
 	confirmAll(t, nil, true)
 	testsendtoaddress2(t, adrs[1], 9.9)
 	confirmAll(t, nil, true)
-	aa, err = getAddress(&s, adrs[0])
+	aa, err = wallet.GetAddress(&s.DBConfig, adrs[0], pwd)
 	if err != nil {
 		t.Error(err)
 	}
