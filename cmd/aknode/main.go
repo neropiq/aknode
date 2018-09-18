@@ -161,7 +161,7 @@ func checkWalletSeed(s *setting.Setting) error {
 		if err != nil {
 			return err
 		}
-		if err := rpc.InitSecret(s, pwd); err != nil {
+		if err := rpc.New(s, pwd); err != nil {
 			return err
 		}
 	}

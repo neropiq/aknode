@@ -48,6 +48,11 @@ func Init(s *setting.Setting) error {
 	return err
 }
 
+//IsSecretEmpty returns true if wallet is empty.
+func IsSecretEmpty() bool {
+	return wallet.EncSeed == nil
+}
+
 //New initialize the wallet.
 func New(s *setting.Setting, pwdd []byte) error {
 	if err := wallet.InitSeed(&s.DBConfig, pwdd); err != nil {
