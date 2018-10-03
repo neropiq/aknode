@@ -36,7 +36,7 @@ import (
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
-	"github.com/AidosKuneen/aknode/consensus"
+	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/node"
@@ -57,7 +57,7 @@ func TestControlAPI(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
+	GoNotify(&s, node.RegisterTxNotifier, akconsensus.RegisterTxNotifier)
 	acs := []string{"ac1"}
 	var adr string
 	for _, ac := range acs {

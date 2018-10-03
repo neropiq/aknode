@@ -27,15 +27,12 @@ import (
 	"log"
 	"time"
 
-	"github.com/AidosKuneen/aklib/address"
-
 	"github.com/AidosKuneen/aklib"
-
-	"github.com/AidosKuneen/aknode/imesh/leaves"
-
+	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/arypack"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh"
+	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/setting"
@@ -270,7 +267,7 @@ func gettxsstatus(conf *setting.Setting, req *Request, res *Response) error {
 		if err != nil {
 			return err
 		}
-		if tr.Status == imesh.StatusConfirmed {
+		if tr.IsConfirmed() {
 			r = append(r, nConfirm)
 		} else {
 			r = append(r, 0)

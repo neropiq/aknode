@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -38,7 +39,6 @@ import (
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/setting"
-	"github.com/alecthomas/template"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
@@ -213,6 +213,18 @@ func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func stat2str(ti *imesh.TxInfo) template.HTML {
+	switch ti.StatNo {
+	case imesh.StatusPending:
+		return "PENDING"
+	case imesh.StatusRejected:
+		return "REJECTED"
+	default:
+		no := hex.EncodeToString(ti.StatNo[:])
+		return template.HTML(`<a href="/statement?id=` + no + `">CONFIRMED</a>`)
+	}
+}
+
 func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id := q.Get("id")
@@ -241,7 +253,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		TXID               string
 		Created            time.Time
 		Received           time.Time
-		Status             imesh.TxStatus
+		StatNo             template.HTML
 		Inputs             []*tx.Output
 		MInputs            []*tx.MultiSigOut
 		Signs              map[string]bool
@@ -261,7 +273,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		TXID:       id,
 		Created:    ti.Body.Time,
 		Received:   ti.Received,
-		Status:     ti.Status,
+		StatNo:     stat2str(ti),
 		Inputs:     make([]*tx.Output, len(ti.Body.Inputs)),
 		MInputs:    make([]*tx.MultiSigOut, len(ti.Body.MultiSigIns)),
 		Signs:      make(map[string]bool),
@@ -277,6 +289,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 			return out.Address(s.Config)
 		},
 	}
+
 	if ti.Body.TicketOutput != nil {
 		info.TicketOutput = ti.Body.TicketOutput.String()
 	}
@@ -328,7 +341,7 @@ type tinfo struct {
 	Hash   tx.Hash
 	Amount int64
 	Time   time.Time
-	Status imesh.TxStatus
+	StatNo template.HTML
 	Spent  bool
 }
 
@@ -372,7 +385,7 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		t := &tinfo{
 			Hash:   h.Hash,
 			Time:   ti.Received,
-			Status: ti.Status,
+			StatNo: stat2str(ti),
 		}
 		switch h.Type {
 		case tx.TypeIn:
@@ -381,20 +394,22 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 				renderError(w, err2.Error())
 				return
 			}
-			switch ti.Status {
+			switch ti.StatNo {
 			case imesh.StatusPending:
 				info.SendUnconfirmed += ins.Value
-			case imesh.StatusConfirmed:
+			case imesh.StatusRejected:
+			default:
 				info.Send += ins.Value
 			}
 			t.Amount = -int64(ins.Value)
 			info.Inputs = append(info.Inputs, t)
 		case tx.TypeOut:
 			v := ti.Body.Outputs[h.Index].Value
-			switch ti.Status {
+			switch ti.StatNo {
 			case imesh.StatusPending:
 				info.ReceivedUnconfirmed += v
-			case imesh.StatusConfirmed:
+			case imesh.StatusRejected:
+			default:
 				info.Received += v
 			}
 			t.Amount = int64(v)
@@ -465,7 +480,7 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 		t := &tinfo{
 			Hash:   h.Hash,
 			Time:   tr.Received,
-			Status: tr.Status,
+			StatNo: stat2str(tr),
 		}
 		switch h.Type {
 		case tx.TypeMulin:
@@ -477,10 +492,11 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 			if !bytes.Equal(madr, mout.AddressByte(s.Config)) {
 				continue
 			}
-			switch tr.Status {
+			switch tr.StatNo {
 			case imesh.StatusPending:
 				info.SendUnconfirmed += mout.Value
-			case imesh.StatusConfirmed:
+			case imesh.StatusRejected:
+			default:
 				info.Send += mout.Value
 			}
 			t.Amount = -int64(mout.Value)
@@ -490,10 +506,11 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 			if !bytes.Equal(madr, mout.AddressByte(s.Config)) {
 				continue
 			}
-			switch tr.Status {
+			switch tr.StatNo {
 			case imesh.StatusPending:
 				info.ReceivedUnconfirmed += mout.Value
-			case imesh.StatusConfirmed:
+			case imesh.StatusRejected:
+			default:
 				info.Received += mout.Value
 			}
 			t.Amount = int64(mout.Value)

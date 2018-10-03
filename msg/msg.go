@@ -48,6 +48,11 @@ const (
 	CmdGetLeaves                 // Header + LeavesFrom,p2p
 	CmdLeaves                    // Header + Inventories,p2p
 	CmdClose                     //Header,p2p
+
+	CmdGetLedger
+	CmdLedger
+	CmdValidation
+	CmdProposal
 )
 
 //Services in Version mesasge.

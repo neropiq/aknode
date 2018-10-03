@@ -131,15 +131,7 @@
 						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
 						  						<td>{{toADKi .Amount}} ADK</td>
 						  						<td>{{duration .Time}}</td>
-												  {{if eq .Status 0 }}
-						  						<td>Pending</td>
-												  {{end}}
-												  {{if eq .Status 1 }}
-						  						<td>Confirmed</td>
-												  {{end}}
-												  {{if eq .Status 2 }}
-						  						<td>Rejected</td>
-												  {{end}}
+						  						<td>{{.StatNo}}</td>
 						  					</tr>
 {{end}}
 {{range .Outputs}}
@@ -148,15 +140,7 @@
 						  						<td class="text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Hash.String}}">{{.Hash.String}}</a></td>
 						  						<td>{{toADKi .Amount}} ADK</td>
 						  						<td>{{duration .Time}}</td>
-												  {{if eq .Status 0 }}
-						  						<td>Pending / 
-												  {{end}}
-												  {{if eq .Status 1 }}
-						  						<td>Confirmed  /
-												  {{end}}
-												  {{if eq .Status 2 }}
-						  						<td>Rejected /
-												  {{end}}
+						  						<td>{{.StatNo}} / 
 												  {{if .Spent }}
 												  Spent
 												  {{else}}

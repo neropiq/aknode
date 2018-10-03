@@ -28,7 +28,7 @@ import (
 
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/tx"
-	"github.com/AidosKuneen/aknode/consensus"
+	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/msg"
@@ -54,7 +54,7 @@ func TestSendAPI(t *testing.T) {
 		}
 	}
 	pwd = nil
-	GoNotify(&s, node.RegisterTxNotifier, consensus.RegisterTxNotifier)
+	GoNotify(&s, node.RegisterTxNotifier, akconsensus.RegisterTxNotifier)
 	acs := []string{""}
 	adr2ac := make(map[string]string)
 	adr2val := make(map[string]uint64)

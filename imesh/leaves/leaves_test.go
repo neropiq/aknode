@@ -83,22 +83,22 @@ func TestLeaves(t *testing.T) {
 	if err := CheckAdd(&s, trs[:6]...); err != nil {
 		t.Error(err)
 	}
-	for _, tr := range leaves.hash {
-		t.Log(hex.EncodeToString(tr))
+	for _, tr := range leaves.leaves {
+		t.Log(hex.EncodeToString(tr.Hash))
 	}
 
-	t.Log(len(leaves.hash))
+	t.Log(len(leaves.leaves))
 	for _, i := range []int{0, 2} {
-		for _, tr := range leaves.hash {
-			if bytes.Equal(trs[i].Hash(), tr) {
+		for _, tr := range leaves.leaves {
+			if bytes.Equal(trs[i].Hash(), tr.Hash) {
 				t.Error("should not be a leaf")
 			}
 		}
 	}
 	for _, i := range []int{1, 3, 4, 5} {
 		ok := false
-		for _, tr := range leaves.hash {
-			if bytes.Equal(trs[i].Hash(), tr) {
+		for _, tr := range leaves.leaves {
+			if bytes.Equal(trs[i].Hash(), tr.Hash) {
 				ok = true
 			}
 		}
@@ -107,9 +107,9 @@ func TestLeaves(t *testing.T) {
 		}
 	}
 
-	leaves.hash = leaves.hash[:0]
+	leaves.leaves = leaves.leaves[:0]
 	Init(&s)
-	if len(leaves.hash) != 4 {
+	if len(leaves.leaves) != 4 {
 		t.Error("invalid init")
 	}
 
@@ -124,16 +124,16 @@ func TestLeaves(t *testing.T) {
 		t.Error(err)
 	}
 	for _, i := range []int{0, 2, 3} {
-		for _, tr := range leaves.hash {
-			if bytes.Equal(trs[i].Hash(), tr) {
+		for _, tr := range leaves.leaves {
+			if bytes.Equal(trs[i].Hash(), tr.Hash) {
 				t.Error("should not be a leaf")
 			}
 		}
 	}
 	for _, i := range []int{1, 4, 5} {
 		ok := false
-		for _, tr := range leaves.hash {
-			if bytes.Equal(trs[i].Hash(), tr) {
+		for _, tr := range leaves.leaves {
+			if bytes.Equal(trs[i].Hash(), tr.Hash) {
 				ok = true
 			}
 		}

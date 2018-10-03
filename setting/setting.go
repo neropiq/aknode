@@ -30,6 +30,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/AidosKuneen/consensus"
+
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
@@ -97,9 +99,9 @@ type Setting struct {
 	MinerAddress    string  `json:"miner_address"`
 
 	DBConfig
-	Stop               chan struct{}   `json:"-"`
-	ValidatorSeedBytes address.Bytes   `json:"-"`
-	TrustedNodeBytes   []address.Bytes `json:"-"`
+	Stop             chan struct{}      `json:"-"`
+	ValidatorAddress *address.Address   `json:"-"`
+	TrustedNodeIDs   []consensus.NodeID `json:"-"`
 }
 
 //Load parse a json file fname , open DB and returns Settings struct .
@@ -198,9 +200,12 @@ func Load(s []byte) (*Setting, error) {
 		if !isNode {
 			return nil, errors.New("invalid validator_seed")
 		}
-		se.ValidatorSeedBytes = b
+		se.ValidatorAddress, err = address.NewNode(se.Config, b)
+		if err != nil {
+			return nil, err
+		}
 	}
-	se.TrustedNodeBytes = make([]address.Bytes, len(se.TrustedNodes))
+	se.TrustedNodeIDs = make([]consensus.NodeID, len(se.TrustedNodes))
 	for i, a := range se.TrustedNodes {
 		ta, isNode, err := address.ParseAddress58(se.Config, a)
 		if err != nil {
@@ -209,7 +214,7 @@ func Load(s []byte) (*Setting, error) {
 		if !isNode {
 			return nil, errors.New("invalid trusted_nodes")
 		}
-		se.TrustedNodeBytes[i] = ta
+		copy(se.TrustedNodeIDs[i][:], ta[2:])
 	}
 
 	dbDir := filepath.Join(se.BaseDir(), "db")
@@ -282,4 +287,15 @@ func (s *Setting) CheckAddress(adr string, hasPort, isEmptyHost bool) error {
 	}
 	_, err2 = net.LookupIP(adr)
 	return err2
+}
+
+//IsTrusted returns true if adr is trusted.
+func (s *Setting) IsTrusted(adr string) bool {
+	ok := false
+	for _, t := range s.TrustedNodes {
+		if t == adr {
+			ok = true
+		}
+	}
+	return ok
 }

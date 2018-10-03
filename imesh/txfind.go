@@ -89,7 +89,7 @@ func Init(s *setting.Setting) error {
 		if err != nil {
 			return err
 		}
-		t.Status = StatusConfirmed
+		t.StatNo = statusGenesis
 		if err := t.Put(s.DB); err != nil {
 			return err
 		}

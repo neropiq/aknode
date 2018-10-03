@@ -33,17 +33,22 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
+type leaf struct {
+	Hash      tx.Hash
+	Confirmed bool
+}
+
 //leaves represents leaves in iMesh.
 var leaves = struct {
-	hash []tx.Hash
+	leaves []*leaf
 	sync.RWMutex
 }{}
 
 //Init loads leaves from DB.
 func Init(s *setting.Setting) error {
-	leaves.hash = nil
+	leaves.leaves = nil
 	err := s.DB.View(func(txn *badger.Txn) error {
-		return db.Get(txn, nil, &leaves.hash, db.HeaderLeaves)
+		return db.Get(txn, nil, &leaves.leaves, db.HeaderLeaves)
 	})
 	if err != nil && err != badger.ErrKeyNotFound {
 		return err
@@ -55,36 +60,78 @@ func Init(s *setting.Setting) error {
 func Size() int {
 	leaves.RLock()
 	defer leaves.RUnlock()
-	return len(leaves.hash)
+	return len(leaves.leaves)
+}
+
+//SetConfirmed set leaves whose hash is h to be confirmed.
+func SetConfirmed(s *setting.Setting, h tx.Hash) error {
+	leaves.Lock()
+	defer leaves.Unlock()
+	for _, l := range leaves.leaves {
+		if bytes.Equal(l.Hash, h) {
+			l.Confirmed = true
+		}
+	}
+	return put(s)
+}
+
+func gethash() ([]tx.Hash, []tx.Hash) {
+	ncs := make([]tx.Hash, 0, len(leaves.leaves))
+	cs := make([]tx.Hash, 0, len(leaves.leaves))
+	for _, l := range leaves.leaves {
+		if !l.Confirmed {
+			ncs = append(ncs, l.Hash)
+		} else {
+			cs = append(cs, l.Hash)
+		}
+	}
+	return ncs, cs
 }
 
 //Get gets n random leaves. if <=0, it returns all leaves.
 func Get(n int) []tx.Hash {
 	leaves.RLock()
 	defer leaves.RUnlock()
-	r := make([]tx.Hash, len(leaves.hash))
-	copy(r, leaves.hash)
+	ncs, cs := gethash()
 
-	for i := len(r) - 1; i >= 0; i-- {
+	for i := len(ncs) - 1; i >= 0; i-- {
 		j := rand.R.Intn(i + 1)
-		r[i], r[j] = r[j], r[i]
+		ncs[i], ncs[j] = ncs[j], ncs[i]
 	}
-	if n >= len(leaves.hash) || n <= 0 {
-		return r
+	for i := len(cs) - 1; i >= 0; i-- {
+		j := rand.R.Intn(i + 1)
+		cs[i], cs[j] = cs[j], cs[i]
 	}
-	return r[:n]
+	if len(ncs) >= n {
+		return ncs[:n]
+	}
+	if len(ncs)+len(cs) < n {
+		return append(ncs, cs...)
+	}
+	return append(ncs, cs[:n-len(ncs)]...)
+}
+
+//GetAllUnconfirmed gets all unconfirmed leaves after sorting.
+func GetAllUnconfirmed() []tx.Hash {
+	leaves.RLock()
+	defer leaves.RUnlock()
+	ncs, _ := gethash()
+	sort.Slice(ncs, func(i, j int) bool {
+		return bytes.Compare(ncs[i], ncs[j]) < 0
+	})
+	return ncs
 }
 
 //GetAll gets all leaves after sorting.
 func GetAll() []tx.Hash {
 	leaves.RLock()
 	defer leaves.RUnlock()
-	r := make([]tx.Hash, len(leaves.hash))
-	copy(r, leaves.hash)
-	sort.Slice(r, func(i, j int) bool {
-		return bytes.Compare(r[i], r[j]) < 0
+	ncs, cs := gethash()
+	ncs = append(ncs, cs...)
+	sort.Slice(ncs, func(i, j int) bool {
+		return bytes.Compare(ncs[i], ncs[j]) < 0
 	})
-	return r
+	return ncs
 }
 
 type txsearch struct {
@@ -97,13 +144,15 @@ func CheckAdd(s *setting.Setting, trs ...*tx.Transaction) error {
 	leaves.Lock()
 	defer leaves.Unlock()
 	txs := isVisited(trs)
-	leaves.hash = leaves.hash[:0]
+	leaves.leaves = leaves.leaves[:0]
 	//h is reused (i.e. always same object) in for loop, so need to clone it.
 	for h, tr := range txs {
 		if !tr.visited {
 			hh := make(tx.Hash, 32)
 			copy(hh, h[:])
-			leaves.hash = append(leaves.hash, hh)
+			leaves.leaves = append(leaves.leaves, &leaf{
+				Hash: hh,
+			})
 		}
 	}
 	return put(s)
@@ -112,7 +161,7 @@ func CheckAdd(s *setting.Setting, trs ...*tx.Transaction) error {
 //locked by mutex(leaves)
 func put(s *setting.Setting) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
-		return db.Put(txn, nil, leaves.hash, db.HeaderLeaves)
+		return db.Put(txn, nil, leaves.leaves, db.HeaderLeaves)
 	})
 }
 
@@ -123,8 +172,8 @@ func isVisited(trs []*tx.Transaction) map[[32]byte]*txsearch {
 			Transaction: tr,
 		}
 	}
-	for _, l := range leaves.hash {
-		txs[l.Array()] = &txsearch{}
+	for _, l := range leaves.leaves {
+		txs[l.Hash.Array()] = &txsearch{}
 	}
 	for _, tr := range trs {
 		for _, prev := range tr.Parent {

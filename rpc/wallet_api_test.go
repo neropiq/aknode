@@ -39,6 +39,13 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
+var (
+	confirmed = imesh.StatNo{
+		0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	}
+)
+
 func confirmAll(t *testing.T, notify chan []tx.Hash, confirm bool) {
 	var txs []tx.Hash
 	err := s.DB.Update(func(txn *badger.Txn) error {
@@ -54,10 +61,10 @@ func confirmAll(t *testing.T, notify chan []tx.Hash, confirm bool) {
 				return err
 			}
 			if confirm {
-				ti.Status = imesh.StatusConfirmed
+				ti.StatNo = confirmed
 			}
 			if !confirm {
-				ti.Status = imesh.StatusPending
+				ti.StatNo = imesh.StatusPending
 			}
 			h := it.Item().Key()[1:]
 			if err := db.Put(txn, h, &ti, db.HeaderTxInfo); err != nil {

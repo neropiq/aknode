@@ -27,17 +27,14 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"sort"
 	"sync"
 	"time"
 
 	akrand "github.com/AidosKuneen/aklib/rand"
-	"github.com/AidosKuneen/aklib/tx"
-	"github.com/AidosKuneen/aknode/imesh/leaves"
-
-	"github.com/AidosKuneen/aknode/imesh"
+	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/setting"
+	"github.com/AidosKuneen/consensus"
 )
 
 const (
@@ -74,6 +71,7 @@ type peer struct {
 	remote  msg.Addr
 	written []wdata
 	sync.RWMutex
+	cons *consensus.Peer
 }
 
 //GetBanned returns a banned list.
@@ -99,6 +97,18 @@ func GetPeerlist() []msg.Addr {
 		i++
 	}
 	return r
+}
+
+type consensusPeer struct{}
+
+func (cp *consensusPeer) GetLedger(s *setting.Setting, id consensus.LedgerID) {
+	WriteAll(s, &id, msg.CmdGetLedger)
+}
+func (cp *consensusPeer) BroadcastProposal(s *setting.Setting, p *consensus.Proposal) {
+	WriteAll(s, p, msg.CmdProposal)
+}
+func (cp *consensusPeer) BroadcastValidatoin(s *setting.Setting, v *consensus.Validation) {
+	WriteAll(s, v, msg.CmdValidation)
 }
 
 //newPeer returns Peer struct.
@@ -134,9 +144,13 @@ func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, erro
 			v.AddrFrom.Address = net.JoinHostPort(remote, po)
 		}
 	}
+	var id consensus.NodeID
+	copy(id[:], s.ValidatorAddress.Address(s.Config)[2:])
+
 	p := &peer{
 		conn:   conn,
 		remote: v.AddrFrom,
+		cons:   consensus.NewPeer(akconsensus.NewAdaptor(s, &consensusPeer{}), id, s.TrustedNodeIDs, s.RunValidator),
 	}
 	peers.RLock()
 	defer peers.RUnlock()
@@ -244,6 +258,13 @@ func (p *peer) write(s *setting.Setting, m interface{}, cmd byte) error {
 		}
 		w.data = n[:]
 		p.written = append(p.written, w)
+	case msg.CmdGetLedger:
+		n, ok := m.(*consensus.LedgerID)
+		if !ok {
+			return errors.New("invalid data")
+		}
+		w.data = n[:]
+		p.written = append(p.written, w)
 	}
 	if err := p.conn.SetWriteDeadline(time.Now().Add(rwTimeout)); err != nil {
 		return err
@@ -304,206 +325,4 @@ func (p *peer) run(s *setting.Setting) {
 //for test
 var setReadDeadline = func(p *peer, t time.Time) error {
 	return p.conn.SetReadDeadline(t)
-}
-
-func (p *peer) runLoop(s *setting.Setting) error {
-	defer p.delete()
-	for {
-		var cmd byte
-		var buf []byte
-		var err2 error
-		if err := setReadDeadline(p, time.Now().Add(connectionTimeout)); err != nil {
-			return err
-		}
-		cmd, buf, err2 = msg.ReadHeader(s, p.conn)
-		if err2 != nil {
-			if ne, ok := err2.(net.Error); ok && ne.Timeout() {
-				if i := p.isWritten(msg.CmdPing, nil); i >= 0 {
-					if err3 := remove(s, p.remote); err3 != nil {
-						log.Println(err3)
-					}
-					return fmt.Errorf("no response from %v", p.remote)
-				}
-				n := nonce()
-				if err := p.write(s, &n, msg.CmdPing); err != nil {
-					return err
-				}
-				continue
-			}
-			return err2
-		}
-		switch cmd {
-		case msg.CmdPing:
-			v, err := msg.ReadNonce(buf)
-			if err != nil {
-				return err
-			}
-			if err := p.write(s, v, msg.CmdPong); err != nil {
-				log.Println(err)
-				continue
-			}
-
-		case msg.CmdPong:
-			v, err := msg.ReadNonce(buf)
-			if err != nil {
-				return err
-			}
-			if err := p.received(msg.CmdPing, v[:]); err != nil {
-				return err
-			}
-
-		case msg.CmdGetAddr:
-			adrs := get(msg.MaxAddrs)
-			if err := p.write(s, adrs, msg.CmdAddr); err != nil {
-				log.Println(err)
-				return nil
-			}
-
-		case msg.CmdAddr:
-			if err := p.received(msg.CmdGetAddr, nil); err != nil {
-				return err
-			}
-			v, err := msg.ReadAddrs(s, buf)
-			if err != nil {
-				return err
-			}
-			if err := putAddrs(s, *v...); err != nil {
-				log.Println(err)
-				continue
-			}
-
-		case msg.CmdInv:
-			invs, err := msg.ReadInventories(buf)
-			if err != nil {
-				return err
-			}
-			for _, inv := range invs {
-				typ, err := inv.Type.ToTxType()
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				if err := imesh.AddNoexistTxHash(s, inv.Hash[:], typ); err != nil {
-					log.Println(err)
-					continue
-				}
-			}
-			Resolve()
-
-		case msg.CmdGetData:
-			invs, err := msg.ReadInventories(buf)
-			if err != nil {
-				return err
-			}
-			trs := make(msg.Txs, 0, len(invs))
-			for _, inv := range invs {
-				switch inv.Type {
-				case msg.InvTxNormal:
-					tr, err := imesh.GetTx(s.DB, inv.Hash[:])
-					if err != nil {
-						log.Println(err)
-						continue
-					}
-					trs = append(trs, &msg.Tx{
-						Type: inv.Type,
-						Tx:   tr,
-					})
-				case msg.InvTxRewardFee:
-					fallthrough
-				case msg.InvTxRewardTicket:
-					typ := tx.TypeRewardFee
-					if inv.Type == msg.InvTxRewardTicket {
-						typ = tx.TypeRewardTicket
-					}
-					tr, err := imesh.GetMinableTx(s, inv.Hash[:], typ)
-					if err != nil {
-						log.Println(err)
-						continue
-					}
-					trs = append(trs, &msg.Tx{
-						Type: inv.Type,
-						Tx:   tr,
-					})
-				default:
-					return fmt.Errorf("unknown inv type %v", inv.Type)
-				}
-			}
-			if len(trs) == 0 {
-				continue
-			}
-			if err := p.write(s, trs, msg.CmdTxs); err != nil {
-				log.Println(err)
-				return nil
-			}
-			Resolve()
-
-		case msg.CmdTxs:
-			vs, err := msg.ReadTxs(buf)
-			if err != nil {
-				return err
-			}
-			for _, v := range vs {
-				typ, err := v.Type.ToTxType()
-				if err != nil {
-					return err
-				}
-				if err := v.Tx.Check(s.Config, typ); err != nil {
-					return err
-				}
-				if err := imesh.CheckAddTx(s, v.Tx, typ); err != nil {
-					log.Println(err)
-				}
-			}
-			Resolve()
-
-		case msg.CmdGetLeaves:
-			v, err := msg.ReadLeavesFrom(buf)
-			if err != nil {
-				return err
-			}
-			ls := leaves.GetAll()
-			idx := sort.Search(len(ls), func(i int) bool {
-				return bytes.Compare(ls[i], v[:]) >= 0
-			})
-			h := make(msg.Inventories, 0, len(ls)-idx)
-			for i := idx; i < len(ls) && i < msg.MaxLeaves; i++ {
-				h = append(h, &msg.Inventory{
-					Type: msg.InvTxNormal,
-					Hash: ls[i].Array(),
-				})
-			}
-			if err := p.write(s, h, msg.CmdLeaves); err != nil {
-				log.Println(err)
-				return nil
-			}
-
-		case msg.CmdLeaves:
-			v, err := msg.ReadInventories(buf)
-			if err != nil {
-				return err
-			}
-			if err := p.received(msg.CmdGetLeaves, nil); err != nil {
-				return err
-			}
-			for _, h := range v {
-				if h.Type != msg.InvTxNormal {
-					return fmt.Errorf("invalid inventory type %v", h.Type)
-				}
-				if err := imesh.AddNoexistTxHash(s, h.Hash[:], tx.TypeNormal); err != nil {
-					log.Println(err)
-				}
-			}
-			if len(v) == msg.MaxLeaves {
-				gl := v[len(v)-1].Hash
-				WriteAll(s, &gl, msg.CmdGetLeaves)
-			}
-			Resolve()
-
-		case msg.CmdClose:
-			return nil
-
-		default:
-			return fmt.Errorf("invalid cmd %d", cmd)
-		}
-	}
 }

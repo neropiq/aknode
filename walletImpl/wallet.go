@@ -289,7 +289,7 @@ func (w *Wallet) GetUTXO(s *setting.DBConfig, pwd []byte, isPublic bool) ([]*tx.
 					return nil, 0, err
 				}
 				outstat := tr.OutputStatus[0][h.Index]
-				if tr.Status != imesh.StatusConfirmed ||
+				if !tr.IsConfirmed() ||
 					(outstat.IsReferred || outstat.IsSpent || outstat.UsedByMinable != nil) {
 					log.Println(h.Hash, outstat.IsReferred, outstat.IsSpent, outstat.UsedByMinable)
 					continue

@@ -25,14 +25,12 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/AidosKuneen/aknode/imesh"
-	"github.com/AidosKuneen/aknode/walletImpl"
-
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/tx"
-
+	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/setting"
+	"github.com/AidosKuneen/aknode/walletImpl"
 )
 
 var mutex sync.RWMutex
@@ -266,7 +264,7 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 	var bt *int64
 	var bh *string
 	var bi *int64
-	if tr.Status == imesh.StatusConfirmed {
+	if tr.IsConfirmed() {
 		nconf = nConfirm
 		var zero int64
 		t := tr.Body.Time.Unix()
@@ -408,7 +406,7 @@ func newTransaction(conf *setting.Setting, tr *imesh.TxInfo, out *tx.Output, vou
 	if ok {
 		dt.Account = &wallet.AccountName
 	}
-	if tr.Status == imesh.StatusConfirmed {
+	if tr.IsConfirmed() {
 		dt.Blockhash = &emp
 		dt.Blocktime = &dt.Time
 		dt.Blockindex = &zero

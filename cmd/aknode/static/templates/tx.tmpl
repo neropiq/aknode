@@ -60,15 +60,15 @@
 					<div class="col-12 col-md-4">
 						<div class="card transaction-box transaction-box-status">
 							<p>
-{{if eq .Status 0}}
+{{if eq .StatNo "PENDING"}}
 								<label class="status pending"><i class="icofont-sand-clock"></i></label>
 								<span>Pending</span>
 {{end}}
-{{if eq .Status 1}}
+{{if and (ne .StatNo "PENDING") (ne .StatNo "REJECTED")}}
 								<label class="status confirmed"><i class="icofont-check-alt"></i></label>
 								<span>Confirmed</span>
 {{end}}
-{{if eq .Status 2}}
+{{if eq .StatNo "REJECTED"}}
 								<label class="status failed"><i class="icofont-close-line"></i></label>
 								<span>Rejected</span>
 {{end}}
