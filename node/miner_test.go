@@ -103,7 +103,6 @@ func TestMiner(t *testing.T) {
 			Tx:   ti,
 		},
 	}
-	// t.Fatal()
 	if err := msg.Write(&s1, &txd, msg.CmdTxs, conn); err != nil {
 		t.Error(err)
 	}
@@ -141,7 +140,6 @@ func TestMiner(t *testing.T) {
 	if len(inout) == 0 {
 		t.Fatal("failed to mine")
 	}
-	// t.Fatal()
 
 	seed = address.GenerateSeed32()
 	a2, err2 := address.New(s.Config, seed)
