@@ -52,7 +52,11 @@ func confirmAll(t *testing.T, notify chan []tx.Hash, confirm bool) {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
 		for it.Seek([]byte{byte(db.HeaderTxInfo)}); it.ValidForPrefix([]byte{byte(db.HeaderTxInfo)}); it.Next() {
-			dat, err2 := it.Item().Value()
+			var dat []byte
+			err2 := it.Item().Value(func(d []byte) {
+				dat := make([]byte, len(d))
+				copy(dat, d)
+			})
 			if err2 != nil {
 				return err2
 			}
