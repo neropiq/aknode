@@ -54,7 +54,7 @@ func confirmAll(t *testing.T, notify chan []tx.Hash, confirm bool) {
 		for it.Seek([]byte{byte(db.HeaderTxInfo)}); it.ValidForPrefix([]byte{byte(db.HeaderTxInfo)}); it.Next() {
 			var dat []byte
 			err2 := it.Item().Value(func(d []byte) {
-				dat := make([]byte, len(d))
+				dat = make([]byte, len(d))
 				copy(dat, d)
 			})
 			if err2 != nil {
