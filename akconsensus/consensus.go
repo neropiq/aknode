@@ -23,6 +23,7 @@ package akconsensus
 import (
 	"bytes"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/AidosKuneen/aknode/imesh"
@@ -42,12 +43,20 @@ var (
 	proposals   = make(map[consensus.ProposalID]time.Time)
 	validations = make(map[consensus.ValidationID]time.Time)
 	lastLedger  *consensus.Ledger
+	mutex       sync.RWMutex
 )
 
 type network interface {
 	GetLedger(s *setting.Setting, id consensus.LedgerID)
 	BroadcastProposal(s *setting.Setting, p *consensus.Proposal)
 	BroadcastValidatoin(s *setting.Setting, v *consensus.Validation)
+}
+
+//LastLedger returns the last ledger.
+func LastLedger() *consensus.Ledger {
+	mutex.RLock()
+	defer mutex.RUnlock()
+	return lastLedger
 }
 
 //Init initialize consensus.
@@ -132,6 +141,8 @@ func handleProposal(s *setting.Setting, peer *consensus.Peer, p *consensus.Propo
 
 //PutLedger puts a ledger.
 func PutLedger(s *setting.Setting, l *consensus.Ledger) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	return s.DB.Update(func(txn *badger.Txn) error {
 		id := l.ID()
 		if err := db.Put(txn, id[:], l, db.HeaderLedger); err != nil {
@@ -143,6 +154,8 @@ func PutLedger(s *setting.Setting, l *consensus.Ledger) error {
 
 //GetLedger gets a ledger whose ID is id.
 func GetLedger(s *setting.Setting, id consensus.LedgerID) (*consensus.Ledger, error) {
+	mutex.RLock()
+	defer mutex.RUnlock()
 	var l consensus.Ledger
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, id[:], &l, db.HeaderLedger)
@@ -172,7 +185,9 @@ func ReadValidation(s *setting.Setting, peer *consensus.Peer, buf []byte) (*cons
 	if err != nil {
 		return nil, false, err
 	}
+	mutex.Lock()
 	noexist, err := handleValidation(s, peer, &v)
+	mutex.Unlock()
 	return &v, noexist, err
 }
 
@@ -183,12 +198,16 @@ func ReadProposal(s *setting.Setting, peer *consensus.Peer, buf []byte) (*consen
 	if err != nil {
 		return nil, false, err
 	}
+	mutex.Lock()
 	noexist, err := handleProposal(s, peer, &v)
+	mutex.Unlock()
 	return &v, noexist, err
 }
 
 //Confirm confirms txs and return hashes of confirmed txs.
 func Confirm(s *setting.Setting, peer network, l *consensus.Ledger) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	var ctx tx.Hash
 	for h := range l.Txs {
 		ctx = tx.Hash(h[:])

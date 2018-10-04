@@ -145,12 +145,21 @@ func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, erro
 		}
 	}
 	var id consensus.NodeID
-	copy(id[:], s.ValidatorAddress.Address(s.Config)[2:])
-
+	if s.RunValidator && s.ValidatorSecret != "" {
+		adr, err := s.ValidatorAddress()
+		if err != nil {
+			return nil, err
+		}
+		copy(id[:], adr.Address(s.Config)[2:])
+	}
+	unl, err := s.TrustedNodeIDs()
+	if err != nil {
+		return nil, err
+	}
 	p := &peer{
 		conn:   conn,
 		remote: v.AddrFrom,
-		cons:   consensus.NewPeer(akconsensus.NewAdaptor(s, &consensusPeer{}), id, s.TrustedNodeIDs, s.RunValidator),
+		cons:   consensus.NewPeer(akconsensus.NewAdaptor(s, &consensusPeer{}), id, unl, s.RunValidator),
 	}
 	peers.RLock()
 	defer peers.RUnlock()

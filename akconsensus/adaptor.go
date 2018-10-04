@@ -70,14 +70,12 @@ func (a *Adaptor) OnStale(*consensus.Validation) {} //nothing
 func (a *Adaptor) Flush(remaining map[consensus.NodeID]*consensus.Validation) {} //nothing
 
 // AcquireTxSet acquires the transaction set associated with a proposed position.
-func (a *Adaptor) AcquireTxSet(id consensus.TxSetID) (consensus.TxSet, error) {
+func (a *Adaptor) AcquireTxSet(id consensus.TxSetID) ([]consensus.TxT, error) {
 	tx, err := imesh.GetTx(a.s.DB, id[:])
 	if err != nil {
 		return nil, err
 	}
-	ts := make(consensus.TxSet, 1)
-	ts[tx.ID()] = tx
-	return ts, nil
+	return []consensus.TxT{tx}, nil
 }
 
 // HasOpenTransactions returns whether any transactions are in the open ledger
@@ -126,7 +124,12 @@ func (a *Adaptor) OnAccept(l *consensus.Ledger) {
 // Propose proposes the position to Peers.
 func (a *Adaptor) Propose(prop *consensus.Proposal) {
 	id := prop.ID()
-	sig, err := a.s.ValidatorAddress.Sign(id[:])
+	adr, err := a.s.ValidatorAddress()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	sig, err := adr.Sign(id[:])
 	if err != nil {
 		log.Println(err)
 		return
@@ -149,7 +152,12 @@ func (a *Adaptor) ShareTxset(ts consensus.TxSet) {} //nothing
 //ShareValidaton  shares my validation
 func (a *Adaptor) ShareValidaton(v *consensus.Validation) {
 	id := v.ID()
-	sig, err := a.s.ValidatorAddress.Sign(id[:])
+	adr, err := a.s.ValidatorAddress()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	sig, err := adr.Sign(id[:])
 	if err != nil {
 		log.Println(err)
 		return

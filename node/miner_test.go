@@ -103,6 +103,7 @@ func TestMiner(t *testing.T) {
 			Tx:   ti,
 		},
 	}
+	// t.Fatal()
 	if err := msg.Write(&s1, &txd, msg.CmdTxs, conn); err != nil {
 		t.Error(err)
 	}
@@ -129,6 +130,7 @@ func TestMiner(t *testing.T) {
 
 	var inout []*tx.InoutHash
 	for i := 0; i < 30 && len(inout) == 0; i++ {
+		t.Log(i)
 		var err error
 		time.Sleep(10 * time.Second)
 		inout, err = imesh.GetHisoty(&s, a3.Address58(s.Config), true)
@@ -139,6 +141,7 @@ func TestMiner(t *testing.T) {
 	if len(inout) == 0 {
 		t.Fatal("failed to mine")
 	}
+	// t.Fatal()
 
 	seed = address.GenerateSeed32()
 	a2, err2 := address.New(s.Config, seed)

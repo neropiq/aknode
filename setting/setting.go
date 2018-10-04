@@ -99,9 +99,7 @@ type Setting struct {
 	MinerAddress    string  `json:"miner_address"`
 
 	DBConfig
-	Stop             chan struct{}      `json:"-"`
-	ValidatorAddress *address.Address   `json:"-"`
-	TrustedNodeIDs   []consensus.NodeID `json:"-"`
+	Stop chan struct{} `json:"-"`
 }
 
 //Load parse a json file fname , open DB and returns Settings struct .
@@ -192,29 +190,13 @@ func Load(s []byte) (*Setting, error) {
 	if len(se.TrustedNodes) == 0 {
 		return nil, errors.New("You must spcrify trusted_nodes")
 	}
-	if se.ValidatorSecret != "" {
-		b, isNode, err := address.HDFrom58(se.Config, se.ValidatorSecret, []byte(""))
-		if err != nil {
-			return nil, err
-		}
-		if !isNode {
-			return nil, errors.New("invalid validator_seed")
-		}
-		se.ValidatorAddress, err = address.NewNode(se.Config, b)
-		if err != nil {
-			return nil, err
-		}
+	if _, err := se.TrustedNodeIDs(); err != nil {
+		return nil, err
 	}
-	se.TrustedNodeIDs = make([]consensus.NodeID, len(se.TrustedNodes))
-	for i, a := range se.TrustedNodes {
-		ta, isNode, err := address.ParseAddress58(se.Config, a)
-		if err != nil {
+	if se.ValidatorSecret != "" {
+		if _, err := se.ValidatorAddress(); err != nil {
 			return nil, err
 		}
-		if !isNode {
-			return nil, errors.New("invalid trusted_nodes")
-		}
-		copy(se.TrustedNodeIDs[i][:], ta[2:])
 	}
 
 	dbDir := filepath.Join(se.BaseDir(), "db")
@@ -235,6 +217,37 @@ func Load(s []byte) (*Setting, error) {
 //BaseDir returns a dir which contains a setting file and db dir.
 func (s *Setting) BaseDir() string {
 	return filepath.Join(s.RootDir, s.Config.Name)
+}
+
+//ValidatorAddress returns the validator address  from ValidatorSecret
+func (s *Setting) ValidatorAddress() (*address.Address, error) {
+	if s.ValidatorSecret == "" {
+		return nil, errors.New("validorSecret is nil")
+	}
+	b, isNode, err := address.HDFrom58(s.Config, s.ValidatorSecret, []byte(""))
+	if err != nil {
+		return nil, err
+	}
+	if !isNode {
+		return nil, errors.New("invalid validator_seed")
+	}
+	return address.NewNode(s.Config, b)
+}
+
+//TrustedNodeIDs returns the nodeids of trusted nodes.
+func (s *Setting) TrustedNodeIDs() ([]consensus.NodeID, error) {
+	trustedNodeIDs := make([]consensus.NodeID, len(s.TrustedNodes))
+	for i, a := range s.TrustedNodes {
+		ta, isNode, err := address.ParseAddress58(s.Config, a)
+		if err != nil {
+			return nil, err
+		}
+		if !isNode {
+			return nil, errors.New("invalid trusted_nodes")
+		}
+		copy(trustedNodeIDs[i][:], ta[2:])
+	}
+	return trustedNodeIDs, nil
 }
 
 //InBlacklist returns true if remote is in blacklist.
