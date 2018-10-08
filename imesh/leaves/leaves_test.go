@@ -141,4 +141,31 @@ func TestLeaves(t *testing.T) {
 			t.Error("should be a leaf", i)
 		}
 	}
+
+	if Size() != 4 {
+		t.Error("invalid size", Size())
+	}
+	if err := SetConfirmed(&s, trs[1].Hash()); err != nil {
+		t.Error(err)
+	}
+	rs = Get(6)
+	if !bytes.Equal(rs[len(rs)-1], trs[1].Hash()) {
+		t.Error("invalid get")
+	}
+	rs = GetAllUnconfirmed()
+	if len(rs) != 3 {
+		t.Error("invalid getall")
+	}
+	for _, i := range []int{4, 5, 6} {
+		ok := false
+		for _, tr := range GetAll() {
+			if bytes.Equal(trs[i].Hash(), tr) {
+				ok = true
+			}
+		}
+		if !ok {
+			t.Error("should be a leaf", i)
+		}
+	}
+
 }

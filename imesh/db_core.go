@@ -52,11 +52,7 @@ type StatNo [32]byte
 
 //Status is a status for tx.
 var (
-	StatusPending  StatNo
-	StatusRejected = StatNo{
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-	}
+	StatusPending StatNo
 	statusGenesis = StatNo{
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00,
@@ -74,15 +70,16 @@ type OutputStatus struct {
 type TxInfo struct {
 	Hash         tx.Hash `msgpack:"-"`
 	Body         *tx.Body
-	TxNo         uint64
-	StatNo       StatNo
+	TxNo         uint64 //will be changed
+	IsRejected   bool   //will be changed
+	StatNo       StatNo //if ==StatusPending  pending  else confirmed (accepted of rejected), wil be changed
 	Received     time.Time
-	OutputStatus [3][]OutputStatus
+	OutputStatus [3][]OutputStatus //will be changed
 }
 
-//IsConfirmed returns true if ti is confirmed.
-func (ti *TxInfo) IsConfirmed() bool {
-	return ti.StatNo != StatusPending && ti.StatNo != StatusRejected
+//IsAccepted returns true if confirmed and accepted.
+func (ti *TxInfo) IsAccepted() bool {
+	return ti.StatNo != StatusPending && !ti.IsRejected
 }
 
 func (ti *TxInfo) sigKey() []byte {

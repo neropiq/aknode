@@ -22,7 +22,6 @@ package imesh
 
 import (
 	"bytes"
-	"sort"
 
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
@@ -30,33 +29,68 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-func checkConflict(s *setting.Setting, conflicts map[[34]byte][]tx.Hash, h tx.Hash) error {
+func merge(base, refs map[[34]byte]tx.Hash, conflicts, conf map[[32]byte]struct{}) {
+	for k := range conf {
+		conflicts[k] = struct{}{}
+	}
+	for k, v := range refs {
+		if h, ok := base[k]; !ok {
+			base[k] = v
+		} else {
+			if bytes.Compare(v, h) == 0 {
+				continue
+			}
+			if bytes.Compare(v, h) < 0 {
+				base[k] = v
+				conflicts[h.Array()] = struct{}{}
+			} else {
+				base[k] = h
+				conflicts[v.Array()] = struct{}{}
+			}
+		}
+	}
+}
+
+func checkConflict(s *setting.Setting, h tx.Hash, visited map[[32]byte]struct{}) (map[[34]byte]tx.Hash, map[[32]byte]struct{}, error) {
+	base := make(map[[34]byte]tx.Hash)
+	conflicts := make(map[[32]byte]struct{})
+	if _, y := visited[h.Array()]; y {
+		return base, conflicts, nil
+	}
 	ti, err := GetTxInfo(s.DB, h)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	if ti.StatNo != StatusPending {
-		return nil
+		return base, conflicts, nil
 	}
 	for _, p := range ti.Body.Parent {
-		if err := checkConflict(s, conflicts, p); err != nil {
-			return err
+		refs, conf, err := checkConflict(s, p, visited)
+		if err != nil {
+			return nil, nil, err
 		}
+		merge(base, refs, conflicts, conf)
 	}
 	for _, p := range ti.Body.Inputs {
-		if err := checkConflict(s, conflicts, p.PreviousTX); err != nil {
-			return err
+		refs, conf, err := checkConflict(s, p.PreviousTX, visited)
+		if err != nil {
+			return nil, nil, err
 		}
+		merge(base, refs, conflicts, conf)
 	}
 	for _, p := range ti.Body.MultiSigIns {
-		if err := checkConflict(s, conflicts, p.PreviousTX); err != nil {
-			return err
+		refs, conf, err := checkConflict(s, p.PreviousTX, visited)
+		if err != nil {
+			return nil, nil, err
 		}
+		merge(base, refs, conflicts, conf)
 	}
 	if ticket := ti.Body.TicketInput; ticket != nil {
-		if err := checkConflict(s, conflicts, ticket); err != nil {
-			return err
+		refs, conf, err := checkConflict(s, ticket, visited)
+		if err != nil {
+			return nil, nil, err
 		}
+		merge(base, refs, conflicts, conf)
 	}
 	for _, p := range ti.Body.Inputs {
 		inout := tx.InoutHash{
@@ -64,8 +98,8 @@ func checkConflict(s *setting.Setting, conflicts map[[34]byte][]tx.Hash, h tx.Ha
 			Type:  tx.TypeIn,
 			Index: p.Index,
 		}
-		if len(conflicts[inout.Serialize()]) == 0 {
-			conflicts[inout.Serialize()] = append(conflicts[inout.Serialize()], p.PreviousTX)
+		if _, ok := base[inout.Serialize()]; !ok {
+			base[inout.Serialize()] = h
 		}
 	}
 	for _, p := range ti.Body.MultiSigIns {
@@ -74,8 +108,8 @@ func checkConflict(s *setting.Setting, conflicts map[[34]byte][]tx.Hash, h tx.Ha
 			Type:  tx.TypeMulin,
 			Index: p.Index,
 		}
-		if len(conflicts[inout.Serialize()]) == 0 {
-			conflicts[inout.Serialize()] = append(conflicts[inout.Serialize()], p.PreviousTX)
+		if _, ok := base[inout.Serialize()]; !ok {
+			base[inout.Serialize()] = h
 		}
 	}
 	if ticket := ti.Body.TicketInput; ticket != nil {
@@ -84,54 +118,17 @@ func checkConflict(s *setting.Setting, conflicts map[[34]byte][]tx.Hash, h tx.Ha
 			Type:  tx.TypeTicketin,
 			Index: 0,
 		}
-		if len(conflicts[inout.Serialize()]) == 0 {
-			conflicts[inout.Serialize()] = append(conflicts[inout.Serialize()], ticket)
+		if _, ok := base[inout.Serialize()]; !ok {
+			base[inout.Serialize()] = h
 		}
 	}
-	return nil
+	visited[h.Array()] = struct{}{}
+	return base, conflicts, nil
 }
 
-func getRejectTxs(conflicts map[[34]byte][]tx.Hash) map[[32]byte]struct{} {
-	rejectTx := make(map[[32]byte]struct{})
-	for {
-		var confTx []tx.Hash
-		exists := make(map[[32]byte]struct{})
-		for k, hs := range conflicts {
-			if len(hs) <= 1 {
-				delete(conflicts, k)
-				continue
-			}
-			for _, h := range hs {
-				if _, ok := exists[h.Array()]; !ok {
-					exists[h.Array()] = struct{}{}
-					confTx = append(confTx, h)
-				}
-			}
-		}
-		if len(confTx) == 0 {
-			break
-		}
-		sort.Slice(confTx, func(i, j int) bool {
-			return bytes.Compare(confTx[i], confTx[j]) > 0
-		})
-		rejectTx[confTx[0].Array()] = struct{}{}
-	loop:
-		for k, hs := range conflicts {
-			for i, h := range hs {
-				if bytes.Equal(h, confTx[0]) {
-					conflicts[k] = append(conflicts[k][:i], conflicts[k][i+1:]...)
-					continue loop
-				}
-			}
-		}
-	}
-	return rejectTx
-}
-
-func confirm(s *setting.Setting, txn *badger.Txn,
-	rejectTxs map[[32]byte]struct{}, h tx.Hash, no [32]byte) error {
-	ti, err := GetTxInfo(s.DB, h)
-	if err != nil {
+func confirm(s *setting.Setting, txn *badger.Txn, rejectTxs map[[32]byte]struct{}, h tx.Hash, no [32]byte) error {
+	var ti TxInfo
+	if err := db.Get(txn, h, &ti, db.HeaderTxInfo); err != nil {
 		return err
 	}
 	if ti.StatNo != StatusPending {
@@ -162,67 +159,76 @@ func confirm(s *setting.Setting, txn *badger.Txn,
 		reject = true
 	}
 	for _, p := range ti.Body.Inputs {
-		pti, err := GetTxInfo(s.DB, p.PreviousTX)
-		if err != nil {
+		var pti TxInfo
+		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
 			return err
+		}
+		if !pti.IsAccepted() {
+			reject = true
 		}
 		if pti.OutputStatus[0][p.Index].IsSpent {
 			reject = true
 		}
 	}
 	for _, p := range ti.Body.MultiSigIns {
-		pti, err := GetTxInfo(s.DB, p.PreviousTX)
-		if err != nil {
+		var pti TxInfo
+		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
 			return err
+		}
+		if !pti.IsAccepted() {
+			reject = true
 		}
 		if pti.OutputStatus[1][p.Index].IsSpent {
 			reject = true
 		}
 	}
 	if ticket := ti.Body.TicketInput; ticket != nil {
-		pti, err := GetTxInfo(s.DB, ticket)
-		if err != nil {
+		var pti TxInfo
+		if err := db.Get(txn, ticket, &pti, db.HeaderTxInfo); err != nil {
 			return err
+		}
+		if !pti.IsAccepted() {
+			reject = true
 		}
 		if pti.OutputStatus[2][0].IsSpent {
 			reject = true
 		}
 	}
+	ti.StatNo = no
 	if reject {
-		ti.StatNo = StatusRejected
+		ti.IsRejected = true
 		return db.Put(txn, h, ti, db.HeaderTxInfo)
 	}
-	ti.StatNo = no
 	if err := db.Put(txn, h, ti, db.HeaderTxInfo); err != nil {
 		return err
 	}
 	for _, p := range ti.Body.Inputs {
-		pti, err := GetTxInfo(s.DB, p.PreviousTX)
-		if err != nil {
+		var pti TxInfo
+		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
 			return err
 		}
 		pti.OutputStatus[0][p.Index].IsSpent = true
-		if err := db.Put(txn, p.PreviousTX, pti, db.HeaderTxInfo); err != nil {
+		if err := db.Put(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
 			return err
 		}
 	}
 	for _, p := range ti.Body.MultiSigIns {
-		pti, err := GetTxInfo(s.DB, p.PreviousTX)
-		if err != nil {
+		var pti TxInfo
+		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
 			return err
 		}
 		pti.OutputStatus[1][p.Index].IsSpent = true
-		if err := db.Put(txn, p.PreviousTX, pti, db.HeaderTxInfo); err != nil {
+		if err := db.Put(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
 			return err
 		}
 	}
 	if ticket := ti.Body.TicketInput; ticket != nil {
-		pti, err := GetTxInfo(s.DB, ticket)
-		if err != nil {
+		var pti TxInfo
+		if err := db.Get(txn, ticket, &pti, db.HeaderTxInfo); err != nil {
 			return err
 		}
 		pti.OutputStatus[2][0].IsSpent = true
-		if err := db.Put(txn, ticket, pti, db.HeaderTxInfo); err != nil {
+		if err := db.Put(txn, ticket, &pti, db.HeaderTxInfo); err != nil {
 			return err
 		}
 	}
@@ -231,13 +237,13 @@ func confirm(s *setting.Setting, txn *badger.Txn,
 
 //Confirm txs from h.
 func Confirm(s *setting.Setting, h tx.Hash, no [32]byte) error {
-	conflicts := make(map[[34]byte][]tx.Hash)
-	if err := checkConflict(s, conflicts, h); err != nil {
+	visited := make(map[[32]byte]struct{})
+	_, conflicts, err := checkConflict(s, h, visited)
+	if err != nil {
 		return err
 	}
-	rejectTx := getRejectTxs(conflicts)
 	return s.DB.Update(func(txn *badger.Txn) error {
-		return confirm(s, txn, rejectTx, h, no)
+		return confirm(s, txn, conflicts, h, no)
 	})
 }
 
@@ -249,8 +255,8 @@ func RevertConfirmation(s *setting.Setting, h tx.Hash, no StatNo) error {
 }
 
 func revertConfirmation(s *setting.Setting, txn *badger.Txn, h tx.Hash, no StatNo) error {
-	ti, err := GetTxInfo(s.DB, h)
-	if err != nil {
+	var ti TxInfo
+	if err := db.Get(txn, h, &ti, db.HeaderTxInfo); err != nil {
 		return err
 	}
 	if ti.StatNo != no {
@@ -281,8 +287,8 @@ func revertConfirmation(s *setting.Setting, txn *badger.Txn, h tx.Hash, no StatN
 		return err
 	}
 	for _, p := range ti.Body.Inputs {
-		pti, err := GetTxInfo(s.DB, p.PreviousTX)
-		if err != nil {
+		var pti TxInfo
+		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
 			return err
 		}
 		pti.OutputStatus[0][p.Index].IsSpent = false
@@ -291,8 +297,8 @@ func revertConfirmation(s *setting.Setting, txn *badger.Txn, h tx.Hash, no StatN
 		}
 	}
 	for _, p := range ti.Body.MultiSigIns {
-		pti, err := GetTxInfo(s.DB, p.PreviousTX)
-		if err != nil {
+		var pti TxInfo
+		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
 			return err
 		}
 		pti.OutputStatus[1][p.Index].IsSpent = false
@@ -301,8 +307,8 @@ func revertConfirmation(s *setting.Setting, txn *badger.Txn, h tx.Hash, no StatN
 		}
 	}
 	if ticket := ti.Body.TicketInput; ticket != nil {
-		pti, err := GetTxInfo(s.DB, ticket)
-		if err != nil {
+		var pti TxInfo
+		if err := db.Get(txn, ticket, &pti, db.HeaderTxInfo); err != nil {
 			return err
 		}
 		pti.OutputStatus[2][0].IsSpent = false

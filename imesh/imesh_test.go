@@ -40,7 +40,7 @@ import (
 )
 
 var s setting.Setting
-var a, b *address.Address
+var a, b, c, d *address.Address
 var genesis []tx.Hash
 
 func setup(t *testing.T) {
@@ -64,6 +64,16 @@ func setup(t *testing.T) {
 	}
 	seed = address.GenerateSeed32()
 	b, err2 = address.New(s.Config, seed)
+	if err2 != nil {
+		t.Error(err2)
+	}
+	seed = address.GenerateSeed32()
+	c, err2 = address.New(s.Config, seed)
+	if err2 != nil {
+		t.Error(err2)
+	}
+	seed = address.GenerateSeed32()
+	d, err2 = address.New(s.Config, seed)
 	if err2 != nil {
 		t.Error(err2)
 	}

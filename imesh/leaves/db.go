@@ -89,6 +89,7 @@ func gethash() ([]tx.Hash, []tx.Hash) {
 }
 
 //Get gets n random leaves. if <=0, it returns all leaves.
+//Unconfirmed txs are prior to confirmed ones.
 func Get(n int) []tx.Hash {
 	leaves.RLock()
 	defer leaves.RUnlock()
@@ -158,7 +159,6 @@ func CheckAdd(s *setting.Setting, trs ...*tx.Transaction) error {
 	return put(s)
 }
 
-//locked by mutex(leaves)
 func put(s *setting.Setting) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, nil, leaves.leaves, db.HeaderLeaves)
@@ -180,6 +180,19 @@ func isVisited(trs []*tx.Transaction) map[[32]byte]*txsearch {
 			if t, ok := txs[prev.Array()]; ok {
 				t.visited = true
 			}
+		}
+		for _, prev := range tr.Inputs {
+			if t, ok := txs[prev.PreviousTX.Array()]; ok {
+				t.visited = true
+			}
+		}
+		for _, prev := range tr.MultiSigIns {
+			if t, ok := txs[prev.PreviousTX.Array()]; ok {
+				t.visited = true
+			}
+		}
+		if t, ok := txs[tr.TicketInput.Array()]; ok {
+			t.visited = true
 		}
 	}
 	return txs
