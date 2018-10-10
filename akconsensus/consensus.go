@@ -143,6 +143,10 @@ func handleProposal(s *setting.Setting, peer *consensus.Peer, p *consensus.Propo
 func PutLedger(s *setting.Setting, l *consensus.Ledger) error {
 	mutex.Lock()
 	defer mutex.Unlock()
+	return putLedger(s, l)
+}
+
+func putLedger(s *setting.Setting, l *consensus.Ledger) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		id := l.ID()
 		if err := db.Put(txn, id[:], l, db.HeaderLedger); err != nil {
@@ -156,6 +160,10 @@ func PutLedger(s *setting.Setting, l *consensus.Ledger) error {
 func GetLedger(s *setting.Setting, id consensus.LedgerID) (*consensus.Ledger, error) {
 	mutex.RLock()
 	defer mutex.RUnlock()
+	return getLedger(s, id)
+}
+
+func getLedger(s *setting.Setting, id consensus.LedgerID) (*consensus.Ledger, error) {
 	var l consensus.Ledger
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, id[:], &l, db.HeaderLedger)
@@ -218,12 +226,12 @@ func Confirm(s *setting.Setting, peer network, l *consensus.Ledger) error {
 	last := lastLedger
 	//get all ledgers
 	for i := l.Seq; i != seq; i-- {
-		if _, err := GetLedger(s, last.ParentID); err == badger.ErrKeyNotFound {
+		if _, err := getLedger(s, last.ParentID); err == badger.ErrKeyNotFound {
 			peer.GetLedger(s, last.ParentID)
 			time.Sleep(10 * time.Second)
 		}
 		var err error
-		last, err = GetLedger(s, last.ParentID)
+		last, err = getLedger(s, last.ParentID)
 		if err != nil {
 			return err
 		}
@@ -240,7 +248,7 @@ func Confirm(s *setting.Setting, peer network, l *consensus.Ledger) error {
 		}
 		lastLedger = last
 		var err error
-		last, err = GetLedger(s, last.ParentID)
+		last, err = getLedger(s, last.ParentID)
 		if err != nil {
 			return err
 		}
@@ -248,7 +256,7 @@ func Confirm(s *setting.Setting, peer network, l *consensus.Ledger) error {
 	//go forward
 	for i := seq; i <= l.Seq; i++ {
 		id := l.IndexOf(i)
-		ll, err := GetLedger(s, id)
+		ll, err := getLedger(s, id)
 		if err != nil {
 			return err
 		}
@@ -270,7 +278,7 @@ func Confirm(s *setting.Setting, peer network, l *consensus.Ledger) error {
 		return err
 	}
 	lastLedger = l
-	return PutLedger(s, l)
+	return putLedger(s, l)
 }
 
 //RegisterTxNotifier registers a notifier for resolved txs.

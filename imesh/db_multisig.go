@@ -41,7 +41,8 @@ func updateMulsigAddress(cfg *aklib.Config, txn *badger.Txn, tr *tx.Transaction)
 			Type:  tx.TypeMulout,
 			Index: byte(i),
 		}
-		if err := db.Put(txn, madr, ih, db.HeaderMultisigAddress); err != nil {
+		//don't care if other routines wrote the address.
+		if err := db.Put(txn, madr, ih, db.HeaderMultisigAddress); err != nil && err != badger.ErrConflict {
 			return err
 		}
 	}

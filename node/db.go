@@ -65,9 +65,10 @@ func initDB(s *setting.Setting) error {
 }
 
 //Get returns random n numbers of nodes.
+//mutex Rlocked
 func get(n int) []msg.Addr {
-	nodesDB.Lock()
-	defer nodesDB.Unlock()
+	nodesDB.RLock()
+	defer nodesDB.RUnlock()
 	r := make([]msg.Addr, len(nodesDB.Addrs))
 	i := 0
 	for _, a := range nodesDB.Addrs {
@@ -86,6 +87,7 @@ func get(n int) []msg.Addr {
 }
 
 //Remove removes address from list.
+//mutex locked
 func remove(s *setting.Setting, addr msg.Addr) error {
 	nodesDB.Lock()
 	defer nodesDB.Unlock()
@@ -97,6 +99,7 @@ func remove(s *setting.Setting, addr msg.Addr) error {
 }
 
 //Put put an address into db.
+//mutex locked
 func putAddrs(s *setting.Setting, addrs ...msg.Addr) error {
 	nodesDB.Lock()
 	defer nodesDB.Unlock()

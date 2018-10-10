@@ -267,7 +267,7 @@ func gettxsstatus(conf *setting.Setting, req *Request, res *Response) error {
 		if err != nil {
 			return err
 		}
-		if tr.IsConfirmed() {
+		if tr.IsAccepted() {
 			r = append(r, nConfirm)
 		} else {
 			r = append(r, 0)

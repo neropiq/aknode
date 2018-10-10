@@ -112,6 +112,7 @@ func (cp *consensusPeer) BroadcastValidatoin(s *setting.Setting, v *consensus.Va
 }
 
 //newPeer returns Peer struct.
+//locked
 func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, error) {
 	remote := conn.RemoteAddr().(*net.TCPAddr).IP.String()
 	if s.InBlacklist(remote) {

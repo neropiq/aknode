@@ -214,10 +214,10 @@ func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 }
 
 func stat2str(ti *imesh.TxInfo) template.HTML {
-	switch ti.StatNo {
-	case imesh.StatusPending:
+	switch {
+	case ti.StatNo == imesh.StatusPending:
 		return "PENDING"
-	case imesh.StatusRejected:
+	case ti.IsRejected:
 		return "REJECTED"
 	default:
 		no := hex.EncodeToString(ti.StatNo[:])
@@ -394,10 +394,10 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 				renderError(w, err2.Error())
 				return
 			}
-			switch ti.StatNo {
-			case imesh.StatusPending:
+			switch {
+			case ti.StatNo == imesh.StatusPending:
 				info.SendUnconfirmed += ins.Value
-			case imesh.StatusRejected:
+			case ti.IsRejected:
 			default:
 				info.Send += ins.Value
 			}
@@ -405,10 +405,10 @@ func addressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 			info.Inputs = append(info.Inputs, t)
 		case tx.TypeOut:
 			v := ti.Body.Outputs[h.Index].Value
-			switch ti.StatNo {
-			case imesh.StatusPending:
+			switch {
+			case ti.StatNo == imesh.StatusPending:
 				info.ReceivedUnconfirmed += v
-			case imesh.StatusRejected:
+			case ti.IsRejected:
 			default:
 				info.Received += v
 			}
@@ -492,10 +492,10 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 			if !bytes.Equal(madr, mout.AddressByte(s.Config)) {
 				continue
 			}
-			switch tr.StatNo {
-			case imesh.StatusPending:
+			switch {
+			case tr.StatNo == imesh.StatusPending:
 				info.SendUnconfirmed += mout.Value
-			case imesh.StatusRejected:
+			case tr.IsRejected:
 			default:
 				info.Send += mout.Value
 			}
@@ -506,10 +506,10 @@ func maddressHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) 
 			if !bytes.Equal(madr, mout.AddressByte(s.Config)) {
 				continue
 			}
-			switch tr.StatNo {
-			case imesh.StatusPending:
+			switch {
+			case tr.StatNo == imesh.StatusPending:
 				info.ReceivedUnconfirmed += mout.Value
-			case imesh.StatusRejected:
+			case tr.IsRejected:
 			default:
 				info.Received += mout.Value
 			}

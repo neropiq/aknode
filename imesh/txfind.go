@@ -23,7 +23,6 @@ package imesh
 import (
 	"errors"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/AidosKuneen/aklib"
@@ -54,7 +53,6 @@ type Noexist struct {
 var unresolved = struct {
 	Txs      map[[32]byte]*unresolvedTx
 	Noexists map[[32]byte]*Noexist
-	sync.RWMutex
 }{
 	Txs:      make(map[[32]byte]*unresolvedTx),
 	Noexists: make(map[[32]byte]*Noexist),
@@ -90,7 +88,7 @@ func Init(s *setting.Setting) error {
 			return err
 		}
 		t.StatNo = statusGenesis
-		if err := t.Put(s.DB); err != nil {
+		if err := t.put(s.DB); err != nil {
 			return err
 		}
 		if err := leaves.CheckAdd(s, tr); err != nil {
@@ -129,8 +127,8 @@ func put(s *setting.Setting) error {
 
 //AddNoexistTxHash adds a h as unresolved tx hash.
 func AddNoexistTxHash(s *setting.Setting, h tx.Hash, typ tx.Type) error {
-	unresolved.Lock()
-	defer unresolved.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 	has, err := Has(s, h)
 	if err != nil {
 		return err
@@ -158,8 +156,8 @@ func CheckAddTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 	default:
 		return errors.New("unknows type")
 	}
-	unresolved.Lock()
-	defer unresolved.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 	has, err := Has(s, tr.Hash())
 	if err != nil {
 		return err
@@ -194,8 +192,8 @@ func CheckAddTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 
 //GetSearchingTx returns txs which are need to be searched.
 func GetSearchingTx(s *setting.Setting) ([]Noexist, error) {
-	unresolved.Lock()
-	defer unresolved.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 	r := make([]Noexist, 0, len(unresolved.Noexists))
 	for h, n := range unresolved.Noexists {
 		sleep := (1 << (n.Count - 1)) * time.Minute
@@ -217,8 +215,8 @@ func GetSearchingTx(s *setting.Setting) ([]Noexist, error) {
 //Resolve checks all reference of unresolvev txs
 //and add to imesh if all are resolved.
 func Resolve(s *setting.Setting) ([]*tx.HashWithType, error) {
-	unresolved.Lock()
-	defer unresolved.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 	if err := isResolved(s); err != nil {
 		return nil, err
 	}

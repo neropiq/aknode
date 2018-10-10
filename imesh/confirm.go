@@ -237,6 +237,8 @@ func confirm(s *setting.Setting, txn *badger.Txn, rejectTxs map[[32]byte]struct{
 
 //Confirm txs from h.
 func Confirm(s *setting.Setting, h tx.Hash, no [32]byte) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	visited := make(map[[32]byte]struct{})
 	_, conflicts, err := checkConflict(s, h, visited)
 	if err != nil {
@@ -249,6 +251,8 @@ func Confirm(s *setting.Setting, h tx.Hash, no [32]byte) error {
 
 //RevertConfirmation reverts confirmation from h.
 func RevertConfirmation(s *setting.Setting, h tx.Hash, no StatNo) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return revertConfirmation(s, txn, h, no)
 	})

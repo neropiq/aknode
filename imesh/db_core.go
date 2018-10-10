@@ -35,9 +35,11 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
+var mutex sync.RWMutex
+
+//should be locked my mutex above
 var txno = struct {
 	TxNo uint64
-	sync.RWMutex
 }{}
 
 var latestTxs = struct {
@@ -67,6 +69,7 @@ type OutputStatus struct {
 }
 
 //TxInfo is for tx in db with sighash and status.
+//Never save  TxInfo  to DB without cares, or  DB conflicts occurs
 type TxInfo struct {
 	Hash         tx.Hash `msgpack:"-"`
 	Body         *tx.Body
@@ -131,7 +134,7 @@ func Has(s *setting.Setting, hash []byte) (bool, error) {
 }
 
 //Put puts a transaction info.
-func (ti *TxInfo) Put(akdb *badger.DB) error {
+func (ti *TxInfo) put(akdb *badger.DB) error {
 	return akdb.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, ti.Hash, ti, db.HeaderTxInfo)
 	})
@@ -139,6 +142,7 @@ func (ti *TxInfo) Put(akdb *badger.DB) error {
 }
 
 //GetTxInfo gets a transaction info.
+//Never save the TxInfo  to db without care, or db conflicts occur.
 func GetTxInfo(akdb *badger.DB, h tx.Hash) (*TxInfo, error) {
 	var ti TxInfo
 	err := akdb.View(func(txn *badger.Txn) error {
@@ -186,6 +190,8 @@ func GetTx(akdb *badger.DB, hash []byte) (*tx.Transaction, error) {
 
 //PutTxDirect puts a transaction  into db without checking tx relation..
 func PutTxDirect(s *setting.DBConfig, tr *tx.Transaction) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	ti := TxInfo{
 		Hash:     tr.Hash(),
 		Body:     tr.Body,
@@ -218,6 +224,7 @@ func PutTxDirect(s *setting.DBConfig, tr *tx.Transaction) error {
 
 //called synchonously from resolve
 func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
+
 	ti := TxInfo{
 		Hash:     tr.Hash(),
 		Body:     tr.Body,
@@ -301,6 +308,7 @@ func deleteUnresolvedTx(s *setting.Setting, hash []byte) error {
 	})
 }
 
+//called synchonously from resolve
 func deleteMinableTx(txn *badger.Txn, h tx.Hash, header db.Header) error {
 	var minTx tx.Transaction
 	if err := db.Get(txn, h, &minTx, header); err != nil {
@@ -482,27 +490,20 @@ func isBrokenTx(s *setting.Setting, h []byte) (bool, error) {
 
 //locked by mutex
 func updateTxNo(txn *badger.Txn) error {
-	txno.Lock()
-	defer txno.Unlock()
 	txno.TxNo++
 	return db.Put(txn, nil, &txno.TxNo, db.HeaderTxNo)
 }
 
 func getTxNo(s *setting.Setting) error {
 	return s.DB.View(func(txn *badger.Txn) error {
-		err := db.Get(txn, nil, &txno.TxNo, db.HeaderTxNo)
-		log.Println(err)
-		if err == badger.ErrKeyNotFound {
-			return nil
-		}
-		return err
+		return db.Get(txn, nil, &txno.TxNo, db.HeaderTxNo)
 	})
 }
 
 //GetTxNo returns a total number of txs in imesh.
 func GetTxNo() uint64 {
-	txno.RLock()
-	defer txno.RUnlock()
+	mutex.RLock()
+	defer mutex.RUnlock()
 	return txno.TxNo
 }
 

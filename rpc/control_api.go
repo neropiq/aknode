@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"log"
 
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aknode/node"
@@ -87,7 +86,6 @@ type Dump struct {
 }
 
 func dumpwallet(conf *setting.Setting, req *Request, res *Response) error {
-	log.Println(req.Params)
 	fname := ""
 	n, err := req.parseParam(&fname)
 	if err != nil {
@@ -96,7 +94,6 @@ func dumpwallet(conf *setting.Setting, req *Request, res *Response) error {
 	if n != 1 {
 		return errors.New("invalid #params")
 	}
-	log.Println(fname)
 	mutex.RLock()
 	defer mutex.RUnlock()
 	h, err := walletImpl.GetHistory(&conf.DBConfig)

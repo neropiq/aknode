@@ -264,7 +264,7 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 	var bt *int64
 	var bh *string
 	var bi *int64
-	if tr.IsConfirmed() {
+	if tr.IsAccepted() {
 		nconf = nConfirm
 		var zero int64
 		t := tr.Body.Time.Unix()
@@ -315,6 +315,7 @@ type Transaction struct {
 	Abandoned         *bool  `json:"abandoned,omitempty"`
 }
 
+//not RPC func
 func (dt *Transaction) toDetail() (*Details, error) {
 	if dt.Account == nil {
 		return nil, errors.New("Account is nil")
@@ -378,6 +379,7 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 	return nil
 }
 
+//not rpc func
 func newTransaction(conf *setting.Setting, tr *imesh.TxInfo, out *tx.Output, vout int64, isInput bool) (*Transaction, error) {
 	adr, err := address.Address58(conf.Config, out.Address)
 	if err != nil {
@@ -406,7 +408,7 @@ func newTransaction(conf *setting.Setting, tr *imesh.TxInfo, out *tx.Output, vou
 	if ok {
 		dt.Account = &wallet.AccountName
 	}
-	if tr.IsConfirmed() {
+	if tr.IsAccepted() {
 		dt.Blockhash = &emp
 		dt.Blocktime = &dt.Time
 		dt.Blockindex = &zero

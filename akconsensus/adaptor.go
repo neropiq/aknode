@@ -28,11 +28,8 @@ import (
 	"time"
 
 	"github.com/AidosKuneen/aklib/arypack"
-
-	"github.com/AidosKuneen/aknode/imesh/leaves"
-
 	"github.com/AidosKuneen/aknode/imesh"
-
+	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/setting"
 	"github.com/AidosKuneen/consensus"
 )
