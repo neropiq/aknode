@@ -83,7 +83,7 @@ func setup(t *testing.T) {
 
 	nodesDB.Addrs = make(adrmap)
 	peers.Peers = make(map[string]*peer)
-	banned.addr = make(map[string]time.Time)
+	peers.banned = make(map[string]time.Time)
 	if err := initDB(&s); err != nil {
 		t.Error(err)
 	}
@@ -433,7 +433,7 @@ func TestNode2(t *testing.T) {
 		t.Error(err)
 	}
 	time.Sleep(3 * time.Second)
-	if _, e := banned.addr["127.0.0.1"]; !e {
+	if _, e := peers.banned["127.0.0.1"]; !e {
 		t.Error("should be banned")
 	}
 	if err := conn.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {

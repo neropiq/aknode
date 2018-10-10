@@ -46,17 +46,12 @@ const (
 
 //peers is a slice of connecting peers.
 var peers = struct {
-	Peers map[string]*peer
+	Peers  map[string]*peer
+	banned map[string]time.Time
 	sync.RWMutex
 }{
-	Peers: make(map[string]*peer),
-}
-
-var banned = struct {
-	addr map[string]time.Time
-	sync.RWMutex
-}{
-	addr: make(map[string]time.Time),
+	Peers:  make(map[string]*peer),
+	banned: make(map[string]time.Time),
 }
 
 type wdata struct {
@@ -76,10 +71,10 @@ type peer struct {
 
 //GetBanned returns a banned list.
 func GetBanned() map[string]time.Time {
-	banned.RLock()
-	defer banned.RUnlock()
+	peers.RLock()
+	defer peers.RUnlock()
 	r := make(map[string]time.Time)
-	for k, v := range banned.addr {
+	for k, v := range peers.banned {
 		r[k] = v
 	}
 
@@ -119,11 +114,11 @@ func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, erro
 		return nil, errors.New("remote is in blacklist")
 	}
 	err2 := func() error {
-		banned.Lock()
-		defer banned.Unlock()
-		if t, exist := banned.addr[remote]; exist {
+		peers.Lock()
+		defer peers.Unlock()
+		if t, exist := peers.banned[remote]; exist {
 			if t.Add(BanTime).Before(time.Now()) {
-				delete(banned.addr, remote)
+				delete(peers.banned, remote)
 			} else {
 				return errors.New("the remote node is banned now")
 			}
@@ -318,14 +313,14 @@ func nonce() msg.Nonce {
 func (p *peer) run(s *setting.Setting) {
 	if err := p.runLoop(s); err != nil {
 		log.Println(err)
-		banned.Lock()
+		peers.Lock()
 		h, _, err2 := net.SplitHostPort(p.remote.Address)
 		if err2 != nil {
-			banned.addr[p.remote.Address] = time.Now()
+			peers.banned[p.remote.Address] = time.Now()
 		} else {
-			banned.addr[h] = time.Now()
+			peers.banned[h] = time.Now()
 		}
-		banned.Unlock()
+		peers.Unlock()
 		if err3 := remove(s, p.remote); err3 != nil {
 			log.Println(err3)
 		}
