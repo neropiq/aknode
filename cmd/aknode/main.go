@@ -170,6 +170,9 @@ func initialize(setting *setting.Setting) error {
 	if err := leaves.Init(setting); err != nil {
 		return err
 	}
+	if err := akconsensus.Init(setting, &node.ConsensusPeer{}); err != nil {
+		return err
+	}
 	if _, err := node.Start(setting, false); err != nil {
 		return err
 	}

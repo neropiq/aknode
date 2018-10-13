@@ -29,11 +29,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/AidosKuneen/aklib/rpc"
 	"github.com/AidosKuneen/aknode/setting"
 	"golang.org/x/net/netutil"
 )
 
-type rpcfunc func(*setting.Setting, *Request, *Response) error
+type rpcfunc func(*setting.Setting, *rpc.Request, *rpc.Response) error
 
 var publicRPCs = map[string]rpcfunc{
 	"sendrawtx":       sendrawtx,
@@ -44,6 +45,7 @@ var publicRPCs = map[string]rpcfunc{
 	"getminabletx":    getminabletx,
 	"gettxsstatus":    gettxsstatus,
 	"getmultisiginfo": getmultisiginfo,
+	"getledger":       getledger,
 }
 
 var rpcs = map[string]rpcfunc{
@@ -107,15 +109,7 @@ func Run(setting *setting.Setting) net.Listener {
 	return l
 }
 
-//Request is for parsing request from client.
-type Request struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      interface{}     `json:"id"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params"`
-}
-
-func (req *Request) parseParam(data ...interface{}) (int, error) {
+func parseParam(req *rpc.Request, data ...interface{}) (int, error) {
 	if len(req.Params) == 0 {
 		return 0, nil
 	}
@@ -123,19 +117,6 @@ func (req *Request) parseParam(data ...interface{}) (int, error) {
 		return 0, err
 	}
 	return len(data), nil
-}
-
-//Err represents error struct for response.
-type Err struct {
-	Code    int64  `json:"code"`
-	Message string `json:"message"`
-}
-
-//Response is for respoding to clinete in jsonrpc.
-type Response struct {
-	Result interface{} `json:"result"`
-	Error  *Err        `json:"error"`
-	ID     interface{} `json:"id"`
 }
 
 func isValidAuth(s *setting.Setting, w http.ResponseWriter, r *http.Request) error {
@@ -158,15 +139,15 @@ func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 		}
 	}()
-	var req Request
+	var req rpc.Request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	res := Response{
+	res := rpc.Response{
 		ID: req.ID,
 	}
-	log.Println(req.Method, " is requested")
+	log.Println(req.Method, " is rpc.Requested")
 	exist := false
 	var err error
 	if f, ok := publicRPCs[req.Method]; ok {
@@ -195,7 +176,7 @@ func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		err = errors.New(req.Method + " is not supported")
 	}
 	if err != nil {
-		res.Error = &Err{
+		res.Error = &rpc.Err{
 			Code:    -1,
 			Message: err.Error(),
 		}

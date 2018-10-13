@@ -21,6 +21,7 @@
 package explorer
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
@@ -31,10 +32,12 @@ import (
 
 	"github.com/AidosKuneen/aklib/rand"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/consensus"
 
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
+	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/node"
@@ -121,6 +124,13 @@ func TestExploere(t *testing.T) {
 		t.Fatal("should be not found")
 	}
 	resp, err = cl.Get(fmt.Sprintf("http://localhost:%d/tx?id=AAA", s.ExplorerPort))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatal("should be not found")
+	}
+	resp, err = cl.Get(fmt.Sprintf("http://localhost:%d/statement?id=AAA", s.ExplorerPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,6 +242,18 @@ func TestExploere(t *testing.T) {
 	node.Resolve()
 	time.Sleep(6 * time.Second)
 
+	ledger := &consensus.Ledger{
+		ParentID:  consensus.GenesisID,
+		Seq:       1,
+		CloseTime: time.Now(),
+	}
+	id := ledger.ID()
+	t.Log("ledger id", hex.EncodeToString(id[:]))
+	if err := akconsensus.PutLedger(&s, ledger); err != nil {
+		t.Fatal(err)
+	}
+	akconsensus.SetLatest(ledger)
+
 	resp, err = cl.Get(fmt.Sprintf("http://localhost:%d", s.ExplorerPort))
 	if err != nil {
 		t.Fatal(err)
@@ -256,6 +278,13 @@ func TestExploere(t *testing.T) {
 		t.Error("should be OK")
 	}
 	resp, err = cl.Get(fmt.Sprintf("http://localhost:%d/tx?id=%s", s.ExplorerPort, tr.Hash()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("should be OK", tr.Hash())
+	}
+	resp, err = cl.Get(fmt.Sprintf("http://localhost:%d/statement?id=%s", s.ExplorerPort, hex.EncodeToString(id[:])))
 	if err != nil {
 		t.Fatal(err)
 	}

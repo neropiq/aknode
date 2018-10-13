@@ -31,7 +31,9 @@ import (
 	"time"
 
 	akrand "github.com/AidosKuneen/aklib/rand"
+	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/akconsensus"
+	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/setting"
 	"github.com/AidosKuneen/consensus"
@@ -94,16 +96,29 @@ func GetPeerlist() []msg.Addr {
 	return r
 }
 
-type consensusPeer struct{}
+//ConsensusPeer is for consensus to communicate with peers.
+type ConsensusPeer struct{}
 
-func (cp *consensusPeer) GetLedger(s *setting.Setting, id consensus.LedgerID) {
+//GetLedger get a ledger with id.
+func (cp *ConsensusPeer) GetLedger(s *setting.Setting, id consensus.LedgerID) {
 	WriteAll(s, &id, msg.CmdGetLedger)
 }
-func (cp *consensusPeer) BroadcastProposal(s *setting.Setting, p *consensus.Proposal) {
+
+//BroadcastProposal broadcast our proposal.
+func (cp *ConsensusPeer) BroadcastProposal(s *setting.Setting, p *consensus.Proposal) {
 	WriteAll(s, p, msg.CmdProposal)
 }
-func (cp *consensusPeer) BroadcastValidatoin(s *setting.Setting, v *consensus.Validation) {
+
+//BroadcastValidatoin broadcast our validation.
+func (cp *ConsensusPeer) BroadcastValidatoin(s *setting.Setting, v *consensus.Validation) {
 	WriteAll(s, v, msg.CmdValidation)
+}
+
+//GetTx get a tx with hash h.
+func (cp *ConsensusPeer) GetTx(s *setting.Setting, h tx.Hash) {
+	if err := imesh.AddNoexistTxHash(s, h, tx.TypeNormal); err != nil {
+		log.Println(err)
+	}
 }
 
 //newPeer returns Peer struct.
@@ -155,7 +170,7 @@ func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, erro
 	p := &peer{
 		conn:   conn,
 		remote: v.AddrFrom,
-		cons:   consensus.NewPeer(akconsensus.NewAdaptor(s, &consensusPeer{}), id, unl, s.RunValidator),
+		cons:   consensus.NewPeer(akconsensus.NewAdaptor(s), id, unl, s.RunValidator),
 	}
 	peers.RLock()
 	defer peers.RUnlock()

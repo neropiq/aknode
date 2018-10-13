@@ -163,7 +163,8 @@ func TestConfirm(t *testing.T) {
 	}
 	var id [32]byte
 	id[0] = 42
-	if err := Confirm(&s, trs[7].Hash(), id); err != nil {
+	hs, err := Confirm(&s, trs[7].Hash(), id)
+	if err != nil {
 		t.Error(err)
 	}
 	conf := 5
@@ -172,7 +173,22 @@ func TestConfirm(t *testing.T) {
 		conf = 6
 		rej = 5
 	}
-	for _, i := range []int{0, 1, 2, 3, conf} {
+	if len(hs) != 8 {
+		for _, h := range hs {
+			t.Log(h)
+		}
+		t.Error("invalid accepted txs", len(hs))
+	}
+	for _, i := range []int{0, 1, 2, 3, conf, 7} {
+		ok := false
+		for _, h := range hs {
+			if bytes.Equal(h, trs[i].Hash()) {
+				ok = true
+			}
+		}
+		if !ok {
+			t.Error("invalid accepted txs")
+		}
 		tr, err := GetTxInfo(s.DB, trs[i].Hash())
 		if err != nil {
 			t.Error(err)
@@ -185,6 +201,15 @@ func TestConfirm(t *testing.T) {
 		}
 	}
 	for _, i := range []int{4, rej} {
+		ok := false
+		for _, h := range hs {
+			if bytes.Equal(h, trs[i].Hash()) {
+				ok = true
+			}
+		}
+		if !ok {
+			t.Error("invalid accepted txs")
+		}
 		tr, err := GetTxInfo(s.DB, trs[i].Hash())
 		if err != nil {
 			t.Error(err)
@@ -307,11 +332,24 @@ func TestConfirm(t *testing.T) {
 		log.Println(tr.Hash())
 	}
 	id[0] = 43
-	if err := Confirm(&s, trs2[5].Hash(), id); err != nil {
+	hs, err = Confirm(&s, trs2[5].Hash(), id)
+	if err != nil {
 		t.Error(err)
+	}
+	if len(hs) != 6 {
+		t.Error("invalid accepted txs")
 	}
 
 	for _, i := range []int{0, 1, 2, 3, conf} {
+		ok := false
+		for _, h := range hs {
+			if bytes.Equal(h, trs[i].Hash()) {
+				ok = true
+			}
+		}
+		if ok {
+			t.Error("invalid accepted txs")
+		}
 		tr, err := GetTxInfo(s.DB, trs[i].Hash())
 		if err != nil {
 			t.Error(err)
@@ -324,6 +362,15 @@ func TestConfirm(t *testing.T) {
 		}
 	}
 	for _, i := range []int{4, rej} {
+		ok := false
+		for _, h := range hs {
+			if bytes.Equal(h, trs[i].Hash()) {
+				ok = true
+			}
+		}
+		if ok {
+			t.Error("invalid accepted txs")
+		}
 		tr, err := GetTxInfo(s.DB, trs[i].Hash())
 		if err != nil {
 			t.Error(err)
@@ -337,6 +384,15 @@ func TestConfirm(t *testing.T) {
 	}
 
 	for _, i := range []int{1, 3, 4, 5} {
+		ok := false
+		for _, h := range hs {
+			if bytes.Equal(h, trs2[i].Hash()) {
+				ok = true
+			}
+		}
+		if !ok {
+			t.Error("invalid accepted txs")
+		}
 		tr, err := GetTxInfo(s.DB, trs2[i].Hash())
 		if err != nil {
 			t.Error(err)
@@ -349,6 +405,15 @@ func TestConfirm(t *testing.T) {
 		}
 	}
 	for _, i := range []int{0, 2} {
+		ok := false
+		for _, h := range hs {
+			if bytes.Equal(h, trs2[i].Hash()) {
+				ok = true
+			}
+		}
+		if !ok {
+			t.Error("invalid accepted txs")
+		}
 		tr, err := GetTxInfo(s.DB, trs2[i].Hash())
 		if err != nil {
 			t.Error(err)
@@ -361,11 +426,27 @@ func TestConfirm(t *testing.T) {
 		}
 	}
 
-	if err := RevertConfirmation(&s, trs2[5].Hash(), id); err != nil {
+	hs, err = RevertConfirmation(&s, trs2[5].Hash(), id)
+	if err != nil {
 		t.Error(err)
+	}
+	if len(hs) != 6 {
+		for _, h := range hs {
+			t.Log(h)
+		}
+		t.Error("invalid reverted txs", len(hs))
 	}
 
 	for _, i := range []int{0, 1, 2, 3, conf} {
+		ok := false
+		for _, h := range hs {
+			if bytes.Equal(h, trs[i].Hash()) {
+				ok = true
+			}
+		}
+		if ok {
+			t.Error("invalid accepted txs")
+		}
 		tr, err := GetTxInfo(s.DB, trs[i].Hash())
 		if err != nil {
 			t.Error(err)
@@ -378,6 +459,15 @@ func TestConfirm(t *testing.T) {
 		}
 	}
 	for _, i := range []int{4, rej} {
+		ok := false
+		for _, h := range hs {
+			if bytes.Equal(h, trs[i].Hash()) {
+				ok = true
+			}
+		}
+		if ok {
+			t.Error("invalid accepted txs")
+		}
 		tr, err := GetTxInfo(s.DB, trs[i].Hash())
 		if err != nil {
 			t.Error(err)
@@ -390,6 +480,15 @@ func TestConfirm(t *testing.T) {
 		}
 	}
 	for i, tr := range trs2 {
+		ok := false
+		for _, h := range hs {
+			if bytes.Equal(h, trs2[i].Hash()) {
+				ok = true
+			}
+		}
+		if !ok {
+			t.Error("invalid accepted txs")
+		}
 		tr, err := GetTxInfo(s.DB, tr.Hash())
 		if err != nil {
 			t.Error(err)

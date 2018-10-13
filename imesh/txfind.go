@@ -87,7 +87,7 @@ func Init(s *setting.Setting) error {
 		if err != nil {
 			return err
 		}
-		t.StatNo = statusGenesis
+		t.StatNo = StatusGenesis
 		if err := t.put(s.DB); err != nil {
 			return err
 		}

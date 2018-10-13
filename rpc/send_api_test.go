@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/AidosKuneen/aklib"
+	"github.com/AidosKuneen/aklib/rpc"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/imesh"
@@ -34,6 +35,7 @@ import (
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/setting"
+	"github.com/AidosKuneen/consensus"
 )
 
 func TestSendAPI(t *testing.T) {
@@ -102,7 +104,7 @@ func TestSendAPI(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = sendmany(&s, &Request{Params: reqParams}, nil)
+	err = sendmany(&s, &rpc.Request{Params: reqParams}, nil)
 	if err.Error() != "not priviledged" {
 		t.Error("should be error", err)
 	}
@@ -133,20 +135,20 @@ func TestSendAPI(t *testing.T) {
 	time.Sleep(5 * time.Second) //wait for finishing walletnotify
 }
 
-func testgetnodeinfo(t *testing.T) *NodeInfo {
-	req := &Request{
+func testgetnodeinfo(t *testing.T) *rpc.NodeInfo {
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getrawtx",
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := getnodeinfo(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	result, ok := resp.Result.(*NodeInfo)
+	result, ok := resp.Result.(*rpc.NodeInfo)
 	if !ok {
 		t.Error("result must be slice")
 	}
@@ -169,6 +171,9 @@ func testgetnodeinfo(t *testing.T) *NodeInfo {
 		t.Error("invalid pool size")
 	}
 	if result.Leaves != leaves.Size() {
+		t.Error("invalid leave size")
+	}
+	if result.LatestLedger != hex.EncodeToString(consensus.GenesisID[:]) {
 		t.Error("invalid leave size")
 	}
 	return result
@@ -201,7 +206,7 @@ func getDiff(t *testing.T, u0, u1 []*tx.UTXO) map[string]int64 {
 }
 
 func checkResponse(t *testing.T, diff map[string]int64,
-	resp *Response, sendto map[string]uint64, isConf bool) tx.Hash {
+	resp *rpc.Response, sendto map[string]uint64, isConf bool) tx.Hash {
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
@@ -277,7 +282,7 @@ func checkResponse(t *testing.T, diff map[string]int64,
 }
 
 func testwalletpassphrase1(pwd string, t float64) error {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "walletpassphrase",
@@ -288,12 +293,12 @@ func testwalletpassphrase1(pwd string, t float64) error {
 	if err != nil {
 		return err
 	}
-	var resp Response
+	var resp rpc.Response
 	return walletpassphrase(&s, req, &resp)
 }
 
 func testwalletpassphrase2(t *testing.T, pwdd string) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "walletpassphrase",
@@ -304,7 +309,7 @@ func testwalletpassphrase2(t *testing.T, pwdd string) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := walletpassphrase(&s, req, &resp); err != nil {
 		t.Log(string(pwd))
 		t.Fatal(err)
@@ -318,7 +323,7 @@ func testwalletpassphrase2(t *testing.T, pwdd string) {
 }
 
 func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string]string) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "sendmany",
@@ -334,7 +339,7 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	utxo0, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)
@@ -375,7 +380,7 @@ func testsendmany(t *testing.T, isErr bool, adr1, adr2 string, adr2ac map[string
 }
 
 func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "sendtoaddress",
@@ -386,7 +391,7 @@ func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	utxo0, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)
@@ -416,7 +421,7 @@ func testsendtoaddress(t *testing.T, adr1 string, v float64) tx.Hash {
 }
 
 func testsendfrom(t *testing.T, adr1 string, adr2ac map[string]string) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "sendfrom",
@@ -427,7 +432,7 @@ func testsendfrom(t *testing.T, adr1 string, adr2ac map[string]string) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	utxo0, _, err := wallet.GetAllUTXO(&s.DBConfig, pwd)
 	if err != nil {
 		t.Error(err)

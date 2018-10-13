@@ -23,15 +23,15 @@ package akconsensus
 import (
 	"bytes"
 	"errors"
+	"log"
 	"sync"
 	"time"
-
-	"github.com/AidosKuneen/aknode/imesh"
 
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/arypack"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/setting"
 	"github.com/AidosKuneen/consensus"
@@ -39,12 +39,65 @@ import (
 )
 
 var (
-	notify      chan []tx.Hash
-	proposals   = make(map[consensus.ProposalID]time.Time)
-	validations = make(map[consensus.ValidationID]time.Time)
-	lastLedger  *consensus.Ledger
-	mutex       sync.RWMutex
+	notify            chan []tx.Hash
+	proposals         = make(map[consensus.ProposalID]time.Time)
+	validations       = make(map[consensus.ValidationID]time.Time)
+	latestLedger      = consensus.Genesis
+	latestSolidLedger = consensus.Genesis
+	peer              network
+	mutex             sync.RWMutex
 )
+
+type ledger struct {
+	ParentID            consensus.LedgerID
+	Seq                 consensus.Seq
+	Txs                 tx.Hash
+	CloseTimeResolution time.Duration
+	CloseTime           time.Time
+	ParentCloseTime     time.Time
+	CloseTimeAgree      bool
+}
+
+func newLedger(l *consensus.Ledger) *ledger {
+	le := &ledger{
+		ParentID:            l.ParentID,
+		Seq:                 l.Seq,
+		CloseTimeResolution: l.CloseTimeResolution,
+		CloseTime:           l.CloseTime,
+		ParentCloseTime:     l.ParentCloseTime,
+		CloseTimeAgree:      l.CloseTimeAgree,
+	}
+	for h := range l.Txs {
+		le.Txs = tx.Hash(h[:])
+	}
+	return le
+}
+func fromLedger(s *setting.Setting, l *ledger) (*consensus.Ledger, error) {
+	var id consensus.TxID
+	copy(id[:], l.Txs)
+	le := &consensus.Ledger{
+		ParentID:            l.ParentID,
+		Seq:                 l.Seq,
+		CloseTimeResolution: l.CloseTimeResolution,
+		CloseTime:           l.CloseTime,
+		ParentCloseTime:     l.ParentCloseTime,
+		CloseTimeAgree:      l.CloseTimeAgree,
+	}
+	le.IndexOf = consensus.IndexOfFunc(le, func(lid consensus.LedgerID) (*consensus.Ledger, error) {
+		return getLedger(s, lid)
+	})
+	if l.Txs != nil {
+		t, err := imesh.GetTx(s.DB, l.Txs)
+		if err != nil {
+			return nil, err
+		}
+		le.Txs = consensus.TxSet{
+			id: t,
+		}
+	}
+
+	return le, nil
+}
 
 type network interface {
 	GetLedger(s *setting.Setting, id consensus.LedgerID)
@@ -52,18 +105,23 @@ type network interface {
 	BroadcastValidatoin(s *setting.Setting, v *consensus.Validation)
 }
 
-//LastLedger returns the last ledger.
-func LastLedger() *consensus.Ledger {
+//LatestLedger returns the last ledger.
+func LatestLedger() *consensus.Ledger {
 	mutex.RLock()
 	defer mutex.RUnlock()
-	return lastLedger
+	return latestSolidLedger
 }
 
 //Init initialize consensus.
-func Init(s *setting.Setting) error {
+func Init(s *setting.Setting, p network) error {
+	peer = p
 	err := s.DB.View(func(txn *badger.Txn) error {
-		return db.Get(txn, nil, &lastLedger, db.HeaderLastLedger)
+		return db.Get(txn, nil, &latestSolidLedger, db.HeaderLastLedger)
 	})
+	latestLedger = latestSolidLedger
+	if err == badger.ErrKeyNotFound {
+		return nil
+	}
 	return err
 }
 
@@ -149,10 +207,10 @@ func PutLedger(s *setting.Setting, l *consensus.Ledger) error {
 func putLedger(s *setting.Setting, l *consensus.Ledger) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		id := l.ID()
-		if err := db.Put(txn, id[:], l, db.HeaderLedger); err != nil {
+		if err := db.Put(txn, id[:], newLedger(l), db.HeaderLedger); err != nil {
 			return err
 		}
-		return db.Put(txn, nil, lastLedger, db.HeaderLastLedger)
+		return db.Put(txn, nil, latestSolidLedger, db.HeaderLastLedger)
 	})
 }
 
@@ -164,11 +222,17 @@ func GetLedger(s *setting.Setting, id consensus.LedgerID) (*consensus.Ledger, er
 }
 
 func getLedger(s *setting.Setting, id consensus.LedgerID) (*consensus.Ledger, error) {
-	var l consensus.Ledger
+	if id == consensus.GenesisID {
+		return consensus.Genesis, nil
+	}
+	var l ledger
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, id[:], &l, db.HeaderLedger)
 	})
-	return &l, err
+	if err != nil {
+		return nil, err
+	}
+	return fromLedger(s, &l)
 }
 
 //ReadGetLeadger parse a getLedger command.
@@ -182,7 +246,7 @@ func ReadGetLeadger(buf []byte) (consensus.LedgerID, error) {
 func ReadLeadger(peer *consensus.Peer, buf []byte) (*consensus.Ledger, error) {
 	var v consensus.Ledger
 	err := arypack.Unmarshal(buf, &v)
-	v.IndexOf = peer.IndexOfFunc(&v)
+	v.IndexOf = consensus.IndexOfFunc(&v, peer.AcquireLedger)
 	return &v, err
 }
 
@@ -212,20 +276,39 @@ func ReadProposal(s *setting.Setting, peer *consensus.Peer, buf []byte) (*consen
 	return &v, noexist, err
 }
 
+func goRetryLedger(s *setting.Setting) {
+	go func() {
+		for {
+			time.Sleep(5 * time.Second)
+			if latestLedger.ID() == latestSolidLedger.ID() {
+				continue
+			}
+			if err := Confirm(s, latestLedger); err != nil {
+				log.Println(err)
+			}
+		}
+	}()
+}
+
 //Confirm confirms txs and return hashes of confirmed txs.
-func Confirm(s *setting.Setting, peer network, l *consensus.Ledger) error {
+func Confirm(s *setting.Setting, l *consensus.Ledger) error {
 	mutex.Lock()
 	defer mutex.Unlock()
+	latestLedger = l
 	var ctx tx.Hash
 	for h := range l.Txs {
 		ctx = tx.Hash(h[:])
 	}
 	var tr []tx.Hash
 
-	seq := consensus.NewSpan(l).Diff(lastLedger)
-	last := lastLedger
+	if err := putLedger(s, l); err != nil {
+		return err
+	}
+
+	seq := consensus.NewSpan(l).Diff(latestSolidLedger)
+	last := latestSolidLedger
 	//get all ledgers
-	for i := l.Seq; i != seq; i-- {
+	for i := l.Seq; i > seq; i-- {
 		if _, err := getLedger(s, last.ParentID); err == badger.ErrKeyNotFound {
 			peer.GetLedger(s, last.ParentID)
 			time.Sleep(10 * time.Second)
@@ -237,17 +320,17 @@ func Confirm(s *setting.Setting, peer network, l *consensus.Ledger) error {
 		}
 	}
 	//go backward
-	last = lastLedger
-	for i := l.Seq; i != seq; i-- {
+	last = latestSolidLedger
+	for i := last.Seq; i >= seq; i-- {
 		var t tx.Hash
 		for h := range last.Txs {
 			t = tx.Hash(h[:])
 		}
-		if err := imesh.RevertConfirmation(s, t, imesh.StatNo(last.ID())); err != nil {
+		_, err := imesh.RevertConfirmation(s, t, imesh.StatNo(last.ID()))
+		if err != nil {
 			return err
 		}
-		lastLedger = last
-		var err error
+		latestSolidLedger = last
 		last, err = getLedger(s, last.ParentID)
 		if err != nil {
 			return err
@@ -264,24 +347,49 @@ func Confirm(s *setting.Setting, peer network, l *consensus.Ledger) error {
 		for h := range ll.Txs {
 			t = tx.Hash(h[:])
 		}
-		if err := imesh.Confirm(s, t, l.ID()); err != nil {
+		has, err := imesh.Has(s, t)
+		if err != nil {
 			return err
 		}
+		if !has {
+			if err := imesh.AddNoexistTxHash(s, t, tx.TypeNormal); err != nil {
+				return err
+			}
+			return errors.New("no tx:" + t.String())
+		}
+		hs, err := imesh.Confirm(s, t, l.ID())
+		if err != nil {
+			return err
+		}
+		tr = append(tr, hs...)
+		latestSolidLedger = ll
 	}
 
 	if notify != nil {
-		txs := make([]tx.Hash, len(tr))
-		copy(txs, tr)
+		txs := make([]tx.Hash, 0, len(tr))
+		for _, t := range tr {
+			ti, err := imesh.GetTxInfo(s.DB, t)
+			if err != nil {
+				return err
+			}
+			if ti.IsAccepted() {
+				txs = append(txs, t)
+			}
+		}
 		notify <- txs
 	}
-	if err := leaves.SetConfirmed(s, ctx); err != nil {
-		return err
-	}
-	lastLedger = l
-	return putLedger(s, l)
+	return leaves.SetConfirmed(s, ctx)
 }
 
 //RegisterTxNotifier registers a notifier for resolved txs.
 func RegisterTxNotifier(n chan []tx.Hash) {
+	mutex.Lock()
+	defer mutex.Unlock()
 	notify = n
+}
+
+//SetLatest is only for test. Don't use it.
+func SetLatest(l *consensus.Ledger) {
+	latestLedger = l
+	latestSolidLedger = l
 }

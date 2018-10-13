@@ -30,18 +30,21 @@ import (
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/arypack"
+	"github.com/AidosKuneen/aklib/rpc"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/setting"
+	"github.com/AidosKuneen/consensus"
 )
 
-func sendrawtx(conf *setting.Setting, req *Request, res *Response) error {
+func sendrawtx(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	var txent []byte
 	typ := tx.TypeNormal
-	n, err := req.parseParam(&txent, &typ)
+	n, err := parseParam(req, &txent, &typ)
 	if err != nil {
 		return err
 	}
@@ -73,23 +76,7 @@ func sendrawtx(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-//NodeInfo is a struct for getnodeinfo RPC.
-type NodeInfo struct {
-	Version         string  `json:"version"`
-	ProtocolVersion int     `json:"protocolversion"`
-	WalletVersion   int     `json:"walletversion"`
-	Balance         *uint64 `json:"balance,omitempty"`
-	Connections     int     `json:"connections"`
-	Proxy           string  `json:"proxy"`
-	Testnet         byte    `json:"testnet"`
-	KeyPoolSize     int     `json:"keypoolsize"`
-	Leaves          int     `json:"leaves"`
-	Time            int64   `json:"time"`
-	TxNo            uint64  `json:"txno"`
-	//TODO:some value for consensus
-}
-
-func getnodeinfo(conf *setting.Setting, req *Request, res *Response) error {
+func getnodeinfo(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	var bal *uint64
 	if conf.RPCUser != "" {
 		mutex.Lock()
@@ -100,7 +87,8 @@ func getnodeinfo(conf *setting.Setting, req *Request, res *Response) error {
 		}
 		bal = &total
 	}
-	res.Result = &NodeInfo{
+	lid := akconsensus.LatestLedger().ID()
+	res.Result = &rpc.NodeInfo{
 		Version:         setting.Version,
 		ProtocolVersion: msg.MessageVersion,
 		WalletVersion:   walletVersion,
@@ -112,13 +100,14 @@ func getnodeinfo(conf *setting.Setting, req *Request, res *Response) error {
 		Leaves:          leaves.Size(),
 		Time:            time.Now().Unix(),
 		TxNo:            imesh.GetTxNo(),
+		LatestLedger:    hex.EncodeToString(lid[:]),
 	}
 	return nil
 }
 
-func getleaves(conf *setting.Setting, req *Request, res *Response) error {
+func getleaves(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	num := tx.DefaultPreviousSize
-	n, err := req.parseParam(&num)
+	n, err := parseParam(req, &num)
 	if err != nil {
 		return err
 	}
@@ -134,16 +123,9 @@ func getleaves(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-//InoutHash is a struct for getlasthistory RPC.
-type InoutHash struct {
-	Hash  string           `json:"hash"`
-	Type  tx.InOutHashType `json:"type"`
-	Index byte             `json:"index"`
-}
-
-func getlasthistory(conf *setting.Setting, req *Request, res *Response) error {
+func getlasthistory(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	adr := ""
-	n, err := req.parseParam(&adr)
+	n, err := parseParam(req, &adr)
 	if err != nil {
 		return err
 	}
@@ -154,9 +136,9 @@ func getlasthistory(conf *setting.Setting, req *Request, res *Response) error {
 	if err != nil {
 		return err
 	}
-	r := make([]*InoutHash, len(ihs))
+	r := make([]*rpc.InoutHash, len(ihs))
 	for i, ih := range ihs {
-		r[i] = &InoutHash{
+		r[i] = &rpc.InoutHash{
 			Hash:  ih.Hash.String(),
 			Type:  ih.Type,
 			Index: ih.Index,
@@ -165,10 +147,10 @@ func getlasthistory(conf *setting.Setting, req *Request, res *Response) error {
 	res.Result = r
 	return nil
 }
-func getrawtx(conf *setting.Setting, req *Request, res *Response) error {
+func getrawtx(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	txid := ""
 	jsonformat := false
-	n, err := req.parseParam(&txid, &jsonformat)
+	n, err := parseParam(req, &txid, &jsonformat)
 	if err != nil {
 		return err
 	}
@@ -191,9 +173,9 @@ func getrawtx(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-func getminabletx(conf *setting.Setting, req *Request, res *Response) error {
+func getminabletx(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	var v interface{}
-	n, err := req.parseParam(&v)
+	n, err := parseParam(req, &v)
 	if err != nil {
 		return err
 	}
@@ -235,7 +217,7 @@ func getminabletx(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-func gettxsstatus(conf *setting.Setting, req *Request, res *Response) error {
+func gettxsstatus(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	if len(req.Params) == 0 {
 		return errors.New("must specify txid")
 	}
@@ -249,7 +231,8 @@ func gettxsstatus(conf *setting.Setting, req *Request, res *Response) error {
 	if len(data) > 50 {
 		return errors.New("array is too big")
 	}
-	r := make([]int, 0, len(data))
+
+	r := make([]*rpc.TxStatus, 0, len(data))
 	for _, txid := range data {
 		tid, err := hex.DecodeString(txid)
 		if err != nil {
@@ -260,24 +243,45 @@ func gettxsstatus(conf *setting.Setting, req *Request, res *Response) error {
 			return err
 		}
 		if !ok {
-			r = append(r, -1)
+			r = append(r, &rpc.TxStatus{
+				Hash: txid,
+			})
 			continue
 		}
 		tr, err := imesh.GetTxInfo(conf.DB, tid)
 		if err != nil {
 			return err
 		}
-		if tr.IsAccepted() {
-			r = append(r, nConfirm)
-		} else {
-			r = append(r, 0)
+		switch tr.StatNo {
+		case imesh.StatusPending:
+			r = append(r, &rpc.TxStatus{
+				Hash:   txid,
+				Exists: true,
+			})
+		default:
+			if tr.IsRejected {
+				r = append(r, &rpc.TxStatus{
+					Hash:        txid,
+					Exists:      true,
+					IsRejected:  true,
+					IsConfirmed: true,
+					LedgerID:    hex.EncodeToString(tr.StatNo[:]),
+				})
+			} else {
+				r = append(r, &rpc.TxStatus{
+					Hash:        txid,
+					Exists:      true,
+					IsConfirmed: true,
+					LedgerID:    hex.EncodeToString(tr.StatNo[:]),
+				})
+			}
 		}
 	}
 	res.Result = r
 	return nil
 }
 
-func getmultisiginfo(conf *setting.Setting, req *Request, res *Response) error {
+func getmultisiginfo(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	if len(req.Params) == 0 {
 		return errors.New("must specify mutisig address")
 	}
@@ -297,5 +301,28 @@ func getmultisiginfo(conf *setting.Setting, req *Request, res *Response) error {
 		return err
 	}
 	res.Result = mul
+	return nil
+}
+
+func getledger(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
+	txid := ""
+	n, err := parseParam(req, &txid)
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return errors.New("invalid #params")
+	}
+	id, err := hex.DecodeString(txid)
+	if err != nil {
+		return err
+	}
+	var led consensus.LedgerID
+	copy(led[:], id)
+	tr, err := akconsensus.GetLedger(conf, led)
+	if err != nil {
+		return err
+	}
+	res.Result = rpc.NewLedger(tr)
 	return nil
 }

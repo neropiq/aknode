@@ -35,6 +35,7 @@ import (
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
+	"github.com/AidosKuneen/aklib/rpc"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/imesh"
@@ -157,13 +158,13 @@ func TestControlAPI(t *testing.T) {
 }
 
 func testlistbanned(t *testing.T) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listbanned",
 		Params:  json.RawMessage{},
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := listbanned(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -171,7 +172,7 @@ func testlistbanned(t *testing.T) {
 		t.Error(resp.Error)
 	}
 	t.Log(resp.Result)
-	bs, ok := resp.Result.([]*Bans)
+	bs, ok := resp.Result.([]*rpc.Bans)
 	if !ok {
 		t.Error("invalid return")
 	}
@@ -191,13 +192,13 @@ func testlistbanned(t *testing.T) {
 	}
 }
 func testlistpeer(t *testing.T, n int) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listpeer",
 		Params:  json.RawMessage{},
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := listpeer(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -225,13 +226,13 @@ func testlistpeer(t *testing.T, n int) {
 }
 
 func testdumpseed(t *testing.T) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "dumpseed",
 		Params:  json.RawMessage{},
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := dumpprivkey(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -258,13 +259,13 @@ func testdumpseed(t *testing.T) {
 
 func teststop(t *testing.T) {
 	s.Stop = make(chan struct{}, 2)
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "stop",
 		Params:  json.RawMessage{},
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := stop(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -280,7 +281,7 @@ func teststop(t *testing.T) {
 
 func testdumpwallet(t *testing.T) {
 	wdat := filepath.Join(tdir, "tmp.dat")
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "dumpwallet",
@@ -291,7 +292,7 @@ func testdumpwallet(t *testing.T) {
 		t.Error(err)
 	}
 	t.Log(wdat, string(req.Params))
-	var resp Response
+	var resp rpc.Response
 	if err := dumpwallet(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -337,7 +338,7 @@ func testimportwallet(t *testing.T, pwdd []byte) {
 	if err2 := os.RemoveAll("./test_db"); err2 != nil {
 		t.Error(err2)
 	}
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "importwallet",
@@ -347,7 +348,7 @@ func testimportwallet(t *testing.T, pwdd []byte) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err2 := importwallet(&s, req, &resp); err2 != nil {
 		t.Error(err2)
 	}

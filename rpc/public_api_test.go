@@ -29,7 +29,10 @@ import (
 
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/arypack"
+	"github.com/AidosKuneen/aklib/rpc"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/imesh"
+	"github.com/AidosKuneen/consensus"
 )
 
 func TestPublicAPI(t *testing.T) {
@@ -73,6 +76,9 @@ func TestPublicAPI(t *testing.T) {
 	confirmAll(t, nil, true)
 	testgettxsstatus(t, ti.Hash(), true)
 }
+func TestPublicAPI3(t *testing.T) {
+	testgetledger(t)
+}
 
 func TestPublicAPI2(t *testing.T) {
 	setup(t)
@@ -94,7 +100,7 @@ func TestPublicAPI2(t *testing.T) {
 }
 
 func testgetmultisiginfo(t *testing.T, tr *tx.Transaction) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getmultisiginfo",
@@ -107,7 +113,7 @@ func testgetmultisiginfo(t *testing.T, tr *tx.Transaction) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := getmultisiginfo(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -135,7 +141,7 @@ func testgetmultisiginfo(t *testing.T, tr *tx.Transaction) {
 func testgettxsstatus(t *testing.T, h tx.Hash, isConf bool) {
 	var zero [32]byte
 	var inva tx.Hash = zero[:]
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "gettxsstatus",
@@ -147,7 +153,7 @@ func testgettxsstatus(t *testing.T, h tx.Hash, isConf bool) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := gettxsstatus(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -155,29 +161,34 @@ func testgettxsstatus(t *testing.T, h tx.Hash, isConf bool) {
 		t.Error(resp.Error)
 	}
 	t.Log(resp.Result)
-	is, ok := resp.Result.([]int)
+	is, ok := resp.Result.([]*rpc.TxStatus)
 	if !ok {
 		t.Error("invalid return")
 	}
 	if len(is) != 3 {
 		t.Error("invalid return")
 	}
-	if is[0] != nConfirm {
-		t.Error("invalid genesis status")
+	if !is[0].Exists || is[0].Hash != genesis.String() || is[0].IsRejected || !is[0].IsConfirmed || is[0].LedgerID != hex.EncodeToString(imesh.StatusGenesis[:]) {
+		t.Error("invalid genesis status", is[0])
 	}
-	if isConf && is[1] != nConfirm {
-		t.Error("invalid tx status")
+	if isConf {
+		id := ledger.ID()
+		if !is[1].Exists || is[1].Hash != h.String() || is[1].IsRejected || !is[1].IsConfirmed || is[1].LedgerID != hex.EncodeToString(id[:]) {
+			t.Error("invalid tx status", is[1])
+		}
 	}
-	if !isConf && is[1] != 0 {
-		t.Error("invalid tx status")
+	if !isConf {
+		if !is[1].Exists || is[1].Hash != h.String() || is[1].IsRejected || is[1].IsConfirmed || is[1].LedgerID != "" {
+			t.Error("invalid tx status", is[1])
+		}
 	}
-	if is[2] != -1 {
-		t.Error("invalid invalid tx status")
+	if is[2].Exists || is[2].Hash != inva.String() || is[2].IsRejected || is[2].IsConfirmed || is[2].LedgerID != "" {
+		t.Error("invalid tx status", is[2])
 	}
 }
 
 func testgethist(t *testing.T, h tx.Hash) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getlasthistory",
@@ -188,7 +199,7 @@ func testgethist(t *testing.T, h tx.Hash) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := getlasthistory(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -196,7 +207,7 @@ func testgethist(t *testing.T, h tx.Hash) {
 		t.Error(resp.Error)
 	}
 	t.Log(resp.Result)
-	is, ok := resp.Result.([]*InoutHash)
+	is, ok := resp.Result.([]*rpc.InoutHash)
 	if !ok {
 		t.Error("invalid return")
 	}
@@ -226,12 +237,12 @@ func testgethist(t *testing.T, h tx.Hash) {
 }
 
 func testgetleaves(t *testing.T, l tx.Hash) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getleaves",
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := getleaves(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -257,7 +268,7 @@ func testgetleaves(t *testing.T, l tx.Hash) {
 
 func testsendrawtx(t *testing.T, tr *tx.Transaction, typ tx.Type) {
 	dat := arypack.Marshal(tr)
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "sendrawtx",
@@ -269,7 +280,7 @@ func testsendrawtx(t *testing.T, tr *tx.Transaction, typ tx.Type) {
 		t.Error(err)
 	}
 
-	var resp Response
+	var resp rpc.Response
 	if err2 := sendrawtx(&s, req, &resp); err2 != nil {
 		t.Error(err2, typ)
 	}
@@ -291,7 +302,7 @@ func testsendrawtx(t *testing.T, tr *tx.Transaction, typ tx.Type) {
 }
 
 func testgetrawtx(t *testing.T, format bool) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getrawtx",
@@ -302,7 +313,7 @@ func testgetrawtx(t *testing.T, format bool) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := getrawtx(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -331,7 +342,7 @@ func testgetrawtx(t *testing.T, format bool) {
 }
 
 func testgetfeetx(t *testing.T, min float64, h tx.Hash) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getminabletx",
@@ -342,7 +353,7 @@ func testgetfeetx(t *testing.T, min float64, h tx.Hash) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := getminabletx(&s, req, &resp); err != nil {
 		if h == nil {
 			if err == nil {
@@ -369,7 +380,7 @@ func testgetfeetx(t *testing.T, min float64, h tx.Hash) {
 }
 
 func testgettickettx(t *testing.T, h tx.Hash) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getminabletx",
@@ -380,7 +391,7 @@ func testgettickettx(t *testing.T, h tx.Hash) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := getminabletx(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -397,5 +408,38 @@ func testgettickettx(t *testing.T, h tx.Hash) {
 	}
 	if !bytes.Equal(tr.Hash(), h) {
 		t.Error("invalid gettickettx")
+	}
+}
+
+func testgetledger(t *testing.T) {
+	req := &rpc.Request{
+		JSONRPC: "1.0",
+		ID:      "curltest",
+		Method:  "getledger",
+		Params:  json.RawMessage{},
+	}
+	params := []interface{}{hex.EncodeToString(consensus.GenesisID[:])}
+	var err error
+	req.Params, err = json.Marshal(params)
+	if err != nil {
+		t.Error(err)
+	}
+	var resp rpc.Response
+	if err := getledger(&s, req, &resp); err != nil {
+		t.Error(err)
+	}
+	if resp.Error != nil {
+		t.Error(resp.Error)
+	}
+	t.Log(resp.Result)
+	l, ok := resp.Result.(*rpc.Ledger)
+	if !ok {
+		t.Error("invalid return")
+	}
+	if l.ID != hex.EncodeToString(consensus.GenesisID[:]) {
+		t.Error("invalid ledger")
+	}
+	if l.Seq != 0 {
+		t.Error("invalid ledger", l.Seq, l.Txs)
 	}
 }

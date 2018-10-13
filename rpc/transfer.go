@@ -25,12 +25,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/AidosKuneen/aknode/imesh"
-	"github.com/AidosKuneen/aknode/node"
-
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
+	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/setting"
 )
 

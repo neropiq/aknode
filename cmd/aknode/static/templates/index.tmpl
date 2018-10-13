@@ -102,7 +102,7 @@
 					<div class="col-12 col-md-12 col-lg-6 latest-block-transaction">
 						<div class="card">
 							<div class="card-header">
-								<h3 class="text-uppercase">Latest Statement <a href="#">SEE MORE</a></h3>
+								<h3 class="text-uppercase">Latest Statement</h3>
 							</div>	
 						  	<div class="card-body p-0">
 						  		<div class="table-responsive">
@@ -110,18 +110,18 @@
 						  				<thead>
 						  					<tr>
 						  						<th>Index</th>
+						  						<th>ID</th>
 						  						<th>Time</th>
-						  						<th>Transactions</th>
-						  						<th>Total Sent</th>
+						  						<th>Transaction</th>
 						  					</tr>
 						  				</thead>
 						  				<tbody>
 {{range .Statements}}
 						  					<tr>
 						  						<td class="text-success">{{.Index}}</td>
+						  						<td class="text-success text-truncate d-inline-block" style="max-width:150px;"><a href="/statement?id={{.ID}}">{{.ID}}</a></td>
 						  						<td>{{duration .Time}}</td>
-						  						<td>{{.Txs}}</td>
-						  						<td>{{toADK .ADK}} ADK</td>
+						  						<td class="text-success text-truncate d-inline-block" style="max-width:150px;"><a href="/tx?id={{.Transaction}}">{{.Transaction}}</a></td>
 						  					</tr>
 {{end}}
 						  				</tbody>

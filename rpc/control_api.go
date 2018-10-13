@@ -26,16 +26,17 @@ import (
 	"io/ioutil"
 
 	"github.com/AidosKuneen/aklib/address"
+	"github.com/AidosKuneen/aklib/rpc"
 	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/setting"
 	"github.com/AidosKuneen/aknode/walletImpl"
 )
 
-func listpeer(conf *setting.Setting, req *Request, res *Response) error {
+func listpeer(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	res.Result = node.GetPeerlist()
 	return nil
 }
-func dumpprivkey(conf *setting.Setting, req *Request, res *Response) error {
+func dumpprivkey(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 	if pwd == nil {
@@ -49,19 +50,11 @@ func dumpprivkey(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-//Bans is a struct for listbanned RPC.
-type Bans struct {
-	Address string `json:"address"`
-	Created int64  `json:"ban_created"`
-	Until   int64  `json:"banned_until"`
-	Reason  string `json:"ban_reason"`
-}
-
-func listbanned(conf *setting.Setting, req *Request, res *Response) error {
+func listbanned(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	bs := node.GetBanned()
-	banned := make([]*Bans, 0, len(bs))
+	banned := make([]*rpc.Bans, 0, len(bs))
 	for k, v := range bs {
-		banned = append(banned, &Bans{
+		banned = append(banned, &rpc.Bans{
 			Address: k,
 			Created: v.Unix(),
 			Until:   v.Add(node.BanTime).Unix(),
@@ -72,22 +65,22 @@ func listbanned(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-func stop(conf *setting.Setting, req *Request, res *Response) error {
+func stop(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	res.Result = "aknode servere stopping"
 	conf.Stop <- struct{}{}
 	return nil
 }
 
 //Dump is a struct for dumpwallet RPC.
-type Dump struct {
+type dump struct {
 	Wallet  *walletImpl.Wallet             `json:"wallet"`
 	Hist    []*walletImpl.History          `json:"history"`
 	Address map[string]*walletImpl.Address `json:"address"`
 }
 
-func dumpwallet(conf *setting.Setting, req *Request, res *Response) error {
+func dumpwallet(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	fname := ""
-	n, err := req.parseParam(&fname)
+	n, err := parseParam(req, &fname)
 	if err != nil {
 		return err
 	}
@@ -104,7 +97,7 @@ func dumpwallet(conf *setting.Setting, req *Request, res *Response) error {
 	if err != nil {
 		return err
 	}
-	d := &Dump{
+	d := &dump{
 		Wallet:  wallet,
 		Hist:    h,
 		Address: adrs,
@@ -116,9 +109,9 @@ func dumpwallet(conf *setting.Setting, req *Request, res *Response) error {
 	return ioutil.WriteFile(fname, dat, 0644)
 }
 
-func importwallet(conf *setting.Setting, req *Request, res *Response) error {
+func importwallet(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	fname := ""
-	n, err := req.parseParam(&fname)
+	n, err := parseParam(req, &fname)
 	if err != nil {
 		return err
 	}
@@ -129,7 +122,7 @@ func importwallet(conf *setting.Setting, req *Request, res *Response) error {
 	if err != nil {
 		return err
 	}
-	var d Dump
+	var d dump
 	if err := json.Unmarshal(dat, &d); err != nil {
 		return err
 	}

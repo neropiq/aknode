@@ -21,7 +21,6 @@
 package akconsensus
 
 import (
-	"bytes"
 	"errors"
 	"log"
 	"sort"
@@ -41,10 +40,9 @@ type Adaptor struct {
 }
 
 //NewAdaptor returns a instance of Adaptor.
-func NewAdaptor(s *setting.Setting, peer network) *Adaptor {
+func NewAdaptor(s *setting.Setting) *Adaptor {
 	return &Adaptor{
-		s:       s,
-		network: peer,
+		s: s,
 	}
 }
 
@@ -54,7 +52,7 @@ func (a *Adaptor) AcquireLedger(id consensus.LedgerID) (*consensus.Ledger, error
 	if err == nil {
 		return l, nil
 	}
-	a.network.GetLedger(a.s, id)
+	peer.GetLedger(a.s, id)
 	return nil, errors.New("not found")
 }
 
@@ -86,30 +84,36 @@ func (a *Adaptor) OnModeChange(consensus.Mode, consensus.Mode) {} //nothing
 
 // OnClose is called when ledger closes
 func (a *Adaptor) OnClose(prev *consensus.Ledger, now time.Time, mode consensus.Mode) consensus.TxSet {
+	//return the oldest unconfirmed leaf
 	ls := leaves.GetAllUnconfirmed()
 	if len(ls) == 0 {
 		return nil
 	}
-	id := prev.ID()
-	i := sort.Search(len(ls), func(i int) bool {
-		return bytes.Compare(ls[i], id[:]) >= 0
-	})
-	if i >= len(ls) {
-		i = len(ls) - 1
+	trs := make([]*imesh.TxInfo, len(ls))
+	var err error
+	for i, h := range ls {
+		trs[i], err = imesh.GetTxInfo(a.s.DB, h)
+		if err != nil {
+			log.Println(err)
+			return nil
+		}
 	}
-	tr, err := imesh.GetTx(a.s.DB, ls[i-1])
+	sort.Slice(trs, func(i, j int) bool {
+		return trs[i].Received.Before(trs[j].Received)
+	})
+	tr, err := imesh.GetTx(a.s.DB, trs[0].Hash)
 	if err != nil {
 		log.Println(err)
 		return nil
 	}
-	ts := make(consensus.TxSet, 1)
-	ts[tr.ID()] = tr
-	return ts
+	return consensus.TxSet{
+		tr.ID(): tr,
+	}
 }
 
 // OnAccept is called when ledger is accepted by consensus
 func (a *Adaptor) OnAccept(l *consensus.Ledger) {
-	if err := Confirm(a.s, a.network, l); err != nil {
+	if err := Confirm(a.s, l); err != nil {
 		log.Println(err)
 		return
 	}

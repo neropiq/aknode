@@ -22,16 +22,21 @@ package rpc
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/AidosKuneen/aknode/akconsensus"
+	"github.com/AidosKuneen/consensus"
 
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/arypack"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/rand"
+	"github.com/AidosKuneen/aklib/rpc"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/node"
@@ -40,14 +45,21 @@ import (
 )
 
 var (
-	confirmed = imesh.StatNo{
-		0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-	}
+	ledger *consensus.Ledger
 )
 
 func confirmAll(t *testing.T, notify chan []tx.Hash, confirm bool) {
 	var txs []tx.Hash
+	ledger = &consensus.Ledger{
+		ParentID:  consensus.GenesisID,
+		Seq:       1,
+		CloseTime: time.Now(),
+	}
+	id := ledger.ID()
+	t.Log("ledger id", hex.EncodeToString(id[:]))
+	if err := akconsensus.PutLedger(&s, ledger); err != nil {
+		t.Fatal(err)
+	}
 	err := s.DB.Update(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -64,10 +76,10 @@ func confirmAll(t *testing.T, notify chan []tx.Hash, confirm bool) {
 			if err := arypack.Unmarshal(dat, &ti); err != nil {
 				return err
 			}
-			if confirm {
-				ti.StatNo = confirmed
+			if confirm && ti.StatNo != imesh.StatusGenesis {
+				ti.StatNo = imesh.StatNo(id)
 			}
-			if !confirm {
+			if !confirm && ti.StatNo != imesh.StatusGenesis {
 				ti.StatNo = imesh.StatusPending
 			}
 			h := it.Item().Key()[1:]
@@ -118,7 +130,7 @@ func TestWalletAPI2(t *testing.T) {
 	}
 	pwd = nil
 	newAddressT(t, "")
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getnewaddress",
@@ -129,7 +141,7 @@ func TestWalletAPI2(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := getnewaddress(&s, req, &resp); err == nil {
 		t.Error("should  be error")
 	}
@@ -167,12 +179,12 @@ func TestWalletAPI(t *testing.T) {
 	}
 	h := genesis
 	var remain = aklib.ADKSupply
-	var tss []*Transaction
+	var tss []*rpc.Transaction
 	var tr *tx.Transaction
 	var preadr string
 	var prev uint64
 	var amount int64
-	ac2ts := make(map[string][]*Transaction)
+	ac2ts := make(map[string][]*rpc.Transaction)
 	for adr, v := range adr2val {
 		amount = 0
 		ac := adr2ac[adr]
@@ -219,7 +231,7 @@ func TestWalletAPI(t *testing.T) {
 			t.Fatal(preadr, err)
 		}
 
-		ts := &Transaction{
+		ts := &rpc.Transaction{
 			Account: &ac,
 			Address: adr,
 			Amount:  float64(v) / aklib.ADK,
@@ -233,7 +245,7 @@ func TestWalletAPI(t *testing.T) {
 		ac2ts[ac] = append(ac2ts[ac], ts)
 		if preadr != "" {
 			preac := adr2ac[preadr]
-			ts := &Transaction{
+			ts := &rpc.Transaction{
 				Account: &preac,
 				Address: preadr,
 				Amount:  float64(prev/2) / aklib.ADK,
@@ -246,7 +258,7 @@ func TestWalletAPI(t *testing.T) {
 			amount += int64(prev / 2)
 			t.Log(tr.Hash(), prev/2)
 
-			ts = &Transaction{
+			ts = &rpc.Transaction{
 				Account: &preac,
 				Address: preadr,
 				Amount:  -float64(prev) / aklib.ADK,
@@ -298,7 +310,7 @@ func TestWalletAPI(t *testing.T) {
 }
 
 func testgetaccount(t *testing.T, adr, ac string) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getaccount",
@@ -309,7 +321,7 @@ func testgetaccount(t *testing.T, adr, ac string) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := getaccount(&s, req, &resp); err != nil {
 		t.Error(err, adr, ac)
 	}
@@ -326,12 +338,12 @@ func testgetaccount(t *testing.T, adr, ac string) {
 }
 
 func testlistaddressgroupings(t *testing.T, adr2ac map[string]string, adr2val map[string]uint64) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listaddressgroupings",
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := listaddressgroupings(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -378,7 +390,7 @@ func testlistaddressgroupings(t *testing.T, adr2ac map[string]string, adr2val ma
 	}
 }
 func testvalidateaddress2(t *testing.T, adr, ac string) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "validateaddress",
@@ -389,14 +401,14 @@ func testvalidateaddress2(t *testing.T, adr, ac string) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := validateaddress(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	result, ok := resp.Result.(*Info)
+	result, ok := resp.Result.(*rpc.Info)
 	if !ok {
 		t.Error("result must be info struct")
 	}
@@ -420,7 +432,7 @@ func testvalidateaddress2(t *testing.T, adr, ac string) {
 }
 
 func testvalidateaddress1(t *testing.T, adr string, isValid bool) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "validateaddress",
@@ -431,14 +443,14 @@ func testvalidateaddress1(t *testing.T, adr string, isValid bool) {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := validateaddress(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	result, ok := resp.Result.(*Info)
+	result, ok := resp.Result.(*rpc.Info)
 	if !ok {
 		t.Error("result must be info struct")
 	}
@@ -462,7 +474,7 @@ func testvalidateaddress1(t *testing.T, adr string, isValid bool) {
 }
 
 func testgettransaction(t *testing.T, adr2ac map[string]string, tr *tx.Transaction, amount float64, isConf bool) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "gettransaction",
@@ -473,14 +485,14 @@ func testgettransaction(t *testing.T, adr2ac map[string]string, tr *tx.Transacti
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := gettransaction(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	tx, ok := resp.Result.(*Gettx)
+	tx, ok := resp.Result.(*rpc.Gettx)
 	if !ok {
 		t.Error("result must be tx")
 	}
@@ -586,7 +598,7 @@ func testgettransaction(t *testing.T, adr2ac map[string]string, tr *tx.Transacti
 }
 
 func testgetbalance(t *testing.T, ac string, ac2val map[string]uint64) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getbalance",
@@ -598,7 +610,7 @@ func testgetbalance(t *testing.T, ac string, ac2val map[string]uint64) {
 		t.Error(err)
 	}
 
-	var resp Response
+	var resp rpc.Response
 	if err := getbalance(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -615,13 +627,13 @@ func testgetbalance(t *testing.T, ac string, ac2val map[string]uint64) {
 }
 
 func testgetbalance2(t *testing.T, ac2val map[string]uint64) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getbalance",
 	}
 
-	var resp Response
+	var resp rpc.Response
 	if err := getbalance(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -641,11 +653,11 @@ func testgetbalance2(t *testing.T, ac2val map[string]uint64) {
 	}
 }
 
-func testlisttransactions(t *testing.T, ac string, hashes []*Transaction, isConf bool) {
+func testlisttransactions(t *testing.T, ac string, hashes []*rpc.Transaction, isConf bool) {
 	skip := 1
 	count := 2
 
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listtransactions",
@@ -657,14 +669,14 @@ func testlisttransactions(t *testing.T, ac string, hashes []*Transaction, isConf
 		t.Error(err)
 	}
 
-	var resp Response
+	var resp rpc.Response
 	if err := listtransactions(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	result, ok := resp.Result.([]*Transaction)
+	result, ok := resp.Result.([]*rpc.Transaction)
 	if !ok {
 		t.Error("result must be transaction struct")
 	}
@@ -718,7 +730,9 @@ func testlisttransactions(t *testing.T, ac string, hashes []*Transaction, isConf
 			t.Error("invalid dummy params")
 		}
 		if isConf {
-			if *tx.Blockhash != "" || *tx.Blockindex != 0 || *tx.Blocktime != tx.Time {
+			id := ledger.ID()
+			if *tx.Blockhash != hex.EncodeToString(id[:]) || *tx.Blockindex != int64(ledger.Seq) ||
+				*tx.Blocktime != ledger.CloseTime.Unix() {
 				t.Error("invalid block params")
 			}
 			if tx.Trusted != nil {
@@ -741,8 +755,8 @@ func testlisttransactions(t *testing.T, ac string, hashes []*Transaction, isConf
 	}
 }
 
-func testlisttransactions2(t *testing.T, isConf bool, adr2ac map[string]string, txs []*Transaction) {
-	req := &Request{
+func testlisttransactions2(t *testing.T, isConf bool, adr2ac map[string]string, txs []*rpc.Transaction) {
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listtransactions",
@@ -754,14 +768,14 @@ func testlisttransactions2(t *testing.T, isConf bool, adr2ac map[string]string, 
 		t.Error(err)
 	}
 
-	var resp Response
+	var resp rpc.Response
 	if err := listtransactions(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
 	if resp.Error != nil {
 		t.Error(resp.Error)
 	}
-	result, ok := resp.Result.([]*Transaction)
+	result, ok := resp.Result.([]*rpc.Transaction)
 	if !ok {
 		t.Error("result must be transaction struct")
 	}
@@ -818,7 +832,9 @@ func testlisttransactions2(t *testing.T, isConf bool, adr2ac map[string]string, 
 			t.Error("invalid vout")
 		}
 		if isConf {
-			if *tx.Blockhash != "" || *tx.Blockindex != 0 || *tx.Blocktime != tx.Time {
+			id := ledger.ID()
+			if *tx.Blockhash != hex.EncodeToString(id[:]) || *tx.Blockindex != int64(ledger.Seq) ||
+				*tx.Blocktime != ledger.CloseTime.Unix() {
 				t.Error("invalid block params")
 			}
 			if tx.Trusted != nil {
@@ -842,12 +858,12 @@ func testlisttransactions2(t *testing.T, isConf bool, adr2ac map[string]string, 
 }
 
 func testListAccounts(t *testing.T, ac2val map[string]uint64, acc ...string) {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "listaccounts",
 	}
-	var resp Response
+	var resp rpc.Response
 	if err := listaccounts(&s, req, &resp); err != nil {
 		t.Error(err)
 	}
@@ -870,7 +886,7 @@ func testListAccounts(t *testing.T, ac2val map[string]uint64, acc ...string) {
 
 func newAddressT(t *testing.T, ac string) []string {
 	adrs := make([]string, 3)
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "getnewaddress",
@@ -885,7 +901,7 @@ func newAddressT(t *testing.T, ac string) []string {
 			t.Error(err)
 		}
 	}
-	var resp Response
+	var resp rpc.Response
 	for i := range adrs {
 		if err := getnewaddress(&s, req, &resp); err != nil {
 			t.Error(err)

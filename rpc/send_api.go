@@ -25,16 +25,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/AidosKuneen/aklib/tx"
-
 	"github.com/AidosKuneen/aklib"
+	"github.com/AidosKuneen/aklib/rpc"
+	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/setting"
 )
 
-func walletpassphrase(conf *setting.Setting, req *Request, res *Response) error {
+func walletpassphrase(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	var spwd string
 	var sec uint
-	n, err := req.parseParam(&spwd, &sec)
+	n, err := parseParam(req, &spwd, &sec)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -60,17 +60,17 @@ func walletpassphrase(conf *setting.Setting, req *Request, res *Response) error 
 	return nil
 }
 
-func walletlock(conf *setting.Setting, req *Request, res *Response) error {
+func walletlock(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 	pwd = nil
 	return nil
 }
 
-func sendmany(conf *setting.Setting, req *Request, res *Response) error {
+func sendmany(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	var acc string
 	target := map[string]float64{}
-	n, err := req.parseParam(&acc, &target)
+	n, err := parseParam(req, &acc, &target)
 	if err != nil {
 		return err
 	}
@@ -98,10 +98,10 @@ func sendmany(conf *setting.Setting, req *Request, res *Response) error {
 	return err
 }
 
-func sendfrom(conf *setting.Setting, req *Request, res *Response) error {
+func sendfrom(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	var acc, adrstr string
 	var value float64
-	n, err := req.parseParam(&acc, &adrstr, &value)
+	n, err := parseParam(req, &acc, &adrstr, &value)
 	if err != nil {
 		return err
 	}
@@ -124,10 +124,10 @@ func sendfrom(conf *setting.Setting, req *Request, res *Response) error {
 	return err
 }
 
-func sendtoaddress(conf *setting.Setting, req *Request, res *Response) error {
+func sendtoaddress(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	var adrstr string
 	var value float64
-	n, err := req.parseParam(&adrstr, &value)
+	n, err := parseParam(req, &adrstr, &value)
 	if err != nil {
 		return err
 	}

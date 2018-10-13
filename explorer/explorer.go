@@ -34,11 +34,14 @@ import (
 
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
+	"github.com/AidosKuneen/aklib/rpc"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/node"
 	"github.com/AidosKuneen/aknode/setting"
+	"github.com/AidosKuneen/consensus"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
@@ -122,6 +125,9 @@ func Run(setting *setting.Setting) {
 	mux.HandleFunc("/maddress/", func(w http.ResponseWriter, r *http.Request) {
 		maddressHandle(setting, w, r)
 	})
+	mux.HandleFunc("/statement/", func(w http.ResponseWriter, r *http.Request) {
+		statementHandle(setting, w, r)
+	})
 	mux.HandleFunc("/qrcode/", func(w http.ResponseWriter, r *http.Request) {
 		qrHandle(setting, w, r)
 	})
@@ -167,10 +173,10 @@ func qrHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 //Handle handles api calls.
 func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	type Statement struct {
-		Index        int
-		Time         time.Time
-		Transactions int
-		ADK          uint64
+		ID          string
+		Index       consensus.Seq
+		Time        time.Time
+		Transaction string
 	}
 	type Transaction struct {
 		ID   string
@@ -206,6 +212,32 @@ func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 			Time: tr.Received,
 		})
 	}
+	for i, l := 0, akconsensus.LatestLedger(); i < 5; i++ {
+		id := l.ID()
+		log.Println(hex.EncodeToString(id[:]))
+		var h consensus.TxID
+		for h = range l.Txs {
+		}
+		st := Statement{
+			ID:          hex.EncodeToString(id[:]),
+			Index:       l.Seq,
+			Time:        l.CloseTime,
+			Transaction: "---",
+		}
+		if len(l.Txs) != 0 {
+			st.Transaction = hex.EncodeToString(h[:])
+		}
+		info.Statements = append(info.Statements, st)
+		if l.Seq == 0 {
+			break
+		}
+		var err error
+		l, err = akconsensus.GetLedger(s, l.ParentID)
+		if err != nil {
+			renderError(w, err.Error())
+			return
+		}
+	}
 
 	err := tmpl.ExecuteTemplate(w, "index", &info)
 	if err != nil {
@@ -213,15 +245,14 @@ func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func stat2str(ti *imesh.TxInfo) template.HTML {
+func stat2str(ti *imesh.TxInfo) string {
 	switch {
 	case ti.StatNo == imesh.StatusPending:
 		return "PENDING"
 	case ti.IsRejected:
 		return "REJECTED"
 	default:
-		no := hex.EncodeToString(ti.StatNo[:])
-		return template.HTML(`<a href="/statement?id=` + no + `">CONFIRMED</a>`)
+		return "CONFIRMED"
 	}
 }
 
@@ -253,7 +284,8 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		TXID               string
 		Created            time.Time
 		Received           time.Time
-		StatNo             template.HTML
+		Status             string
+		StatNo             string
 		Inputs             []*tx.Output
 		MInputs            []*tx.MultiSigOut
 		Signs              map[string]bool
@@ -273,7 +305,8 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		TXID:       id,
 		Created:    ti.Body.Time,
 		Received:   ti.Received,
-		StatNo:     stat2str(ti),
+		Status:     stat2str(ti),
+		StatNo:     hex.EncodeToString(ti.StatNo[:]),
 		Inputs:     make([]*tx.Output, len(ti.Body.Inputs)),
 		MInputs:    make([]*tx.MultiSigOut, len(ti.Body.MultiSigIns)),
 		Signs:      make(map[string]bool),
@@ -341,7 +374,7 @@ type tinfo struct {
 	Hash   tx.Hash
 	Amount int64
 	Time   time.Time
-	StatNo template.HTML
+	StatNo string
 	Spent  bool
 }
 
@@ -538,23 +571,70 @@ func renderError(w http.ResponseWriter, str string) {
 }
 
 func searchHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+	var isTx, isStatement, isAddress, isMaddress bool
 	q := r.URL.Query()
 	id := q.Get("id")
-	_, err1 := hex.DecodeString(id)
-	_, _, err2 := address.ParseAddress58(s.Config, id)
-	_, err3 := address.ParseMultisigAddress(s.Config, id)
+	bid, err := hex.DecodeString(id)
+	if err == nil {
+		var lid consensus.LedgerID
+		copy(lid[:], bid)
+		var err2 error
+		_, err2 = akconsensus.GetLedger(s, lid)
+		if err2 == nil {
+			isStatement = true
+		}
+		isTx, err2 = imesh.Has(s, bid)
+		if err2 != nil {
+			renderError(w, err2.Error())
+			return
+		}
+	} else {
+		_, _, err = address.ParseAddress58(s.Config, id)
+		if err == nil {
+			isAddress = true
+		}
+		_, err = address.ParseMultisigAddress(s.Config, id)
+		if err == nil {
+			isMaddress = true
+		}
+	}
 	switch {
-	case err1 == nil:
+	case isTx:
 		http.Redirect(w, r, "/tx?id="+id, http.StatusFound)
-		return
-	case err2 == nil:
+	case isStatement:
+		http.Redirect(w, r, "/statement?id="+id, http.StatusFound)
+	case isAddress:
 		http.Redirect(w, r, "/address?id="+id, http.StatusFound)
-		return
-	case err3 == nil:
+	case isMaddress:
 		http.Redirect(w, r, "/maddress?id="+id, http.StatusFound)
-		return
 	default:
 		renderError(w, notFound)
+	}
+}
+
+func statementHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	id := q.Get("id")
+	txid, err := hex.DecodeString(id)
+	if err != nil {
+		renderError(w, err.Error())
 		return
+	}
+	var lid consensus.LedgerID
+	copy(lid[:], txid)
+	l, err := akconsensus.GetLedger(s, lid)
+	if err != nil {
+		renderError(w, err.Error())
+		return
+	}
+	err = tmpl.ExecuteTemplate(w, "statement", &struct {
+		Net    string
+		Ledger *rpc.Ledger
+	}{
+		Net:    s.Config.Name,
+		Ledger: rpc.NewLedger(l),
+	})
+	if err != nil {
+		renderError(w, err.Error())
 	}
 }

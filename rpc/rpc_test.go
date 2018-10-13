@@ -37,6 +37,7 @@ import (
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
+	"github.com/AidosKuneen/aklib/rpc"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
@@ -202,7 +203,7 @@ func TestAPIFee(t *testing.T) {
 }
 
 func testsendtoaddress2(t *testing.T, adr1 string, v float64) tx.Hash {
-	req := &Request{
+	req := &rpc.Request{
 		JSONRPC: "1.0",
 		ID:      "curltest",
 		Method:  "sendtoaddress",
@@ -213,7 +214,7 @@ func testsendtoaddress2(t *testing.T, adr1 string, v float64) tx.Hash {
 	if err != nil {
 		t.Error(err)
 	}
-	var resp Response
+	var resp rpc.Response
 
 	err = sendtoaddress(&s, req, &resp)
 	if err != nil {

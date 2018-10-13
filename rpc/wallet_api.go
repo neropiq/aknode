@@ -23,23 +23,27 @@ package rpc
 import (
 	"encoding/hex"
 	"errors"
+	"log"
 	"sync"
 
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
+	"github.com/AidosKuneen/aklib/rpc"
 	"github.com/AidosKuneen/aklib/tx"
+	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/setting"
 	"github.com/AidosKuneen/aknode/walletImpl"
+	"github.com/AidosKuneen/consensus"
 )
 
 var mutex sync.RWMutex
 
 const nConfirm = 100000
 
-func getnewaddress(conf *setting.Setting, req *Request, res *Response) error {
+func getnewaddress(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	var acc string
-	n, err := req.parseParam(&acc)
+	n, err := parseParam(req, &acc)
 	if err != nil {
 		return err
 	}
@@ -59,7 +63,7 @@ func getnewaddress(conf *setting.Setting, req *Request, res *Response) error {
 	return err
 }
 
-func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) error {
+func listaddressgroupings(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 	var result [][][]interface{}
@@ -90,9 +94,9 @@ func listaddressgroupings(conf *setting.Setting, req *Request, res *Response) er
 	return nil
 }
 
-func getbalance(conf *setting.Setting, req *Request, res *Response) error {
+func getbalance(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	accstr := "*"
-	n, err := req.parseParam(&accstr)
+	n, err := parseParam(req, &accstr)
 	if err != nil {
 		return err
 	}
@@ -109,7 +113,7 @@ func getbalance(conf *setting.Setting, req *Request, res *Response) error {
 	return err
 }
 
-func listaccounts(conf *setting.Setting, req *Request, res *Response) error {
+func listaccounts(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 	result := make(map[string]float64)
@@ -122,23 +126,10 @@ func listaccounts(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-//Info is a struct for validateaddress RPC.
-type Info struct {
-	IsValid      bool    `json:"isvalid"`
-	Address      string  `json:"address"`
-	ScriptPubKey string  `json:"scriptPubkey"`
-	IsMine       bool    `json:"ismine"`
-	IsWatchOnly  *bool   `json:"iswatchonly,omitempty"`
-	IsScript     *bool   `json:"isscript,omitempty"`
-	Pubkey       *string `json:"pubkey,omitempty"`
-	IsCompressed *bool   `json:"iscompressed,omitempty"`
-	Account      *string `json:"account,omitempty"`
-}
-
 //only 'isvalid' params is valid, others may be incorrect.
-func validateaddress(conf *setting.Setting, req *Request, res *Response) error {
+func validateaddress(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	var adrstr string
-	n, err := req.parseParam(&adrstr)
+	n, err := parseParam(req, &adrstr)
 	if err != nil {
 		return err
 	}
@@ -153,7 +144,7 @@ func validateaddress(conf *setting.Setting, req *Request, res *Response) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 	isMine := wallet.FindAddress(adrstr)
-	infoi := Info{
+	infoi := rpc.Info{
 		IsValid: valid,
 		Address: adrstr,
 		IsMine:  isMine,
@@ -171,42 +162,14 @@ func validateaddress(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-func settxfee(conf *setting.Setting, req *Request, res *Response) error {
+func settxfee(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	res.Result = true
 	return nil
 }
 
-//Details is a struct for gettransaction RPC.
-type Details struct {
-	Account   string  `json:"account"`
-	Address   string  `json:"address"`
-	Category  string  `json:"category"`
-	Amount    float64 `json:"amount"`
-	Vout      int64   `json:"vout"`
-	Fee       float64 `json:"fee"`
-	Abandoned *bool   `json:"abandoned,omitempty"`
-}
-
-//Gettx is a struct for gettransaction RPC.
-type Gettx struct {
-	Amount            float64    `json:"amount"`
-	Fee               float64    `json:"fee"`
-	Confirmations     int        `json:"confirmations"`
-	Blockhash         *string    `json:"blockhash,omitempty"`
-	Blockindex        *int64     `json:"blockindex,omitempty"`
-	Blocktime         *int64     `json:"blocktime,omitempty"`
-	Txid              string     `json:"txid"`
-	WalletConflicts   []string   `json:"walletconflicts"`
-	Time              int64      `json:"time"`
-	TimeReceived      int64      `json:"timereceived"`
-	BIP125Replaceable string     `json:"bip125-replaceable"`
-	Details           []*Details `json:"details"`
-	Hex               string     `json:"hex"`
-}
-
-func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
+func gettransaction(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	var str string
-	n, err := req.parseParam(&str)
+	n, err := parseParam(req, &str)
 	if err != nil {
 		return err
 	}
@@ -218,14 +181,14 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 		return err
 	}
 	var amount int64
-	var detailss []*Details
+	var detailss []*rpc.Details
 	tr, err := imesh.GetTxInfo(conf.DB, txid)
 	if err != nil {
 		return err
 	}
 	mutex.RLock()
 	defer mutex.RUnlock()
-	detailss = make([]*Details, 0, len(tr.Body.Inputs)+len(tr.Body.Outputs))
+	detailss = make([]*rpc.Details, 0, len(tr.Body.Inputs)+len(tr.Body.Outputs))
 	for vout, out := range tr.Body.Outputs {
 		dt, errr := newTransaction(conf, tr, out, int64(vout), false)
 		if errr != nil {
@@ -235,7 +198,7 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 			continue
 		}
 		amount += int64(out.Value)
-		det, err := dt.toDetail()
+		det, err := dt.ToDetail()
 		if err != nil {
 			return err
 		}
@@ -254,7 +217,7 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 			continue
 		}
 		amount -= int64(out.Value)
-		det, err := dt.toDetail()
+		det, err := dt.ToDetail()
 		if err != nil {
 			return err
 		}
@@ -273,7 +236,7 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 		bi = &zero
 		bh = &emp
 	}
-	res.Result = &Gettx{
+	res.Result = &rpc.Gettx{
 		Amount:            float64(amount) / aklib.ADK,
 		Confirmations:     nconf,
 		Blocktime:         bt,
@@ -289,53 +252,12 @@ func gettransaction(conf *setting.Setting, req *Request, res *Response) error {
 	return nil
 }
 
-//Transaction is a struct for listtransactions RPC.
-type Transaction struct {
-	Account  *string `json:"account"`
-	Address  string  `json:"address"`
-	Category string  `json:"category"`
-	Amount   float64 `json:"amount"`
-	// Label             string      `json:"label"`
-	Vout          int64   `json:"vout"`
-	Fee           float64 `json:"fee"`
-	Confirmations int     `json:"confirmations"`
-	Trusted       *bool   `json:"trusted,omitempty"`
-	// Generated         bool        `json:"generated"`
-	Blockhash       *string  `json:"blockhash,omitempty"`
-	Blockindex      *int64   `json:"blockindex,omitempty"`
-	Blocktime       *int64   `json:"blocktime,omitempty"`
-	Txid            string   `json:"txid"`
-	Walletconflicts []string `json:"walletconflicts"`
-	Time            int64    `json:"time"`
-	TimeReceived    int64    `json:"timereceived"`
-	// Comment           string      `json:"string"`
-	// To                string `json:"to"`
-	// Otheraccount      string `json:"otheraccount"`
-	BIP125Replaceable string `json:"bip125-replaceable"`
-	Abandoned         *bool  `json:"abandoned,omitempty"`
-}
-
-//not RPC func
-func (dt *Transaction) toDetail() (*Details, error) {
-	if dt.Account == nil {
-		return nil, errors.New("Account is nil")
-	}
-	return &Details{
-		Account:   *dt.Account,
-		Address:   dt.Address,
-		Category:  dt.Category,
-		Amount:    dt.Amount,
-		Vout:      dt.Vout,
-		Abandoned: dt.Abandoned,
-	}, nil
-}
-
 //dont supprt over 1000 txs.
-func listtransactions(conf *setting.Setting, req *Request, res *Response) error {
+func listtransactions(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	acc := "*"
 	num := 10
 	skip := 0
-	n, err := req.parseParam(&acc, &num, &skip)
+	n, err := parseParam(req, &acc, &num, &skip)
 	if err != nil {
 		return err
 	}
@@ -351,7 +273,7 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 	if acc != "*" && acc != wallet.AccountName {
 		return errors.New("invalid accout name")
 	}
-	var ltx []*Transaction
+	var ltx []*rpc.Transaction
 	for skipped, i := 0, 0; i < len(hist) && len(ltx) < num; i++ {
 		h := hist[len(hist)-i-1]
 		if skipped++; skipped <= skip {
@@ -380,20 +302,18 @@ func listtransactions(conf *setting.Setting, req *Request, res *Response) error 
 }
 
 //not rpc func
-func newTransaction(conf *setting.Setting, tr *imesh.TxInfo, out *tx.Output, vout int64, isInput bool) (*Transaction, error) {
+func newTransaction(conf *setting.Setting, tr *imesh.TxInfo, out *tx.Output, vout int64, isInput bool) (*rpc.Transaction, error) {
 	adr, err := address.Address58(conf.Config, out.Address)
 	if err != nil {
 		return nil, err
 	}
 	ok := wallet.FindAddress(adr)
 	f := false
-	emp := ""
-	var zero int64
 	value := int64(out.Value)
 	if isInput {
 		value = -value
 	}
-	dt := &Transaction{
+	dt := &rpc.Transaction{
 		Address:           adr,
 		Category:          "send",
 		Amount:            float64(value) / aklib.ADK,
@@ -409,9 +329,17 @@ func newTransaction(conf *setting.Setting, tr *imesh.TxInfo, out *tx.Output, vou
 		dt.Account = &wallet.AccountName
 	}
 	if tr.IsAccepted() {
-		dt.Blockhash = &emp
-		dt.Blocktime = &dt.Time
-		dt.Blockindex = &zero
+		lid := hex.EncodeToString(tr.StatNo[:])
+		l, err := akconsensus.GetLedger(conf, consensus.LedgerID(tr.StatNo))
+		if err != nil {
+			log.Println(err, lid)
+			return nil, err
+		}
+		s := int64(l.Seq)
+		t := l.CloseTime.Unix()
+		dt.Blockhash = &lid
+		dt.Blocktime = &t
+		dt.Blockindex = &s
 		dt.Confirmations = nConfirm
 	} else {
 		dt.Trusted = &f
@@ -423,9 +351,9 @@ func newTransaction(conf *setting.Setting, tr *imesh.TxInfo, out *tx.Output, vou
 	return dt, nil
 }
 
-func getaccount(conf *setting.Setting, req *Request, res *Response) error {
+func getaccount(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
 	adr := ""
-	n, err := req.parseParam(&adr)
+	n, err := parseParam(req, &adr)
 	if err != nil {
 		return err
 	}

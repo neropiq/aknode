@@ -165,6 +165,13 @@
 								<div class="table-responsive">
 						  			<table class="table table-borderless">
 						  				<tbody>
+{{if not .StatNo}}
+						  					<tr>
+						  						<td>Confirmed by</td>
+						  						<td><a href="statement?id={{.StatNo}}">{{.StatNo}}</a></td>
+						  					</tr>
+{{end}}
+
 {{if .TicketInput}}
 						  					<tr>
 						  						<td>Ticketin </td>

@@ -126,33 +126,42 @@ func checkConflict(s *setting.Setting, h tx.Hash, visited map[[32]byte]struct{})
 	return base, conflicts, nil
 }
 
-func confirm(s *setting.Setting, txn *badger.Txn, rejectTxs map[[32]byte]struct{}, h tx.Hash, no [32]byte) error {
+func confirm(s *setting.Setting, txn *badger.Txn, rejectTxs map[[32]byte]struct{}, h tx.Hash, no [32]byte) ([]tx.Hash, error) {
 	var ti TxInfo
+	var hs []tx.Hash
 	if err := db.Get(txn, h, &ti, db.HeaderTxInfo); err != nil {
-		return err
+		return nil, err
 	}
 	if ti.StatNo != StatusPending {
-		return nil
+		return hs, nil
 	}
 	for _, p := range ti.Body.Parent {
-		if err := confirm(s, txn, rejectTxs, p, no); err != nil {
-			return err
+		hs2, err := confirm(s, txn, rejectTxs, p, no)
+		if err != nil {
+			return nil, err
 		}
+		hs = append(hs, hs2...)
 	}
 	for _, p := range ti.Body.Inputs {
-		if err := confirm(s, txn, rejectTxs, p.PreviousTX, no); err != nil {
-			return err
+		hs2, err := confirm(s, txn, rejectTxs, p.PreviousTX, no)
+		if err != nil {
+			return nil, err
 		}
+		hs = append(hs, hs2...)
 	}
 	for _, p := range ti.Body.MultiSigIns {
-		if err := confirm(s, txn, rejectTxs, p.PreviousTX, no); err != nil {
-			return err
+		hs2, err := confirm(s, txn, rejectTxs, p.PreviousTX, no)
+		if err != nil {
+			return nil, err
 		}
+		hs = append(hs, hs2...)
 	}
 	if ticket := ti.Body.TicketInput; ticket != nil {
-		if err := confirm(s, txn, rejectTxs, ticket, no); err != nil {
-			return err
+		hs2, err := confirm(s, txn, rejectTxs, ticket, no)
+		if err != nil {
+			return nil, err
 		}
+		hs = append(hs, hs2...)
 	}
 	reject := false
 	if _, ok := rejectTxs[h.Array()]; ok {
@@ -161,7 +170,7 @@ func confirm(s *setting.Setting, txn *badger.Txn, rejectTxs map[[32]byte]struct{
 	for _, p := range ti.Body.Inputs {
 		var pti TxInfo
 		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 		if !pti.IsAccepted() {
 			reject = true
@@ -173,7 +182,7 @@ func confirm(s *setting.Setting, txn *badger.Txn, rejectTxs map[[32]byte]struct{
 	for _, p := range ti.Body.MultiSigIns {
 		var pti TxInfo
 		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 		if !pti.IsAccepted() {
 			reject = true
@@ -185,7 +194,7 @@ func confirm(s *setting.Setting, txn *badger.Txn, rejectTxs map[[32]byte]struct{
 	if ticket := ti.Body.TicketInput; ticket != nil {
 		var pti TxInfo
 		if err := db.Get(txn, ticket, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 		if !pti.IsAccepted() {
 			reject = true
@@ -195,130 +204,154 @@ func confirm(s *setting.Setting, txn *badger.Txn, rejectTxs map[[32]byte]struct{
 		}
 	}
 	ti.StatNo = no
+	hs = append(hs, h)
 	if reject {
 		ti.IsRejected = true
-		return db.Put(txn, h, ti, db.HeaderTxInfo)
+		return hs, db.Put(txn, h, ti, db.HeaderTxInfo)
 	}
 	if err := db.Put(txn, h, ti, db.HeaderTxInfo); err != nil {
-		return err
+		return nil, err
 	}
 	for _, p := range ti.Body.Inputs {
 		var pti TxInfo
 		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 		pti.OutputStatus[0][p.Index].IsSpent = true
 		if err := db.Put(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	for _, p := range ti.Body.MultiSigIns {
 		var pti TxInfo
 		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 		pti.OutputStatus[1][p.Index].IsSpent = true
 		if err := db.Put(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if ticket := ti.Body.TicketInput; ticket != nil {
 		var pti TxInfo
 		if err := db.Get(txn, ticket, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 		pti.OutputStatus[2][0].IsSpent = true
 		if err := db.Put(txn, ticket, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return hs, nil
 }
 
 //Confirm txs from h.
-func Confirm(s *setting.Setting, h tx.Hash, no [32]byte) error {
+func Confirm(s *setting.Setting, h tx.Hash, no [32]byte) ([]tx.Hash, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
+	var hs []tx.Hash
 	visited := make(map[[32]byte]struct{})
 	_, conflicts, err := checkConflict(s, h, visited)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return s.DB.Update(func(txn *badger.Txn) error {
-		return confirm(s, txn, conflicts, h, no)
+	err = s.DB.Update(func(txn *badger.Txn) error {
+		var err2 error
+		hs, err2 = confirm(s, txn, conflicts, h, no)
+		return err2
 	})
+	return hs, err
 }
 
 //RevertConfirmation reverts confirmation from h.
-func RevertConfirmation(s *setting.Setting, h tx.Hash, no StatNo) error {
+func RevertConfirmation(s *setting.Setting, h tx.Hash, no StatNo) ([]tx.Hash, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	return s.DB.Update(func(txn *badger.Txn) error {
-		return revertConfirmation(s, txn, h, no)
+	var hs []tx.Hash
+	err := s.DB.Update(func(txn *badger.Txn) error {
+		var err2 error
+		hs, err2 = revertConfirmation(s, txn, h, no)
+		return err2
 	})
+	return hs, err
 }
 
-func revertConfirmation(s *setting.Setting, txn *badger.Txn, h tx.Hash, no StatNo) error {
+func revertConfirmation(s *setting.Setting, txn *badger.Txn, h tx.Hash, no StatNo) ([]tx.Hash, error) {
 	var ti TxInfo
+	var hs []tx.Hash
 	if err := db.Get(txn, h, &ti, db.HeaderTxInfo); err != nil {
-		return err
+		return nil, err
 	}
 	if ti.StatNo != no {
-		return nil
+		return hs, nil
 	}
+	hs = append(hs, h)
 	for _, p := range ti.Body.Parent {
-		if err := revertConfirmation(s, txn, p, no); err != nil {
-			return err
+		hs2, err := revertConfirmation(s, txn, p, no)
+		if err != nil {
+			return nil, err
 		}
+		hs = append(hs, hs2...)
 	}
 	for _, p := range ti.Body.Inputs {
-		if err := revertConfirmation(s, txn, p.PreviousTX, no); err != nil {
-			return err
+		hs2, err := revertConfirmation(s, txn, p.PreviousTX, no)
+		if err != nil {
+			return nil, err
 		}
+		hs = append(hs, hs2...)
 	}
 	for _, p := range ti.Body.MultiSigIns {
-		if err := revertConfirmation(s, txn, p.PreviousTX, no); err != nil {
-			return err
+		hs2, err := revertConfirmation(s, txn, p.PreviousTX, no)
+		if err != nil {
+			return nil, err
 		}
+		hs = append(hs, hs2...)
 	}
 	if ticket := ti.Body.TicketInput; ticket != nil {
-		if err := revertConfirmation(s, txn, ticket, no); err != nil {
-			return err
+		hs2, err := revertConfirmation(s, txn, ticket, no)
+		if err != nil {
+			return nil, err
 		}
+		hs = append(hs, hs2...)
 	}
+	rejected := ti.IsRejected
 	ti.StatNo = StatusPending
+	ti.IsRejected = false
 	if err := db.Put(txn, h, ti, db.HeaderTxInfo); err != nil {
-		return err
+		return nil, err
+	}
+	if rejected {
+		return hs, nil
 	}
 	for _, p := range ti.Body.Inputs {
 		var pti TxInfo
 		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 		pti.OutputStatus[0][p.Index].IsSpent = false
 		if err := db.Put(txn, p.PreviousTX, pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	for _, p := range ti.Body.MultiSigIns {
 		var pti TxInfo
 		if err := db.Get(txn, p.PreviousTX, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 		pti.OutputStatus[1][p.Index].IsSpent = false
 		if err := db.Put(txn, p.PreviousTX, pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if ticket := ti.Body.TicketInput; ticket != nil {
 		var pti TxInfo
 		if err := db.Get(txn, ticket, &pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 		pti.OutputStatus[2][0].IsSpent = false
 		if err := db.Put(txn, ticket, pti, db.HeaderTxInfo); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return hs, nil
 }

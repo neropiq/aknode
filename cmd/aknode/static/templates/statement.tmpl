@@ -1,0 +1,130 @@
+{{define "statement"}}
+<!DOCTYPE html>
+<html lang="en-US">
+	<head>
+		<meta charset="utf-8">
+		<meta name="keywords" content="key, words">
+		<meta name="description" content="description">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Aidos Mesh Explorer</title>
+
+		<link href="/css/style.css" rel="stylesheet" type="text/css">
+		<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700,800" rel="stylesheet">
+		<link rel="stylesheet" media="all" type="text/css" href="/icofont/icofont.min.css">
+		<link rel="icon" href="/favicon.ico" type="image/x-icon">
+
+	</head>
+
+	<body>
+		<!--Header-->
+		<header class="inner-header">
+			<div class="container">
+				<div class="row header-top">
+					<div class="col-8 col-md-5">
+						<div class="logo">
+							<a href="/index.html"><img src="/images/logo.png" alt="Logo"> Aidos Mesh <span>Explorer {{if ne .Net "main"}}<span class="text-uppercase bg-danger text-white"> {{.Net}}net </span>{{end}}</span></a>
+						</div>
+					</div>
+					<div class="col-4 col-md-7">
+<form action="/search">
+						<div class="inner-header-search">
+							<div class="input-group">
+							  <input type="text" name="id" class="form-control" placeholder="Example: AKADRSM2SFXBcL8w7VqAtM7inbkbGc2tLrcwauEB5KBLEvtFcNySCREWG">
+							</div>							
+							<button type="submit"><i class="icofont-search"></i></button>
+						</div>
+</form>
+					</div>
+				</div>
+				<div class="row header-banner">
+					<div class="col-12 search-mesh">
+						<h2>Aidos Kuneen Statement</h2>
+						<h5>{{.Ledger.ID}}</h5>						
+					</div>
+				</div>
+			</div>
+		</header>
+		<!--Header END-->
+		<!--Content-->
+		<section id="content">			
+			<div class="container">
+				<div class="row pb-5 transaction-address">
+					<div class="col-12">
+						<div class="card">
+							<div class="card-body">
+								<div class="table-responsive">
+						  			<table class="table table-borderless">
+						  				<tbody>
+						  					<tr>
+						  						<td>ID</td>
+												  <td>{{.Ledger.ID}}</td>
+						  					</tr>
+						  					<tr>
+						  						<td>Parent ID</td>
+						  						<td><a href="statement?id={{.Ledger.ParentID}}">{{.Ledger.ParentID}}</a></td>
+						  					</tr>
+						  					<tr>
+						  						<td>Sequence Number</td>
+												  <td>{{.Ledger.Seq}}</td>
+						  					</tr>
+						  					<tr>
+						  						<td>Transaction</td>
+						  						<td><a href="/tx?id={{.Ledger.Txs}}">{{.Ledger.Txs}}</a></td>
+						  					</tr>
+						  					<tr>
+						  						<td>Closetime Resuolution</td>
+						  						<td>{{.Ledger.CloseTimeResolution}}</td>
+						  					</tr>
+						  					<tr>
+						  						<td>Closetime</td>
+						  						<td>{{.Ledger.CloseTime}}</td>
+						  					</tr>
+						  					<tr>
+						  						<td>Closetime Agree</td>
+						  						<td>{{.Ledger.CloseTimeAgree}}</td>
+						  					</tr>
+						  					<tr>
+						  						<td>Parent Closetime</td>
+						  						<td>{{.Ledger.ParentCloseTime}}</td>
+						  					</tr>
+						  				</tbody>
+									</table>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+		<!--Footer-->
+		<footer>
+			<div class="footer-bottom">
+				<div class="container">
+					<div class="row">
+						<div class="col-12">
+							<p>2018 © Aidos Developer / Aidos Foundation. All Rights Reserved.</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</footer>
+		<!--Footer END-->
+
+		<script type="text/javascript" src="/js/jquery.min.js"></script>
+		<script type="text/javascript" src="/js/popper.min.js"></script>
+		<script src="/js/bootstrap.min.js"></script>
+		<script type="text/javascript" src="/js/custom.js"></script>
+
+
+		<script>
+			$(document).ready(function() {
+				$(".advance-details-table").hide();
+				$("#advance-details").click(function(){
+				    $(".advance-details-table").slideToggle();
+				});
+			});
+		</script>
+
+	</body>
+</html>
+{{end}}
