@@ -409,10 +409,11 @@ func testimportwallet(t *testing.T, pwdd []byte) {
 			if adrs[i] != string(adr) {
 				t.Error("invalid address", adrs[i], string(adr))
 			}
-			err2 := it.Item().Value(func(v []byte) {
+			err2 := it.Item().Value(func(v []byte) error {
 				if !bytes.Equal(dat[i], v) {
 					t.Error("invalid address")
 				}
+				return nil
 			})
 			if err2 != nil {
 				return err2

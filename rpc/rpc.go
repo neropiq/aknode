@@ -147,7 +147,7 @@ func handle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	res := rpc.Response{
 		ID: req.ID,
 	}
-	log.Println(req.Method, " is rpc.Requested")
+	log.Println(req.Method, " is requested")
 	exist := false
 	var err error
 	if f, ok := publicRPCs[req.Method]; ok {

@@ -69,7 +69,7 @@ func listaddressgroupings(conf *setting.Setting, req *rpc.Request, res *rpc.Resp
 	var result [][][]interface{}
 	var r0 [][]interface{}
 	us := make(map[string]uint64)
-	utxos, _, err := wallet.GetUTXO(&conf.DBConfig, pwd, true)
+	utxos, _, err := wallet.GetAllUTXO(&conf.DBConfig, pwd)
 	if err != nil {
 		return err
 	}
