@@ -189,9 +189,9 @@ func TestConfirm(t *testing.T) {
 		if !ok {
 			t.Error("invalid accepted txs")
 		}
-		tr, err := GetTxInfo(s.DB, trs[i].Hash())
-		if err != nil {
-			t.Error(err)
+		tr, err2 := GetTxInfo(s.DB, trs[i].Hash())
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if !tr.IsAccepted() {
 			t.Error("invalid Cofnrim", i)
@@ -210,9 +210,9 @@ func TestConfirm(t *testing.T) {
 		if !ok {
 			t.Error("invalid accepted txs")
 		}
-		tr, err := GetTxInfo(s.DB, trs[i].Hash())
-		if err != nil {
-			t.Error(err)
+		tr, err2 := GetTxInfo(s.DB, trs[i].Hash())
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if tr.IsAccepted() {
 			t.Error("invalid Cofnrim", i)
@@ -228,35 +228,35 @@ func TestConfirm(t *testing.T) {
 	//spend a rejected tx
 	trs2[0] = tx.New(s.Config, genesis[0])
 	trs2[0].AddInput(trs[4].Hash(), 0)
-	if err := trs2[0].AddOutput(s.Config, a.Address58(s.Config), 200); err != nil {
+	if err = trs2[0].AddOutput(s.Config, a.Address58(s.Config), 200); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[0].Sign(b); err != nil {
+	if err = trs2[0].Sign(b); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[0].PoW(); err != nil {
+	if err = trs2[0].PoW(); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, trs2[0], tx.TypeNormal); err != nil {
+	if err = CheckAddTx(&s, trs2[0], tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 
 	//ok
 	trs2[1] = tx.New(s.Config, trs[0].Hash())
 	trs2[1].AddInput(trs[conf].Hash(), 0)
-	if err := trs2[1].AddOutput(s.Config, a.Address58(s.Config), 100); err != nil {
+	if err = trs2[1].AddOutput(s.Config, a.Address58(s.Config), 100); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[1].AddOutput(s.Config, b.Address58(s.Config), aklib.ADKSupply-100); err != nil {
+	if err = trs2[1].AddOutput(s.Config, b.Address58(s.Config), aklib.ADKSupply-100); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[1].Sign(d); err != nil {
+	if err = trs2[1].Sign(d); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[1].PoW(); err != nil {
+	if err = trs2[1].PoW(); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, trs2[1], tx.TypeNormal); err != nil {
+	if err = CheckAddTx(&s, trs2[1], tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 
@@ -264,35 +264,35 @@ func TestConfirm(t *testing.T) {
 	trs2[2] = tx.New(s.Config, genesis[0])
 	trs2[2].AddInput(trs[4].Hash(), 0)
 	trs2[2].AddInput(trs2[1].Hash(), 0)
-	if err := trs2[2].AddOutput(s.Config, b.Address58(s.Config), 200+100); err != nil {
+	if err = trs2[2].AddOutput(s.Config, b.Address58(s.Config), 200+100); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[2].Sign(b); err != nil {
+	if err = trs2[2].Sign(b); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[2].Sign(a); err != nil {
+	if err = trs2[2].Sign(a); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[2].PoW(); err != nil {
+	if err = trs2[2].PoW(); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, trs2[2], tx.TypeNormal); err != nil {
+	if err = CheckAddTx(&s, trs2[2], tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 
 	//ok
 	trs2[3] = tx.New(s.Config, trs2[2].Hash())
 	trs2[3].AddInput(trs2[1].Hash(), 0)
-	if err := trs2[3].AddOutput(s.Config, c.Address58(s.Config), 100); err != nil {
+	if err = trs2[3].AddOutput(s.Config, c.Address58(s.Config), 100); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[3].Sign(a); err != nil {
+	if err = trs2[3].Sign(a); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[3].PoW(); err != nil {
+	if err = trs2[3].PoW(); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, trs2[3], tx.TypeNormal); err != nil {
+	if err = CheckAddTx(&s, trs2[3], tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 
@@ -300,31 +300,31 @@ func TestConfirm(t *testing.T) {
 	trs2[4] = tx.New(s.Config, trs[3].Hash())
 	trs2[4].AddInput(trs2[1].Hash(), 1)
 	trs2[4].AddInput(trs2[3].Hash(), 0)
-	if err := trs2[4].AddOutput(s.Config, b.Address58(s.Config), aklib.ADKSupply); err != nil {
+	if err = trs2[4].AddOutput(s.Config, b.Address58(s.Config), aklib.ADKSupply); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[4].Sign(c); err != nil {
+	if err = trs2[4].Sign(c); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[4].Sign(b); err != nil {
+	if err = trs2[4].Sign(b); err != nil {
 		t.Error(err)
 	}
-	if err := trs2[4].PoW(); err != nil {
+	if err = trs2[4].PoW(); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, trs2[4], tx.TypeNormal); err != nil {
+	if err = CheckAddTx(&s, trs2[4], tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 
 	trs2[5] = tx.New(s.Config, trs[5].Hash(), trs2[4].Hash(), trs2[3].Hash(), trs2[0].Hash())
-	if err := trs2[5].PoW(); err != nil {
+	if err = trs2[5].PoW(); err != nil {
 		t.Error(err)
 	}
-	if err := CheckAddTx(&s, trs2[5], tx.TypeNormal); err != nil {
+	if err = CheckAddTx(&s, trs2[5], tx.TypeNormal); err != nil {
 		t.Error(err)
 	}
 
-	if _, err := Resolve(&s); err != nil {
+	if _, err = Resolve(&s); err != nil {
 		t.Error(err)
 	}
 	time.Sleep(6 * time.Second)
@@ -350,9 +350,9 @@ func TestConfirm(t *testing.T) {
 		if ok {
 			t.Error("invalid accepted txs")
 		}
-		tr, err := GetTxInfo(s.DB, trs[i].Hash())
-		if err != nil {
-			t.Error(err)
+		tr, err2 := GetTxInfo(s.DB, trs[i].Hash())
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if !tr.IsAccepted() {
 			t.Error("invalid Cofnrim", i)
@@ -371,9 +371,9 @@ func TestConfirm(t *testing.T) {
 		if ok {
 			t.Error("invalid accepted txs")
 		}
-		tr, err := GetTxInfo(s.DB, trs[i].Hash())
-		if err != nil {
-			t.Error(err)
+		tr, err2 := GetTxInfo(s.DB, trs[i].Hash())
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if tr.IsAccepted() {
 			t.Error("invalid Cofnrim", i)
@@ -393,9 +393,9 @@ func TestConfirm(t *testing.T) {
 		if !ok {
 			t.Error("invalid accepted txs")
 		}
-		tr, err := GetTxInfo(s.DB, trs2[i].Hash())
-		if err != nil {
-			t.Error(err)
+		tr, err2 := GetTxInfo(s.DB, trs2[i].Hash())
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if !tr.IsAccepted() {
 			t.Error("invalid Cofnrim", i)
@@ -414,9 +414,9 @@ func TestConfirm(t *testing.T) {
 		if !ok {
 			t.Error("invalid accepted txs")
 		}
-		tr, err := GetTxInfo(s.DB, trs2[i].Hash())
-		if err != nil {
-			t.Error(err)
+		tr, err2 := GetTxInfo(s.DB, trs2[i].Hash())
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if tr.IsAccepted() {
 			t.Error("invalid Cofnrim", i)
@@ -447,9 +447,9 @@ func TestConfirm(t *testing.T) {
 		if ok {
 			t.Error("invalid accepted txs")
 		}
-		tr, err := GetTxInfo(s.DB, trs[i].Hash())
-		if err != nil {
-			t.Error(err)
+		tr, err2 := GetTxInfo(s.DB, trs[i].Hash())
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if !tr.IsAccepted() {
 			t.Error("invalid Cofnrim", i)
@@ -468,9 +468,9 @@ func TestConfirm(t *testing.T) {
 		if ok {
 			t.Error("invalid accepted txs")
 		}
-		tr, err := GetTxInfo(s.DB, trs[i].Hash())
-		if err != nil {
-			t.Error(err)
+		tr, err2 := GetTxInfo(s.DB, trs[i].Hash())
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if tr.IsAccepted() {
 			t.Error("invalid Cofnrim", i)
@@ -489,9 +489,9 @@ func TestConfirm(t *testing.T) {
 		if !ok {
 			t.Error("invalid accepted txs")
 		}
-		tr, err := GetTxInfo(s.DB, tr.Hash())
-		if err != nil {
-			t.Error(err)
+		tr, err2 := GetTxInfo(s.DB, tr.Hash())
+		if err2 != nil {
+			t.Error(err2)
 		}
 		if tr.IsAccepted() {
 			t.Error("invalid Cofnrim", i)

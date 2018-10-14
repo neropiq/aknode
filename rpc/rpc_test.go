@@ -23,7 +23,6 @@ package rpc
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -37,7 +36,6 @@ import (
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
-	"github.com/AidosKuneen/aklib/rpc"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
@@ -200,33 +198,4 @@ func TestAPIFee(t *testing.T) {
 	if resp.ID != "curltest" {
 		t.Error("id must be curltest")
 	}
-}
-
-func testsendtoaddress2(t *testing.T, adr1 string, v float64) tx.Hash {
-	req := &rpc.Request{
-		JSONRPC: "1.0",
-		ID:      "curltest",
-		Method:  "sendtoaddress",
-	}
-	var err error
-	params := []interface{}{adr1, v}
-	req.Params, err = json.Marshal(params)
-	if err != nil {
-		t.Error(err)
-	}
-	var resp rpc.Response
-
-	err = sendtoaddress(&s, req, &resp)
-	if err != nil {
-		t.Error(err)
-	}
-	txid, ok := resp.Result.(string)
-	if !ok {
-		t.Error("invalid resp")
-	}
-	h, err := hex.DecodeString(txid)
-	if err != nil {
-		t.Error(err)
-	}
-	return h
 }

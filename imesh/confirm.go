@@ -37,7 +37,7 @@ func merge(base, refs map[[34]byte]tx.Hash, conflicts, conf map[[32]byte]struct{
 		if h, ok := base[k]; !ok {
 			base[k] = v
 		} else {
-			if bytes.Compare(v, h) == 0 {
+			if bytes.Equal(v, h) {
 				continue
 			}
 			if bytes.Compare(v, h) < 0 {

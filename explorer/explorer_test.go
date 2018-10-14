@@ -249,7 +249,7 @@ func TestExploere(t *testing.T) {
 	}
 	id := ledger.ID()
 	t.Log("ledger id", hex.EncodeToString(id[:]))
-	if err := akconsensus.PutLedger(&s, ledger); err != nil {
+	if err = akconsensus.PutLedger(&s, ledger); err != nil {
 		t.Fatal(err)
 	}
 	akconsensus.SetLatest(ledger)

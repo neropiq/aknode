@@ -237,7 +237,7 @@ func TestConsensus(t *testing.T) {
 		select {
 		case tr = <-ch: //l3
 		case <-time.Tick(10 * time.Second):
-			t.Fatal("failed to notify")
+			t.Error("failed to notify")
 		}
 		if len(tr) != 4 {
 			t.Error("invalid accepted txs")
@@ -256,7 +256,7 @@ func TestConsensus(t *testing.T) {
 		select {
 		case tr = <-ch: //l7
 		case <-time.Tick(10 * time.Second):
-			t.Fatal("failed to notify")
+			t.Error("failed to notify")
 		}
 		if len(tr) != 2 {
 			t.Error("invalid accepted txs", len(tr))
@@ -275,7 +275,7 @@ func TestConsensus(t *testing.T) {
 		select {
 		case tr = <-ch: //l6
 		case <-time.Tick(10 * time.Second):
-			t.Fatal("failed to notify")
+			t.Error("failed to notify")
 		}
 		if len(tr) != 1 {
 			t.Error("invalid accepted txs", len(tr))

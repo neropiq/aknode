@@ -122,6 +122,7 @@ func Init(s *setting.Setting, p network) error {
 	if err == badger.ErrKeyNotFound {
 		return nil
 	}
+	goRetryLedger(s)
 	return err
 }
 
@@ -352,14 +353,14 @@ func Confirm(s *setting.Setting, l *consensus.Ledger) error {
 			return err
 		}
 		if !has {
-			if err := imesh.AddNoexistTxHash(s, t, tx.TypeNormal); err != nil {
-				return err
+			if err2 := imesh.AddNoexistTxHash(s, t, tx.TypeNormal); err2 != nil {
+				return err2
 			}
 			return errors.New("no tx:" + t.String())
 		}
-		hs, err := imesh.Confirm(s, t, l.ID())
-		if err != nil {
-			return err
+		hs, err2 := imesh.Confirm(s, t, l.ID())
+		if err2 != nil {
+			return err2
 		}
 		tr = append(tr, hs...)
 		latestSolidLedger = ll
