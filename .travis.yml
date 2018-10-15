@@ -16,6 +16,7 @@ before_install:
 - go generate -x ./...
 
 script:
+- go test  ./node. -tags travis -v  -timeout 100m -covermode=count -coverprofile=coverage.out
 - travis_wait 30 go test  -coverpkg ./akconsensus,./explorer,./imesh,./msg,./node,./rpc,./setting,./walletImpl,./imesh/leaves  ./... -tags travis -v  -timeout 100m -covermode=count -coverprofile=coverage.out
 
 after_success:
