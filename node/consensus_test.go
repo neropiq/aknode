@@ -90,6 +90,7 @@ func TestConsensus(t *testing.T) {
 		t.Error(err2)
 	}
 	defer func() {
+		peers.cons.Stop()
 		if err := l.Close(); err != nil {
 			t.Error(err)
 		}

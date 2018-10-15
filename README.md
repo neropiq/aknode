@@ -6,7 +6,7 @@
 
 ## Overview
 
-This  library is the node server for Aidos Kuneen for step2, 
+This is the node server for Aidos Kuneen for step2, 
 including:
 
 * Messaging between nodes (Testing)
@@ -15,7 +15,7 @@ including:
 * RPC APIs with Wallet Service (Testing)
 
 
-UNDER CONSTRUCTION (~_~)
+UNDER CONSTRUCTION. DON'T TOUCH ME.
 
 
 ## Requirements
