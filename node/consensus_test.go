@@ -45,6 +45,18 @@ func TestConsensus(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
+	tr := tx.New(s.Config, genesis)
+	tr.AddInput(genesis, 0)
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
+		t.Error(err)
+	}
+	if err := tr.Sign(a); err != nil {
+		t.Error(err)
+	}
+	if err := tr.PoW(); err != nil {
+		t.Error(err)
+	}
+
 	//peer
 	seed := address.GenerateSeed32()
 	akseed := address.HDSeed58(s.Config, seed, []byte(""), true)
@@ -70,18 +82,6 @@ func TestConsensus(t *testing.T) {
 	s1.TrustedNodes = []string{pub.Address58(s.Config)}
 
 	if err := akconsensus.Init(&s, &ConsensusPeer{}); err != nil {
-		t.Error(err)
-	}
-
-	tr := tx.New(s.Config, genesis)
-	tr.AddInput(genesis, 0)
-	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
-		t.Error(err)
-	}
-	if err := tr.Sign(a); err != nil {
-		t.Error(err)
-	}
-	if err := tr.PoW(); err != nil {
 		t.Error(err)
 	}
 
