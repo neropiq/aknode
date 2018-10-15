@@ -48,6 +48,8 @@ func setup(t *testing.T) {
 	if err := os.RemoveAll("./test_db"); err != nil {
 		log.Println(err)
 	}
+	s = setting.Setting{}
+	s1 = setting.Setting{}
 	s.DB, err2 = db.Open("./test_db")
 	if err2 != nil {
 		panic(err2)

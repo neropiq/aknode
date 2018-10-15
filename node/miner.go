@@ -25,13 +25,11 @@ import (
 	"errors"
 	"log"
 
-	"github.com/AidosKuneen/aknode/imesh/leaves"
-
 	"github.com/AidosKuneen/aklib"
-
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh"
+	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/setting"
 )
 

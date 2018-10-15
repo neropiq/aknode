@@ -89,12 +89,7 @@ func TestConsensus(t *testing.T) {
 	if err2 != nil {
 		t.Error(err2)
 	}
-	defer func() {
-		peers.cons.Stop()
-		if err := l.Close(); err != nil {
-			t.Error(err)
-		}
-	}()
+
 	if err2 = startConsensus(&s); err2 != nil {
 		t.Error(err2)
 	}
@@ -105,6 +100,15 @@ func TestConsensus(t *testing.T) {
 	if err2 != nil {
 		t.Error(err2)
 	}
+	defer func() {
+		peers.cons.Stop()
+		if err := conn.Close(); err != nil {
+			t.Log(err)
+		}
+		if err := l.Close(); err != nil {
+			t.Log(err)
+		}
+	}()
 	tcpconn, ok := conn.(*net.TCPConn)
 	if !ok {
 		t.Error("invalid connection")

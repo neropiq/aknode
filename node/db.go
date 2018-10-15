@@ -23,6 +23,7 @@ package node
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/rand"
@@ -46,6 +47,11 @@ var verNonce uint64
 
 //Init loads node IP addresses from DB.
 func initDB(s *setting.Setting) error {
+	nodesDB.Addrs = make(adrmap)
+	//peers is a slice of connecting peers.
+	peers.Peers = make(map[string]*peer)
+	peers.banned = make(map[string]time.Time)
+
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &nodesDB.Addrs, db.HeaderNodeIP)
 	})

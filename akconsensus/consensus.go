@@ -109,6 +109,12 @@ func LatestLedger() *consensus.Ledger {
 
 //Init initialize consensus.
 func Init(s *setting.Setting, p network) error {
+	notify = nil
+	proposals = make(map[consensus.ProposalID]time.Time)
+	validations = make(map[consensus.ValidationID]time.Time)
+	latestLedger = consensus.Genesis
+	latestSolidLedger = consensus.Genesis
+
 	peer = p
 	err := s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &latestSolidLedger, db.HeaderLastLedger)
