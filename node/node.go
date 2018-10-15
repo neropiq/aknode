@@ -242,9 +242,9 @@ func Start(setting *setting.Setting, debug bool) (net.Listener, error) {
 			return nil, err
 		}
 		connect(setting)
-	}
-	if err := startConsensus(setting); err != nil {
-		return nil, err
+		if err := startConsensus(setting); err != nil {
+			return nil, err
+		}
 	}
 	l, err := start(setting)
 	return l, err

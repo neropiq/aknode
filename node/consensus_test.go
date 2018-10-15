@@ -302,14 +302,14 @@ func TestConsensus(t *testing.T) {
 		t.Error(err2)
 	}
 	if cmd != msg.CmdTxs {
-		t.Error("cmd must be txs")
+		t.Error("cmd must be txs", cmd)
 	}
 	tr2, err2 := msg.ReadTxs(buf)
 	if err2 != nil {
 		t.Error(err2)
 	}
 	if len(tr2) != 1 {
-		t.Error("invalid read txs")
+		t.Error("invalid read txs", cmd)
 	}
 	if tr2[0].Tx.Hash().Array() != tr.Hash().Array() {
 		t.Error("invalid tx")
