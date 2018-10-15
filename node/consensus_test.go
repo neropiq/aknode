@@ -302,30 +302,7 @@ func TestConsensus(t *testing.T) {
 		t.Error("invalid tx")
 	}
 
-	if err := msg.Write(&s1, &inv, msg.CmdGetData, conn); err != nil {
-		t.Error(err)
-	}
-	cmd, buf, err2 = msg.ReadHeader(&s1, conn)
-	if err2 != nil {
-		t.Error(err2)
-	}
-	if cmd != msg.CmdTxs {
-		t.Error("cmd must be txs", cmd)
-	}
-	tr2, err2 := msg.ReadTxs(buf)
-	if err2 != nil {
-		t.Error(err2)
-	}
-	if len(tr2) != 1 {
-		t.Error("invalid read txs", cmd)
-	}
-	if tr2[0].Tx.Hash().Array() != tr.Hash().Array() {
-		t.Error("invalid tx")
-	}
-	if tr2[0].Type != msg.InvTxNormal {
-		t.Error("invalid type")
-	}
-	log.Println("end of sharing a tx", tr2[0].Tx.Hash())
+	log.Println("end of sharing a tx", tr.Hash())
 
 	//wait for proposal
 	time.Sleep(5 * time.Second)
@@ -353,6 +330,30 @@ func TestConsensus(t *testing.T) {
 	if !bytes.Equal(prop.Position[:], tr.Hash()) {
 		t.Error("invalid proposal position",
 			hex.EncodeToString(prop.Position[:]), tr.Hash())
+	}
+
+	if err := msg.Write(&s1, &inv, msg.CmdGetData, conn); err != nil {
+		t.Error(err)
+	}
+	cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+	if err2 != nil {
+		t.Error(err2)
+	}
+	if cmd != msg.CmdTxs {
+		t.Error("cmd must be txs", cmd)
+	}
+	tr2, err2 := msg.ReadTxs(buf)
+	if err2 != nil {
+		t.Error(err2)
+	}
+	if len(tr2) != 1 {
+		t.Error("invalid read txs", cmd)
+	}
+	if tr2[0].Tx.Hash().Array() != tr.Hash().Array() {
+		t.Error("invalid tx")
+	}
+	if tr2[0].Type != msg.InvTxNormal {
+		t.Error("invalid type")
 	}
 
 	pro = consensus.Proposal{
