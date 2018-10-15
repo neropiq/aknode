@@ -58,8 +58,6 @@ func (a *Adaptor) AcquireLedger(id consensus.LedgerID) (*consensus.Ledger, error
 	if err == nil {
 		return l, nil
 	}
-	log.Println("no ledger while aq", hex.EncodeToString(id[:]))
-	panic("")
 	peer.GetLedger(a.s, id)
 	return nil, errors.New("not found")
 }
