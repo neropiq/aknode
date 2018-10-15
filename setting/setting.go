@@ -30,11 +30,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/AidosKuneen/consensus"
-
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
+	"github.com/AidosKuneen/consensus"
 	"github.com/dgraph-io/badger"
 )
 

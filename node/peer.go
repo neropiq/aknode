@@ -32,7 +32,6 @@ import (
 
 	akrand "github.com/AidosKuneen/aklib/rand"
 	"github.com/AidosKuneen/aklib/tx"
-	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/setting"
@@ -50,6 +49,7 @@ const (
 var peers = struct {
 	Peers  map[string]*peer
 	banned map[string]time.Time
+	cons   *consensus.Peer
 	sync.RWMutex
 }{
 	Peers:  make(map[string]*peer),
@@ -68,7 +68,6 @@ type peer struct {
 	remote  msg.Addr
 	written []wdata
 	sync.RWMutex
-	cons *consensus.Peer
 }
 
 //GetBanned returns a banned list.
@@ -155,22 +154,10 @@ func newPeer(v *msg.Version, conn *net.TCPConn, s *setting.Setting) (*peer, erro
 			v.AddrFrom.Address = net.JoinHostPort(remote, po)
 		}
 	}
-	var id consensus.NodeID
-	if s.RunValidator && s.ValidatorSecret != "" {
-		adr, err := s.ValidatorAddress()
-		if err != nil {
-			return nil, err
-		}
-		copy(id[:], adr.Address(s.Config)[2:])
-	}
-	unl, err := s.TrustedNodeIDs()
-	if err != nil {
-		return nil, err
-	}
+
 	p := &peer{
 		conn:   conn,
 		remote: v.AddrFrom,
-		cons:   consensus.NewPeer(akconsensus.NewAdaptor(s), id, unl, s.RunValidator),
 	}
 	peers.RLock()
 	defer peers.RUnlock()
@@ -289,6 +276,7 @@ func (p *peer) write(s *setting.Setting, m interface{}, cmd byte) error {
 	if err := p.conn.SetWriteDeadline(time.Now().Add(rwTimeout)); err != nil {
 		return err
 	}
+	log.Println("writing", cmd, p.remote)
 	return msg.Write(s, m, cmd, p.conn)
 }
 

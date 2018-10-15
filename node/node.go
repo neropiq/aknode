@@ -30,8 +30,10 @@ import (
 
 	"golang.org/x/net/proxy"
 
+	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/msg"
 	"github.com/AidosKuneen/aknode/setting"
+	"github.com/AidosKuneen/consensus"
 )
 
 func readVersion(s *setting.Setting, conn *net.TCPConn, nonce uint64) (*peer, error) {
@@ -160,6 +162,7 @@ func connect(s *setting.Setting) {
 }
 
 func start(setting *setting.Setting) (*net.TCPListener, error) {
+
 	ipport := fmt.Sprintf("%s:%d", setting.Bind, setting.Port)
 	tcpAddr, err2 := net.ResolveTCPAddr("tcp", ipport)
 	if err2 != nil {
@@ -240,6 +243,28 @@ func Start(setting *setting.Setting, debug bool) (net.Listener, error) {
 		}
 		connect(setting)
 	}
+	if err := startConsensus(setting); err != nil {
+		return nil, err
+	}
 	l, err := start(setting)
 	return l, err
+}
+
+func startConsensus(setting *setting.Setting) error {
+	var id consensus.NodeID
+	if setting.RunValidator && setting.ValidatorSecret != "" {
+		adr, err := setting.ValidatorAddress()
+		if err != nil {
+			return err
+		}
+		copy(id[:], adr.Address(setting.Config)[2:])
+	}
+	unl, err := setting.TrustedNodeIDs()
+	if err != nil {
+		return err
+	}
+	peers.cons = consensus.NewPeer(akconsensus.NewAdaptor(setting), id,
+		unl, setting.RunValidator)
+	peers.cons.Start()
+	return nil
 }

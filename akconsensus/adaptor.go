@@ -21,6 +21,7 @@
 package akconsensus
 
 import (
+	"encoding/hex"
 	"errors"
 	"log"
 	"sort"
@@ -33,10 +34,15 @@ import (
 	"github.com/AidosKuneen/consensus"
 )
 
+type network interface {
+	GetLedger(s *setting.Setting, id consensus.LedgerID)
+	BroadcastProposal(s *setting.Setting, p *consensus.Proposal)
+	BroadcastValidatoin(s *setting.Setting, v *consensus.Validation)
+}
+
 //Adaptor is an adaptor for consensus.
 type Adaptor struct {
-	s       *setting.Setting
-	network network
+	s *setting.Setting
 }
 
 //NewAdaptor returns a instance of Adaptor.
@@ -52,6 +58,8 @@ func (a *Adaptor) AcquireLedger(id consensus.LedgerID) (*consensus.Ledger, error
 	if err == nil {
 		return l, nil
 	}
+	log.Println("no ledger while aq", hex.EncodeToString(id[:]))
+	panic("")
 	peer.GetLedger(a.s, id)
 	return nil, errors.New("not found")
 }
@@ -106,13 +114,22 @@ func (a *Adaptor) OnClose(prev *consensus.Ledger, now time.Time, mode consensus.
 		log.Println(err)
 		return nil
 	}
-	return consensus.TxSet{
+	s := consensus.TxSet{
 		tr.ID(): tr,
 	}
+	id := s.ID()
+	log.Println("onclose", tr.Hash(), "txsetid", hex.EncodeToString(id[:]))
+	return s
 }
 
 // OnAccept is called when ledger is accepted by consensus
 func (a *Adaptor) OnAccept(l *consensus.Ledger) {
+	for h := range l.Txs {
+		log.Println("onaccepted:", hex.EncodeToString(h[:]))
+	}
+	if len(l.Txs) == 0 {
+		log.Println("no txs is onaccepted")
+	}
 	if err := Confirm(a.s, l); err != nil {
 		log.Println(err)
 		return
@@ -136,12 +153,12 @@ func (a *Adaptor) Propose(prop *consensus.Proposal) {
 		return
 	}
 	prop.Signature = arypack.Marshal(sig)
-	a.network.BroadcastProposal(a.s, prop)
+	peer.BroadcastProposal(a.s, prop)
 }
 
 //SharePosition  shares a received Peer proposal with other Peer's.
 func (a *Adaptor) SharePosition(prop *consensus.Proposal) {
-	a.network.BroadcastProposal(a.s, prop)
+	peer.BroadcastProposal(a.s, prop)
 }
 
 // ShareTx shares a disputed transaction with Peers
@@ -164,5 +181,14 @@ func (a *Adaptor) ShareValidaton(v *consensus.Validation) {
 		return
 	}
 	v.Signature = arypack.Marshal(sig)
-	a.network.BroadcastValidatoin(a.s, v)
+	peer.BroadcastValidatoin(a.s, v)
+}
+
+// ShouldAccept returns true if the result should be accepted
+func (a *Adaptor) ShouldAccept(result *consensus.Result) bool {
+	log.Println("#proposers", result.Proposers)
+	if len(a.s.TrustedNodes)/2+1 > int(result.Proposers) {
+		return false
+	}
+	return true
 }

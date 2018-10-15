@@ -247,7 +247,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 				continue
 			}
 		case msg.CmdLedger:
-			v, err := akconsensus.ReadLeadger(p.cons, buf)
+			v, err := akconsensus.ReadLeadger(s, peers.cons, buf)
 			if err != nil {
 				return err
 			}
@@ -259,7 +259,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 				return err
 			}
 		case msg.CmdValidation:
-			v, noexist, err := akconsensus.ReadValidation(s, p.cons, buf)
+			v, noexist, err := akconsensus.ReadValidation(s, peers.cons, buf)
 			if err != nil {
 				return err
 			}
@@ -268,8 +268,10 @@ func (p *peer) runLoop(s *setting.Setting) error {
 			}
 
 		case msg.CmdProposal:
-			v, noexist, err := akconsensus.ReadProposal(s, p.cons, buf)
+			log.Println("recv propsal", len(buf))
+			v, noexist, err := akconsensus.ReadProposal(s, peers.cons, buf)
 			if err != nil {
+				log.Println(err)
 				return err
 			}
 			if noexist {

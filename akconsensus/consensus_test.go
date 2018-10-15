@@ -27,8 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AidosKuneen/consensus"
-
 	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
@@ -36,6 +34,7 @@ import (
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/imesh/leaves"
 	"github.com/AidosKuneen/aknode/setting"
+	"github.com/AidosKuneen/consensus"
 )
 
 var s setting.Setting

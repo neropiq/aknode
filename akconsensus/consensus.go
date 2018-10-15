@@ -22,6 +22,7 @@ package akconsensus
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"log"
 	"sync"
@@ -84,7 +85,7 @@ func fromLedger(s *setting.Setting, l *ledger) (*consensus.Ledger, error) {
 		CloseTimeAgree:      l.CloseTimeAgree,
 	}
 	le.IndexOf = consensus.IndexOfFunc(le, func(lid consensus.LedgerID) (*consensus.Ledger, error) {
-		return getLedger(s, lid)
+		return GetLedger(s, lid)
 	})
 	if l.Txs != nil {
 		t, err := imesh.GetTx(s.DB, l.Txs)
@@ -97,12 +98,6 @@ func fromLedger(s *setting.Setting, l *ledger) (*consensus.Ledger, error) {
 	}
 
 	return le, nil
-}
-
-type network interface {
-	GetLedger(s *setting.Setting, id consensus.LedgerID)
-	BroadcastProposal(s *setting.Setting, p *consensus.Proposal)
-	BroadcastValidatoin(s *setting.Setting, v *consensus.Validation)
 }
 
 //LatestLedger returns the last ledger.
@@ -141,14 +136,22 @@ func handleValidation(s *setting.Setting, peer *consensus.Peer, p *consensus.Val
 	if !bytes.Equal(adr[2:], p.NodeID[:]) {
 		return false, errors.New("invalid nodeID")
 	}
-	if _, ok := validations[p.ID()]; ok {
-		return false, nil
-	}
-	validations[p.ID()] = time.Now()
-	for k, v := range validations {
-		if time.Now().After(v.Add(time.Hour)) {
-			delete(validations, k)
+	noexist := func() bool {
+		mutex.Lock()
+		defer mutex.Unlock()
+		if _, ok := validations[p.ID()]; ok {
+			return false
 		}
+		validations[p.ID()] = time.Now()
+		for k, v := range validations {
+			if time.Now().After(v.Add(50 * time.Second)) {
+				delete(validations, k)
+			}
+		}
+		return true
+	}()
+	if !noexist {
+		return false, nil
 	}
 	adr = append(s.Config.PrefixNode, p.NodeID[:]...)
 	adrstr, err := address.Address58(s.Config, adr)
@@ -177,15 +180,22 @@ func handleProposal(s *setting.Setting, peer *consensus.Peer, p *consensus.Propo
 	if !bytes.Equal(adr[2:], p.NodeID[:]) {
 		return false, errors.New("invalid nodeID")
 	}
-
-	if _, ok := proposals[p.ID()]; ok {
-		return false, nil
-	}
-	proposals[p.ID()] = time.Now()
-	for k, v := range proposals {
-		if time.Now().After(v.Add(time.Hour)) {
-			delete(proposals, k)
+	noexist := func() bool {
+		mutex.Lock()
+		defer mutex.Unlock()
+		if _, ok := proposals[p.ID()]; ok {
+			return false
 		}
+		proposals[p.ID()] = time.Now()
+		for k, v := range proposals {
+			if time.Now().After(v.Add(time.Hour)) {
+				delete(proposals, k)
+			}
+		}
+		return true
+	}()
+	if !noexist {
+		return false, nil
 	}
 	adr = append(s.Config.PrefixNode, p.NodeID[:]...)
 	adrstr, err := address.Address58(s.Config, adr)
@@ -199,6 +209,7 @@ func handleProposal(s *setting.Setting, peer *consensus.Peer, p *consensus.Propo
 }
 
 //PutLedger puts a ledger.
+//called from consensus.Peer
 func PutLedger(s *setting.Setting, l *consensus.Ledger) error {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -216,13 +227,8 @@ func putLedger(s *setting.Setting, l *consensus.Ledger) error {
 }
 
 //GetLedger gets a ledger whose ID is id.
+//called from consensus.Peer, should not lock.
 func GetLedger(s *setting.Setting, id consensus.LedgerID) (*consensus.Ledger, error) {
-	mutex.RLock()
-	defer mutex.RUnlock()
-	return getLedger(s, id)
-}
-
-func getLedger(s *setting.Setting, id consensus.LedgerID) (*consensus.Ledger, error) {
 	if id == consensus.GenesisID {
 		return consensus.Genesis, nil
 	}
@@ -244,7 +250,7 @@ func ReadGetLeadger(buf []byte) (consensus.LedgerID, error) {
 }
 
 //ReadLeadger parse a Ledger command.
-func ReadLeadger(peer *consensus.Peer, buf []byte) (*consensus.Ledger, error) {
+func ReadLeadger(s *setting.Setting, peer *consensus.Peer, buf []byte) (*consensus.Ledger, error) {
 	var v consensus.Ledger
 	err := arypack.Unmarshal(buf, &v)
 	v.IndexOf = consensus.IndexOfFunc(&v, peer.AcquireLedger)
@@ -258,22 +264,17 @@ func ReadValidation(s *setting.Setting, peer *consensus.Peer, buf []byte) (*cons
 	if err != nil {
 		return nil, false, err
 	}
-	mutex.Lock()
 	noexist, err := handleValidation(s, peer, &v)
-	mutex.Unlock()
 	return &v, noexist, err
 }
 
 //ReadProposal parse a Proposal command.
 func ReadProposal(s *setting.Setting, peer *consensus.Peer, buf []byte) (*consensus.Proposal, bool, error) {
 	var v consensus.Proposal
-	err := arypack.Unmarshal(buf, &v)
-	if err != nil {
+	if err := arypack.Unmarshal(buf, &v); err != nil {
 		return nil, false, err
 	}
-	mutex.Lock()
 	noexist, err := handleProposal(s, peer, &v)
-	mutex.Unlock()
 	return &v, noexist, err
 }
 
@@ -296,10 +297,7 @@ func Confirm(s *setting.Setting, l *consensus.Ledger) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 	latestLedger = l
-	var ctx tx.Hash
-	for h := range l.Txs {
-		ctx = tx.Hash(h[:])
-	}
+
 	var tr []tx.Hash
 
 	if err := putLedger(s, l); err != nil {
@@ -310,12 +308,13 @@ func Confirm(s *setting.Setting, l *consensus.Ledger) error {
 	last := latestSolidLedger
 	//get all ledgers
 	for i := l.Seq; i > seq; i-- {
-		if _, err := getLedger(s, last.ParentID); err == badger.ErrKeyNotFound {
+		if _, err := GetLedger(s, last.ParentID); err == badger.ErrKeyNotFound {
+			log.Println("no ledger while confirm", hex.EncodeToString(last.ParentID[:]))
 			peer.GetLedger(s, last.ParentID)
 			time.Sleep(10 * time.Second)
 		}
 		var err error
-		last, err = getLedger(s, last.ParentID)
+		last, err = GetLedger(s, last.ParentID)
 		if err != nil {
 			return err
 		}
@@ -323,16 +322,19 @@ func Confirm(s *setting.Setting, l *consensus.Ledger) error {
 	//go backward
 	last = latestSolidLedger
 	for i := last.Seq; i >= seq; i-- {
-		var t tx.Hash
-		for h := range last.Txs {
-			t = tx.Hash(h[:])
-		}
-		_, err := imesh.RevertConfirmation(s, t, imesh.StatNo(last.ID()))
-		if err != nil {
-			return err
+		var err error
+		if len(last.Txs) != 0 {
+			var t tx.Hash
+			for h := range last.Txs {
+				t = tx.Hash(h[:])
+			}
+			_, err = imesh.RevertConfirmation(s, t, imesh.StatNo(last.ID()))
+			if err != nil {
+				return err
+			}
 		}
 		latestSolidLedger = last
-		last, err = getLedger(s, last.ParentID)
+		last, err = GetLedger(s, last.ParentID)
 		if err != nil {
 			return err
 		}
@@ -340,29 +342,31 @@ func Confirm(s *setting.Setting, l *consensus.Ledger) error {
 	//go forward
 	for i := seq; i <= l.Seq; i++ {
 		id := l.IndexOf(i)
-		ll, err := getLedger(s, id)
+		ll, err := GetLedger(s, id)
 		if err != nil {
 			return err
 		}
-		var t tx.Hash
-		for h := range ll.Txs {
-			t = tx.Hash(h[:])
-		}
-		has, err := imesh.Has(s, t)
-		if err != nil {
-			return err
-		}
-		if !has {
-			if err2 := imesh.AddNoexistTxHash(s, t, tx.TypeNormal); err2 != nil {
+		if len(ll.Txs) > 0 {
+			var t tx.Hash
+			for h := range ll.Txs {
+				t = tx.Hash(h[:])
+			}
+			has, err := imesh.Has(s, t)
+			if err != nil {
+				return err
+			}
+			if !has {
+				if err2 := imesh.AddNoexistTxHash(s, t, tx.TypeNormal); err2 != nil {
+					return err2
+				}
+				return errors.New("no tx:" + t.String())
+			}
+			hs, err2 := imesh.Confirm(s, t, l.ID())
+			if err2 != nil {
 				return err2
 			}
-			return errors.New("no tx:" + t.String())
+			tr = append(tr, hs...)
 		}
-		hs, err2 := imesh.Confirm(s, t, l.ID())
-		if err2 != nil {
-			return err2
-		}
-		tr = append(tr, hs...)
 		latestSolidLedger = ll
 	}
 
@@ -378,6 +382,13 @@ func Confirm(s *setting.Setting, l *consensus.Ledger) error {
 			}
 		}
 		notify <- txs
+	}
+	if len(l.Txs) == 0 {
+		return nil
+	}
+	var ctx tx.Hash
+	for h := range l.Txs {
+		ctx = tx.Hash(h[:])
 	}
 	return leaves.SetConfirmed(s, ctx)
 }

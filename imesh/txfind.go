@@ -94,6 +94,9 @@ func Init(s *setting.Setting) error {
 		if err := leaves.CheckAdd(s, tr); err != nil {
 			return err
 		}
+		if err := leaves.SetConfirmed(s, tr.Hash()); err != nil {
+			return err
+		}
 	}
 	err2 = s.DB.View(func(txn *badger.Txn) error {
 		return db.Get(txn, nil, &unresolved, db.HeaderUnresolvedInfo)

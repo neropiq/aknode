@@ -35,6 +35,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/AidosKuneen/aklib/address"
+
 	"github.com/AidosKuneen/aklib/updater"
 	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/explorer"
@@ -92,17 +94,19 @@ func main() {
 		os.Exit(1)
 	}
 	defaultpath := filepath.Join(usr.HomeDir, ".aknode", "aknode.json")
-	var verbose, update bool
+	var verbose, update, genkey bool
 	var fname string
 	flag.BoolVar(&verbose, "verbose", false, "outputs logs to stdout.")
 	flag.BoolVar(&update, "update", false, "check for update")
+	flag.BoolVar(&genkey, "genkey", false, "generate a validator key")
 	flag.StringVar(&fname, "config", defaultpath, "setting file path")
 	flag.Parse()
 
 	if update {
-		if err := updater.Update("AidosKuneen/akwallet", setting.Version); err != nil {
+		if err := updater.Update("AidosKuneen/aknode", setting.Version); err != nil {
 			log.Fatal(err)
 		}
+		return
 	}
 	info, err := os.Stat(fname)
 	if err != nil {
@@ -132,6 +136,20 @@ func main() {
 			MaxAge:     30 * 3, //days
 		}
 		log.SetOutput(l)
+	}
+	if genkey {
+		seed := address.GenerateSeed32()
+		akseed := address.HDSeed58(setting.Config, seed, []byte(""), true)
+		pub, err := address.NewNode(setting.Config, seed)
+		if err != nil {
+			log.Println(err)
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("Your validator secret key is", akseed)
+		fmt.Println("Your validator pulibic key is", pub)
+		fmt.Println("Keep the secret key secret.")
+		return
 	}
 
 	onSigs(setting)

@@ -36,23 +36,23 @@ import (
 
 //Commands in Header.
 const (
-	CmdVersion   byte = iota + 1 //Header + Version  p2p
-	CmdVerack                    // Header  p2p
-	CmdPing                      // Header + Nonce ,p2p
-	CmdPong                      // Header+ Nonce,p2p
-	CmdGetAddr                   // Header,p2p
-	CmdAddr                      // Header * Addrs,p2p
-	CmdInv                       // Header + Inventories,broadcast
-	CmdGetData                   // Header+ Inventories,p2p
-	CmdTxs                       // Header+ Txs,p2p
-	CmdGetLeaves                 // Header + LeavesFrom,p2p
-	CmdLeaves                    // Header + Inventories,p2p
-	CmdClose                     //Header,p2p
+	CmdVersion   byte = iota + 1 //Header + Version  p2p 1
+	CmdVerack                    // Header  p2p 2
+	CmdPing                      // Header + Nonce ,p2p 3
+	CmdPong                      // Header+ Nonce,p2p 4
+	CmdGetAddr                   // Header,p2p 5
+	CmdAddr                      // Header * Addrs,p2p 6
+	CmdInv                       // Header + Inventories,broadcast 7
+	CmdGetData                   // Header+ Inventories,p2p 8
+	CmdTxs                       // Header+ Txs,p2p 9
+	CmdGetLeaves                 // Header + LeavesFrom,p2p 10
+	CmdLeaves                    // Header + Inventories,p2p 11
+	CmdClose                     //Header,p2p 12
 
-	CmdGetLedger
-	CmdLedger
-	CmdValidation
-	CmdProposal
+	CmdGetLedger  //13
+	CmdLedger     //14
+	CmdValidation //15
+	CmdProposal   //16
 )
 
 //Services in Version mesasge.

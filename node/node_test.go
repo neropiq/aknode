@@ -75,6 +75,7 @@ func setup(t *testing.T) {
 		t.Error("invalid genesis")
 	}
 	genesis = gs[0]
+	t.Log("genesis tx", genesis)
 
 	s1.Config = aklib.DebugConfig
 	s1.MaxConnections = 1
