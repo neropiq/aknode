@@ -268,7 +268,6 @@ func (p *peer) runLoop(s *setting.Setting) error {
 			}
 
 		case msg.CmdProposal:
-			log.Println("recv propsal", len(buf))
 			v, noexist, err := akconsensus.ReadProposal(s, peers.cons, buf)
 			if err != nil {
 				log.Println(err)

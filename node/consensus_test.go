@@ -217,6 +217,14 @@ func TestConsensus(t *testing.T) {
 	if err2 != nil {
 		t.Error(err2)
 	}
+	//maybe changed position and sent
+	if cmd == msg.CmdProposal {
+		cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+		if err2 != nil {
+			t.Error(err2)
+		}
+	}
+
 	if cmd != msg.CmdValidation {
 		t.Error("cmd must be validation", cmd)
 	}
@@ -377,6 +385,13 @@ func TestConsensus(t *testing.T) {
 	cmd, buf, err2 = msg.ReadHeader(&s1, conn)
 	if err2 != nil {
 		t.Error(err2)
+	}
+	//maybe changed position and sent
+	if cmd == msg.CmdProposal {
+		cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+		if err2 != nil {
+			t.Error(err2)
+		}
 	}
 	if cmd != msg.CmdValidation {
 		t.Error("cmd must be validation", cmd)
