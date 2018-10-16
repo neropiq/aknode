@@ -21,11 +21,13 @@
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"net"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -96,7 +98,7 @@ func lookup(s *setting.Setting) error {
 	return nil
 }
 
-func connect(s *setting.Setting) {
+func connect(ctx context.Context, s *setting.Setting) {
 	dialer := net.Dial
 	if s.Proxy != "" {
 		p, err2 := proxy.SOCKS5("tcp", s.Proxy, nil, proxy.Direct)
@@ -105,63 +107,79 @@ func connect(s *setting.Setting) {
 		}
 		dialer = p.Dial
 	}
+	var stop uint32
+	go func() {
+		ctx2, cancel2 := context.WithCancel(ctx)
+		defer cancel2()
+		<-ctx2.Done()
+		atomic.StoreUint32(&stop, 1)
+	}()
 	for i := 0; i < int(s.MaxConnections); i++ {
 		go func(i int) {
-			for {
-				var p msg.Addr
-				found := false
-				for _, p = range get(0) {
-					if !isConnected(p.Address) {
-						found = true
-						break
+			for atomic.LoadUint32(&stop) == 0 {
+				errr := func() error {
+					var p msg.Addr
+					found := false
+					for _, p = range get(0) {
+						if !isConnected(p.Address) {
+							found = true
+							break
+						}
 					}
-				}
-				if !found {
-					log.Println("#", i, "no peers found, sleeping")
-					time.Sleep(time.Minute)
-					continue
-				}
-				if err := remove(s, p); err != nil {
-					log.Println(err)
-				}
+					if !found {
+						log.Println("#", i, "no peers found, sleeping")
+						time.Sleep(time.Minute)
+						return nil
+					}
+					if err := remove(s, p); err != nil {
+						log.Println(err)
+					}
 
-				conn, err3 := dialer("tcp", p.Address)
-				if err3 != nil {
-					log.Println(err3)
-					continue
+					conn, err3 := dialer("tcp", p.Address)
+					if err3 != nil {
+						return err3
+					}
+					tcpconn, ok := conn.(*net.TCPConn)
+					if !ok {
+						log.Fatal("invalid connection")
+					}
+					ctx2, cancel2 := context.WithCancel(ctx)
+					defer cancel2()
+					go func() {
+						<-ctx2.Done()
+						if err := tcpconn.Close(); err != nil {
+							log.Println(err)
+						}
+					}()
+					if err := tcpconn.SetDeadline(time.Now().Add(rwTimeout)); err != nil {
+						return err
+					}
+					if err := writeVersion(s, p, tcpconn, verNonce); err != nil {
+						return err
+					}
+					pr, err3 := readVersion(s, tcpconn, verNonce)
+					if err3 != nil {
+						return err3
+					}
+					if err := pr.add(s); err != nil {
+						return err
+					}
+					if err := putAddrs(s, p); err != nil {
+						log.Println(err)
+					}
+					log.Println("#", i, "connected to", p.Address)
+					pr.run(s)
+					return nil
+				}()
+				if errr != nil {
+					log.Println(errr)
 				}
-				tcpconn, ok := conn.(*net.TCPConn)
-				if !ok {
-					log.Fatal("invalid connection")
-				}
-				if err := tcpconn.SetDeadline(time.Now().Add(rwTimeout)); err != nil {
-					log.Println(err)
-					continue
-				}
-				if err := writeVersion(s, p, tcpconn, verNonce); err != nil {
-					log.Println(err)
-					continue
-				}
-				pr, err3 := readVersion(s, tcpconn, verNonce)
-				if err3 != nil {
-					log.Println(err3)
-					continue
-				}
-				if err := pr.add(s); err != nil {
-					log.Println(err)
-					continue
-				}
-				if err := putAddrs(s, p); err != nil {
-					log.Println(err)
-				}
-				log.Println("#", i, "connected to", p.Address)
-				pr.run(s)
 			}
 		}(i)
 	}
 }
 
-func start(setting *setting.Setting) (*net.TCPListener, error) {
+func start(ctx context.Context, setting *setting.Setting) (*net.TCPListener, error) {
 
 	ipport := fmt.Sprintf("%s:%d", setting.Bind, setting.Port)
 	tcpAddr, err2 := net.ResolveTCPAddr("tcp", ipport)
@@ -172,6 +190,14 @@ func start(setting *setting.Setting) (*net.TCPListener, error) {
 	if err2 != nil {
 		return nil, err2
 	}
+	go func() {
+		ctx2, cancel2 := context.WithCancel(ctx)
+		defer cancel2()
+		<-ctx2.Done()
+		if err := l.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
 	fmt.Printf("Starting node Server on " + ipport + "\n")
 	go func() {
 		defer func() {
@@ -191,18 +217,25 @@ func start(setting *setting.Setting) (*net.TCPListener, error) {
 				log.Println(err3)
 				return
 			}
+			ctx2, cancel2 := context.WithCancel(ctx)
 			go func() {
-				log.Println("connected from", conn.RemoteAddr())
-				if err := handle(setting, conn); err != nil {
-					log.Println(conn.RemoteAddr(), ":", err)
-				}
+				defer cancel2()
+				<-ctx2.Done()
 				if err := conn.Close(); err != nil {
 					log.Println(err)
 				}
 			}()
+			go func() {
+				defer cancel2()
+				log.Println("connected from", conn.RemoteAddr())
+				if err := handle(setting, conn); err != nil {
+					log.Println(conn.RemoteAddr(), ":", err)
+				}
+			}()
 		}
 	}()
-	goCron(setting)
+
+	goCron(ctx, setting)
 	return l, nil
 }
 
@@ -233,7 +266,7 @@ func handle(s *setting.Setting, conn *net.TCPConn) error {
 }
 
 //Start starts a node server.
-func Start(setting *setting.Setting, debug bool) (net.Listener, error) {
+func Start(ctx context.Context, setting *setting.Setting, debug bool) (net.Listener, error) {
 	if err := initDB(setting); err != nil {
 		return nil, err
 	}
@@ -241,16 +274,16 @@ func Start(setting *setting.Setting, debug bool) (net.Listener, error) {
 		if err := lookup(setting); err != nil {
 			return nil, err
 		}
-		connect(setting)
-		if err := startConsensus(setting); err != nil {
+		connect(ctx, setting)
+		if err := startConsensus(ctx, setting); err != nil {
 			return nil, err
 		}
 	}
-	l, err := start(setting)
+	l, err := start(ctx, setting)
 	return l, err
 }
 
-func startConsensus(setting *setting.Setting) error {
+func startConsensus(ctx context.Context, setting *setting.Setting) error {
 	var id consensus.NodeID
 	if setting.RunValidator && setting.ValidatorSecret != "" {
 		adr, err := setting.ValidatorAddress()
@@ -265,6 +298,6 @@ func startConsensus(setting *setting.Setting) error {
 	}
 	peers.cons = consensus.NewPeer(akconsensus.NewAdaptor(setting), id,
 		unl, setting.RunValidator)
-	peers.cons.Start()
+	peers.cons.Start(ctx)
 	return nil
 }

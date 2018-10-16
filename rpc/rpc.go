@@ -21,6 +21,7 @@
 package rpc
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -77,7 +78,7 @@ var rpcs = map[string]rpcfunc{
 }
 
 //Run runs RPC server.
-func Run(setting *setting.Setting) net.Listener {
+func Run(ctx context.Context, setting *setting.Setting) net.Listener {
 	ipport := fmt.Sprintf("%s:%d", setting.RPCBind, setting.RPCPort)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -105,6 +106,14 @@ func Run(setting *setting.Setting) net.Listener {
 	}
 	go func() {
 		log.Println(s.Serve(l))
+	}()
+	go func() {
+		ctx2, cancel2 := context.WithCancel(ctx)
+		defer cancel2()
+		<-ctx2.Done()
+		if err := s.Shutdown(ctx2); err != nil {
+			log.Print(err)
+		}
 	}()
 	return l
 }

@@ -22,6 +22,7 @@ package rpc
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"strings"
@@ -119,8 +120,10 @@ func confirmAll(t *testing.T, notify chan []tx.Hash, confirm bool) {
 }
 
 func TestWalletAPI2(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
 	defer teardown(t)
+	defer cancel()
 	pwd = []byte("pwd")
 	if err := New(&s, pwd); err != nil {
 		t.Error(err)
@@ -149,8 +152,10 @@ func TestWalletAPI2(t *testing.T) {
 }
 func TestWalletAPI(t *testing.T) {
 	debugNotify = make(chan string)
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
 	defer teardown(t)
+	defer cancel()
 	pwdd := []byte("pwd")
 	if err := New(&s, pwdd); err != nil {
 		t.Fatal(err)
@@ -161,7 +166,7 @@ func TestWalletAPI(t *testing.T) {
 	}
 	pwd = nil
 	var cnotify chan []tx.Hash
-	GoNotify(&s, node.RegisterTxNotifier, func(ch chan []tx.Hash) {
+	GoNotify(ctx, &s, node.RegisterTxNotifier, func(ch chan []tx.Hash) {
 		cnotify = ch
 	})
 	acs := []string{""}

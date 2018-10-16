@@ -22,6 +22,7 @@ package rpc
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net"
@@ -47,8 +48,10 @@ import (
 )
 
 func TestControlAPI(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
 	defer teardown(t)
+	defer cancel()
 
 	pwd = []byte("pwd")
 	if err := New(&s, pwd); err != nil {
@@ -58,7 +61,7 @@ func TestControlAPI(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	GoNotify(&s, node.RegisterTxNotifier, akconsensus.RegisterTxNotifier)
+	GoNotify(ctx, &s, node.RegisterTxNotifier, akconsensus.RegisterTxNotifier)
 	acs := []string{"ac1"}
 	var adr string
 	for _, ac := range acs {

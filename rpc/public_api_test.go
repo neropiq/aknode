@@ -22,6 +22,7 @@ package rpc
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"testing"
@@ -36,8 +37,10 @@ import (
 )
 
 func TestPublicAPI(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
 	defer teardown(t)
+	defer cancel()
 	testgetrawtx(t, true)
 	testgetrawtx(t, false)
 
@@ -81,7 +84,10 @@ func TestPublicAPI3(t *testing.T) {
 }
 
 func TestPublicAPI2(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
+	defer teardown(t)
+	defer cancel()
 	defer teardown(t)
 	tr2 := tx.New(s.Config, genesis)
 	tr2.AddInput(genesis, 0)

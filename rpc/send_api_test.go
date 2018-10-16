@@ -21,6 +21,7 @@
 package rpc
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"testing"
@@ -39,7 +40,10 @@ import (
 )
 
 func TestSendAPI(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
+	defer teardown(t)
+	defer cancel()
 	defer teardown(t)
 	pwdd := []byte("pwd")
 	{
@@ -56,7 +60,7 @@ func TestSendAPI(t *testing.T) {
 		}
 	}
 	pwd = nil
-	GoNotify(&s, node.RegisterTxNotifier, akconsensus.RegisterTxNotifier)
+	GoNotify(ctx, &s, node.RegisterTxNotifier, akconsensus.RegisterTxNotifier)
 	acs := []string{""}
 	adr2ac := make(map[string]string)
 	adr2val := make(map[string]uint64)

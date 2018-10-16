@@ -21,6 +21,7 @@
 package node
 
 import (
+	"context"
 	"net"
 	"strconv"
 	"testing"
@@ -34,8 +35,10 @@ import (
 )
 
 func TestMiner(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
 	defer teardown(t)
+	defer cancel()
 
 	s.RunFeeMiner = true
 	s.RunTicketMiner = true
@@ -45,11 +48,11 @@ func TestMiner(t *testing.T) {
 		t.Error(err)
 	}
 
-	l, err2 := start(&s)
+	l, err2 := start(ctx, &s)
 	if err2 != nil {
 		t.Error(err2)
 	}
-	RunMiner(&s)
+	RunMiner(ctx, &s)
 
 	to := net.JoinHostPort(s.Bind, strconv.Itoa(int(s.Port)))
 	conn, err2 := net.DialTimeout("tcp", to, 3*time.Second)

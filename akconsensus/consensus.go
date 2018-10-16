@@ -22,6 +22,7 @@ package akconsensus
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"log"
@@ -108,7 +109,7 @@ func LatestLedger() *consensus.Ledger {
 }
 
 //Init initialize consensus.
-func Init(s *setting.Setting, p network) error {
+func Init(ctx context.Context, s *setting.Setting, p network) error {
 	notify = nil
 	proposals = make(map[consensus.ProposalID]time.Time)
 	validations = make(map[consensus.ValidationID]time.Time)
@@ -123,7 +124,7 @@ func Init(s *setting.Setting, p network) error {
 	if err == badger.ErrKeyNotFound {
 		return nil
 	}
-	goRetryLedger(s)
+	goRetryLedger(ctx, s)
 	return err
 }
 
@@ -284,15 +285,21 @@ func ReadProposal(s *setting.Setting, peer *consensus.Peer, buf []byte) (*consen
 	return &v, noexist, err
 }
 
-func goRetryLedger(s *setting.Setting) {
+func goRetryLedger(ctx context.Context, s *setting.Setting) {
 	go func() {
+		ctx2, cancel2 := context.WithCancel(ctx)
+		defer cancel2()
 		for {
-			time.Sleep(5 * time.Second)
-			if latestLedger.ID() == latestSolidLedger.ID() {
-				continue
-			}
-			if err := Confirm(s, latestLedger); err != nil {
-				log.Println(err)
+			select {
+			case <-ctx2.Done():
+				return
+			case <-time.After(5 * time.Second):
+				if latestLedger.ID() == latestSolidLedger.ID() {
+					continue
+				}
+				if err := Confirm(s, latestLedger); err != nil {
+					log.Println(err)
+				}
 			}
 		}
 	}()

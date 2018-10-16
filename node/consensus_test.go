@@ -22,6 +22,7 @@ package node
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"log"
 	"net"
@@ -42,8 +43,10 @@ import (
 )
 
 func TestConsensus(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
 	defer teardown(t)
+	defer cancel()
 
 	tr := tx.New(s.Config, genesis)
 	tr.AddInput(genesis, 0)
@@ -81,16 +84,16 @@ func TestConsensus(t *testing.T) {
 	s1.ValidatorSecret = akseed1
 	s1.TrustedNodes = []string{pub.Address58(s.Config)}
 
-	if err := akconsensus.Init(&s, &ConsensusPeer{}); err != nil {
+	if err := akconsensus.Init(ctx, &s, &ConsensusPeer{}); err != nil {
 		t.Error(err)
 	}
 
-	l, err2 := start(&s)
+	_, err2 := start(ctx, &s)
 	if err2 != nil {
 		t.Error(err2)
 	}
 
-	if err2 = startConsensus(&s); err2 != nil {
+	if err2 = startConsensus(ctx, &s); err2 != nil {
 		t.Error(err2)
 	}
 	//ignore propose
@@ -100,15 +103,7 @@ func TestConsensus(t *testing.T) {
 	if err2 != nil {
 		t.Error(err2)
 	}
-	defer func() {
-		peers.cons.Stop()
-		if err := conn.Close(); err != nil {
-			t.Log(err)
-		}
-		if err := l.Close(); err != nil {
-			t.Log(err)
-		}
-	}()
+
 	tcpconn, ok := conn.(*net.TCPConn)
 	if !ok {
 		t.Error("invalid connection")

@@ -21,6 +21,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -34,6 +35,8 @@ import (
 	"runtime"
 	"syscall"
 	"time"
+
+	"github.com/AidosKuneen/aklib/db"
 
 	"github.com/AidosKuneen/aklib/address"
 
@@ -153,12 +156,15 @@ func main() {
 	}
 
 	onSigs(setting)
-	if err := initialize(setting); err != nil {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := initialize(ctx, setting); err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
 	}
 
 	<-setting.Stop
+	cancel()
 	time.Sleep(3 * time.Second)
 	if err := setting.DB.Close(); err != nil {
 		log.Println(err)
@@ -181,25 +187,35 @@ func checkWalletSeed(s *setting.Setting) error {
 	return nil
 }
 
-func initialize(setting *setting.Setting) error {
+func initialize(ctx context.Context, setting *setting.Setting) error {
+	db.GoGC(ctx, setting.DB)
 	if err := imesh.Init(setting); err != nil {
 		return err
 	}
 	if err := leaves.Init(setting); err != nil {
 		return err
 	}
-	if err := akconsensus.Init(setting, &node.ConsensusPeer{}); err != nil {
+	if err := akconsensus.Init(ctx, setting, &node.ConsensusPeer{}); err != nil {
 		return err
 	}
-	if _, err := node.Start(setting, false); err != nil {
+	if _, err := node.Start(ctx, setting, false); err != nil {
 		return err
 	}
 
 	if setting.Debug {
 		//for pprof
+		srv := &http.Server{Addr: "127.0.0.1:6061"}
 		go func() {
 			runtime.SetBlockProfileRate(1)
-			log.Println(http.ListenAndServe("127.0.0.1:6061", nil))
+			log.Println(srv.ListenAndServe())
+		}()
+		go func() {
+			ctx2, cancel2 := context.WithCancel(ctx)
+			defer cancel2()
+			<-ctx2.Done()
+			if err := srv.Shutdown(ctx2); err != nil {
+				log.Print(err)
+			}
 		}()
 	}
 
@@ -207,7 +223,7 @@ func initialize(setting *setting.Setting) error {
 		return err
 	}
 
-	rpc.GoNotify(setting, node.RegisterTxNotifier, akconsensus.RegisterTxNotifier)
+	rpc.GoNotify(ctx, setting, node.RegisterTxNotifier, akconsensus.RegisterTxNotifier)
 
 	if setting.RPCUser != "" {
 		if err := checkWalletSeed(setting); err != nil {
@@ -215,13 +231,13 @@ func initialize(setting *setting.Setting) error {
 		}
 	}
 	if setting.UsePublicRPC || setting.RPCUser != "" {
-		rpc.Run(setting)
+		rpc.Run(ctx, setting)
 	}
 	if setting.RunExplorer {
-		explorer.Run(setting)
+		explorer.Run(ctx, setting)
 	}
 	if setting.RunFeeMiner || setting.RunTicketMiner {
-		node.RunMiner(setting)
+		node.RunMiner(ctx, setting)
 	}
 	return nil
 }

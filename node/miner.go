@@ -21,6 +21,7 @@
 package node
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"log"
@@ -93,19 +94,31 @@ func issueTicket(s *setting.Setting) error {
 }
 
 //RunMiner runs a miner
-func RunMiner(s *setting.Setting) {
+func RunMiner(ctx context.Context, s *setting.Setting) {
 	mineCh = make(chan *tx.HashWithType, 1)
 
 	if s.RunTicketIssuer {
 		go func() {
+			ctx2, cancel2 := context.WithCancel(ctx)
+			defer cancel2()
 			if err := issueTicket(s); err != nil {
 				log.Println(err)
+			}
+			select {
+			case <-ctx2.Done():
+				return
+			default:
 			}
 		}()
 	}
 
 	go func() {
-		for h := range mineCh {
+		ctx2, cancel2 := context.WithCancel(ctx)
+		defer cancel2()
+		select {
+		case <-ctx2.Done():
+			return
+		case h := <-mineCh:
 			if err := mine(s, h); err != nil {
 				log.Println(err)
 			}

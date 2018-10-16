@@ -21,6 +21,7 @@
 package node
 
 import (
+	"context"
 	"log"
 	"net"
 	"os"
@@ -42,7 +43,7 @@ var s, s1 setting.Setting
 var a *address.Address
 var genesis tx.Hash
 
-func setup(t *testing.T) {
+func setup(ctx context.Context, t *testing.T) {
 	s = setting.Setting{}
 	s1 = setting.Setting{}
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
@@ -99,8 +100,10 @@ func teardown(t *testing.T) {
 	}
 }
 func TestNode(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
 	defer teardown(t)
+	defer cancel()
 	s.Config.DNS = []aklib.SRV{
 		aklib.SRV{
 			Service: "seeds",
@@ -121,8 +124,10 @@ func TestNode(t *testing.T) {
 	}
 }
 func TestNode2(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
 	defer teardown(t)
+	defer cancel()
 	tr := tx.New(s.Config, genesis)
 	tr.AddInput(genesis, 0)
 	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply); err != nil {
@@ -159,7 +164,7 @@ func TestNode2(t *testing.T) {
 		t.Error(err)
 	}
 
-	l, err2 := start(&s)
+	l, err2 := start(ctx, &s)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -465,8 +470,10 @@ func TestNode2(t *testing.T) {
 }
 
 func TestNode3(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
 	defer teardown(t)
+	defer cancel()
 
 	tcpAddr, err2 := net.ResolveTCPAddr("tcp", s1.MyHostPort)
 	if err2 != nil {
@@ -500,17 +507,19 @@ func TestNode3(t *testing.T) {
 	if err := putAddrs(&s, *msg.NewAddr("127.0.0.1"+s1.MyHostPort, msg.ServiceFull)); err != nil {
 		t.Error(err)
 	}
-	connect(&s)
+	connect(ctx, &s)
 	<-ch
 }
 func TestNode4(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
 	defer teardown(t)
+	defer cancel()
 	setReadDeadline = func(p *peer, t time.Time) error {
 		return p.conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	}
 
-	l, err2 := start(&s)
+	l, err2 := start(ctx, &s)
 	if err2 != nil {
 		t.Error(err2)
 	}

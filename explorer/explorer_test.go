@@ -21,6 +21,7 @@
 package explorer
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -49,7 +50,7 @@ var s setting.Setting
 var genesis tx.Hash
 var a *address.Address
 
-func setup(t *testing.T) {
+func setup(t *testing.T) context.CancelFunc {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	if err := os.RemoveAll("./test_db"); err != nil {
 		log.Println(err)
@@ -83,14 +84,17 @@ func setup(t *testing.T) {
 		t.Error("invalid genesis")
 	}
 	genesis = gs[0]
-	l, err = node.Start(&s, true)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	l, err = node.Start(ctx, &s, true)
 	if err != nil {
 		t.Error(err)
 	}
 	s.RunExplorer = true
 	s.ExplorerBind = "0.0.0.0"
 	s.ExplorerPort = 8080
-	Run(&s)
+	Run(ctx, &s)
+	return cancel
 }
 
 func teardown(t *testing.T) {
@@ -102,8 +106,9 @@ func teardown(t *testing.T) {
 	}
 }
 func TestExploere(t *testing.T) {
-	setup(t)
+	cancel := setup(t)
 	defer teardown(t)
+	defer cancel()
 	log.Println(genesis)
 	time.Sleep(3 * time.Second)
 	cl := http.Client{

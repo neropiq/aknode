@@ -21,6 +21,7 @@
 package node
 
 import (
+	"context"
 	"encoding/hex"
 	"log"
 	"time"
@@ -49,78 +50,90 @@ func RegisterTxNotifier(n chan []tx.Hash) {
 	notify = n
 }
 
-func goResolve(s *setting.Setting) {
-	for range ch {
-		log.Println("resolving unresolved transactions...")
-		trs, err2 := imesh.Resolve(s)
-		if err2 != nil {
-			log.Println(err2)
-			continue
-		}
-		for _, tr := range trs {
-			log.Println("resolved txid:", hex.EncodeToString(tr.Hash))
-		}
-		if len(trs) != 0 {
-			ntrs := make([]tx.Hash, 0, len(trs))
-			log.Println(" broadcasting resolved txs...")
-			inv := make(msg.Inventories, 0, len(trs))
-			for _, h := range trs {
-				typ, err3 := msg.TxType2InvType(h.Type)
-				if err3 != nil {
-					log.Println(err3)
-					continue
-				}
-				inv = append(inv, &msg.Inventory{
-					Type: typ,
-					Hash: h.Hash.Array(),
-				})
-				if (h.Type == tx.TypeRewardFee && s.RunFeeMiner) ||
-					(h.Type == tx.TypeRewardTicket && s.RunTicketMiner) {
-					addForMine(h)
-				}
-				if h.Type == tx.TypeNormal {
-					ntrs = append(ntrs, h.Hash)
-				}
-			}
-			WriteAll(s, inv, msg.CmdInv)
-			if notify != nil {
-				notify <- ntrs
-			}
-		}
-		ts, err2 := imesh.GetSearchingTx(s)
-		if err2 != nil {
-			log.Println(err2)
-			continue
-		}
-		if len(ts) != 0 {
-			log.Println("querying non-existent", len(ts), "transactions...")
-			inv := make(msg.Inventories, 0, len(ts))
-			for _, tr := range ts {
-				typ, err2 := msg.TxType2InvType(tr.Type)
-				if err2 != nil {
-					log.Println(err2)
-					continue
-				}
-				inv = append(inv, &msg.Inventory{
-					Type: typ,
-					Hash: tr.Hash.Array(),
-				})
-			}
-			writeGetData(s, inv)
-		}
-
-		//wait to collect noexsistence txs
-		time.Sleep(5 * time.Second)
+func resolve(s *setting.Setting) error {
+	log.Println("resolving unresolved transactions...")
+	trs, err2 := imesh.Resolve(s)
+	if err2 != nil {
+		return err2
 	}
+	for _, tr := range trs {
+		log.Println("resolved txid:", hex.EncodeToString(tr.Hash))
+	}
+	if len(trs) != 0 {
+		ntrs := make([]tx.Hash, 0, len(trs))
+		log.Println(" broadcasting resolved txs...")
+		inv := make(msg.Inventories, 0, len(trs))
+		for _, h := range trs {
+			typ, err3 := msg.TxType2InvType(h.Type)
+			if err3 != nil {
+				log.Println(err3)
+				continue
+			}
+			inv = append(inv, &msg.Inventory{
+				Type: typ,
+				Hash: h.Hash.Array(),
+			})
+			if (h.Type == tx.TypeRewardFee && s.RunFeeMiner) ||
+				(h.Type == tx.TypeRewardTicket && s.RunTicketMiner) {
+				addForMine(h)
+			}
+			if h.Type == tx.TypeNormal {
+				ntrs = append(ntrs, h.Hash)
+			}
+		}
+		WriteAll(s, inv, msg.CmdInv)
+		if notify != nil {
+			notify <- ntrs
+		}
+	}
+	ts, err2 := imesh.GetSearchingTx(s)
+	if err2 != nil {
+		return err2
+	}
+	if len(ts) != 0 {
+		log.Println("querying non-existent", len(ts), "transactions...")
+		inv := make(msg.Inventories, 0, len(ts))
+		for _, tr := range ts {
+			typ, err2 := msg.TxType2InvType(tr.Type)
+			if err2 != nil {
+				log.Println(err2)
+				continue
+			}
+			inv = append(inv, &msg.Inventory{
+				Type: typ,
+				Hash: tr.Hash.Array(),
+			})
+		}
+		writeGetData(s, inv)
+	}
+
+	//wait to collect noexsistence txs
+	time.Sleep(5 * time.Second)
+	return nil
 }
 
 //GoCron starts cron jobs.
-func goCron(s *setting.Setting) {
-	go goResolve(s)
+func goCron(ctx context.Context, s *setting.Setting) {
+	go func() {
+		ctx2, cancel2 := context.WithCancel(ctx)
+		defer cancel2()
+		select {
+		case <-ctx2.Done():
+			return
+		case <-ch:
+			if err := resolve(s); err != nil {
+				log.Println(err)
+			}
+		}
+	}()
 
 	go func() {
-		for {
-			time.Sleep(10 * time.Minute)
+		ctx2, cancel2 := context.WithCancel(ctx)
+		defer cancel2()
+		select {
+		case <-ctx2.Done():
+			return
+		case <-time.After(10 * time.Minute):
 			log.Println("querying latest leaves and node addressses..")
 			WriteAll(s, nil, msg.CmdGetLeaves)
 			WriteAll(s, nil, msg.CmdGetAddr)
@@ -133,8 +146,14 @@ func goCron(s *setting.Setting) {
 	}()
 	go func() {
 		for {
-			time.Sleep(5 * time.Minute)
-			Resolve()
+			ctx2, cancel2 := context.WithCancel(ctx)
+			defer cancel2()
+			select {
+			case <-ctx2.Done():
+				return
+			case <-time.After(5 * time.Minute):
+				Resolve()
+			}
 		}
 	}()
 }

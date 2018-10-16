@@ -22,6 +22,7 @@ package explorer
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"html/template"
@@ -56,7 +57,7 @@ const (
 var tmpl = template.New("")
 
 //Run runs explorer server.
-func Run(setting *setting.Setting) {
+func Run(ctx context.Context, setting *setting.Setting) {
 	p, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
@@ -149,6 +150,14 @@ func Run(setting *setting.Setting) {
 	fmt.Println("Starting Explorer Server on", ipport)
 	go func() {
 		log.Println(s.ListenAndServe())
+	}()
+	go func() {
+		ctx2, cancel2 := context.WithCancel(ctx)
+		defer cancel2()
+		<-ctx2.Done()
+		if err := s.Shutdown(ctx2); err != nil {
+			log.Print(err)
+		}
 	}()
 }
 

@@ -21,6 +21,7 @@
 package rpc
 
 import (
+	"context"
 	"encoding/hex"
 	"log"
 	"os/exec"
@@ -71,7 +72,7 @@ func GetOutput(s *setting.Setting, h *walletImpl.History) (*tx.Output, error) {
 
 //GoNotify runs gorouitine to get history of addresses in wallet.
 //This func needs to run even if RPC is stopped for collecting history.
-func GoNotify(s *setting.Setting, nreg, creg func(chan []tx.Hash)) {
+func GoNotify(ctx context.Context, s *setting.Setting, nreg, creg func(chan []tx.Hash)) {
 	nnotify := make(chan []tx.Hash, 10)
 	nreg(nnotify)
 	cnotify := make(chan []tx.Hash, 10)
@@ -79,7 +80,12 @@ func GoNotify(s *setting.Setting, nreg, creg func(chan []tx.Hash)) {
 	if s.WalletNotify != "" {
 		creg(cnotify)
 		go func() {
-			for noti := range cnotify {
+			ctx2, cancel2 := context.WithCancel(ctx)
+			defer cancel2()
+			select {
+			case <-ctx2.Done():
+				return
+			case noti := <-cnotify:
 				if err := walletnotifyRunCommand(s, noti); err != nil {
 					log.Println(err)
 				}
@@ -87,7 +93,12 @@ func GoNotify(s *setting.Setting, nreg, creg func(chan []tx.Hash)) {
 		}()
 	}
 	go func() {
-		for noti := range nnotify {
+		ctx2, cancel2 := context.WithCancel(ctx)
+		defer cancel2()
+		select {
+		case <-ctx2.Done():
+			return
+		case noti := <-cnotify:
 			trs := make([]*imesh.TxInfo, 0, len(noti))
 			for _, h := range noti {
 				tr, err := imesh.GetTxInfo(s.DB, h)

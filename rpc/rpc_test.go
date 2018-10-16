@@ -22,6 +22,7 @@ package rpc
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -51,7 +52,7 @@ var genesis tx.Hash
 var l net.Listener
 var tdir string
 
-func setup(t *testing.T) {
+func setup(ctx context.Context, t *testing.T) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	{
 		var err error
@@ -108,7 +109,7 @@ func setup(t *testing.T) {
 	s1.Port = uint16(rand.Int() % 65535)
 	s1.MyHostPort = ":" + strconv.Itoa(int(s1.Port))
 	var err error
-	l, err = node.Start(&s, true)
+	l, err = node.Start(ctx, &s, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -161,9 +162,11 @@ func (p *postparam) post(usr, pwd string) error {
 }
 
 func TestAPIFee(t *testing.T) {
-	setup(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	setup(ctx, t)
 	defer teardown(t)
-	Run(&s)
+	defer cancel()
+	Run(ctx, &s)
 	str := ""
 	setfee := &postparam{
 		body: `{"jsonrpc": "1.0", "id":"curltest", "method": "settxfee", "params": [0.00001] }`,
