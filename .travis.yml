@@ -16,7 +16,7 @@ before_install:
 - go generate -x ./...
 
 script:
-- travis_wait 30 go test  ./node -v  -timeout 100m -p 1
+- travis_wait 30 go test  ./node -run ^TestNode4$ -v  -timeout 100m -p 1
 - travis_wait 30 go test  -coverpkg ./...  ./... -tags travis -v  -timeout 100m -covermode=count -coverprofile=coverage.out -p 1
 
 after_success:
