@@ -43,18 +43,17 @@ var a *address.Address
 var genesis tx.Hash
 
 func setup(t *testing.T) {
+	s = setting.Setting{}
+	s1 = setting.Setting{}
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	var err2 error
 	if err := os.RemoveAll("./test_db"); err != nil {
 		log.Println(err)
 	}
-	s = setting.Setting{}
-	s1 = setting.Setting{}
 	s.DB, err2 = db.Open("./test_db")
 	if err2 != nil {
 		panic(err2)
 	}
-	s1.DB = s.DB
 
 	s.Config = aklib.DebugConfig
 	s.MaxConnections = 1
