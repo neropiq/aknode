@@ -286,6 +286,7 @@ func TestWalletAPI(t *testing.T) {
 		select {
 		case str := <-debugNotify:
 			str = strings.TrimSpace(str)
+			t.Log("notified", tr.Hash())
 			if str != tr.Hash().String() {
 				t.Error("invalid walletnotify", str, tr.Hash())
 			}
