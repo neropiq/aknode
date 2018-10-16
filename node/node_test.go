@@ -23,6 +23,7 @@ package node
 import (
 	"context"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -59,8 +60,8 @@ func setup(ctx context.Context, t *testing.T) {
 	s.Config = aklib.DebugConfig
 	s.MaxConnections = 1
 	s.Bind = "127.0.0.1"
-	s.Port = 44134
-	s.MyHostPort = ":44134"
+	s.Port = uint16(rand.Uint32() % 65535)
+	s.MyHostPort = ":" + strconv.Itoa(int(s.Port))
 	seed := address.GenerateSeed32()
 	a, err2 = address.New(s.Config, seed)
 	if err2 != nil {
@@ -82,8 +83,8 @@ func setup(ctx context.Context, t *testing.T) {
 
 	s1.Config = aklib.DebugConfig
 	s1.MaxConnections = 1
-	s1.Port = 2345
-	s1.MyHostPort = ":2345"
+	s1.Port = uint16(rand.Uint32() % 65535)
+	s1.MyHostPort = ":" + strconv.Itoa(int(s1.Port))
 
 	nodesDB.Addrs = make(adrmap)
 	peers.Peers = make(map[string]*peer)

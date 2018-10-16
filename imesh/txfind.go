@@ -91,7 +91,7 @@ func Init(s *setting.Setting) error {
 		if err := t.put(s.DB); err != nil {
 			return err
 		}
-		if err := leaves.CheckAdd(s, tr); err != nil {
+		if err := leaves.CheckAdd(s, nil, tr); err != nil {
 			return err
 		}
 		if err := leaves.SetConfirmed(s, tr.Hash()); err != nil {
@@ -320,13 +320,13 @@ func resolved(s *setting.Setting, tr *unresolvedTx, hs tx.Hash) error {
 		return putBrokenTx(s, hs)
 	}
 	if tr.Type == tx.TypeNormal {
-		//We must add to imesh after adding to leave.
-		//If not and if an user stops aknode before adding to leave afeter adding to imesh,
-		//leaves will be broekn.
-		if err := leaves.CheckAdd(s, tra); err != nil {
-			return err
-		}
-		return putTx(s, tra)
+		//We must add to imesh and leave simultaneously.
+		//If an user stops aknode afeter adding tx to imesh but not adding to leaves,
+		//the tx wont never be in leaves.
+		//If add to leaves first, then cannot be seen tx in db.
+		return leaves.CheckAdd(s, func() error {
+			return putTx(s, tra)
+		}, tra)
 	}
 	return putMinableTx(s, tra, tr.Type)
 }

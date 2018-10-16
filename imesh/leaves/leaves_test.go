@@ -80,7 +80,7 @@ func TestLeaves(t *testing.T) {
 		t.Log(hex.EncodeToString(tr.Hash()))
 	}
 
-	if err := CheckAdd(&s, trs[:6]...); err != nil {
+	if err := CheckAdd(&s, nil, trs[:6]...); err != nil {
 		t.Error(err)
 	}
 	for _, tr := range leaves.leaves {
@@ -120,7 +120,7 @@ func TestLeaves(t *testing.T) {
 
 	trs[6].Parent[0] = trs[3].Hash()
 	trs[6].Parent[1] = trs[2].Hash()
-	if err := CheckAdd(&s, trs[6]); err != nil {
+	if err := CheckAdd(&s, nil, trs[6]); err != nil {
 		t.Error(err)
 	}
 	for _, i := range []int{0, 2, 3} {

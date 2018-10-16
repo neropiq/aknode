@@ -141,7 +141,7 @@ type txsearch struct {
 }
 
 //CheckAdd checks trs and leaves if these are leaves and add them.
-func CheckAdd(s *setting.Setting, trs ...*tx.Transaction) error {
+func CheckAdd(s *setting.Setting, f func() error, trs ...*tx.Transaction) error {
 	leaves.Lock()
 	defer leaves.Unlock()
 	txs := isVisited(trs)
@@ -156,7 +156,13 @@ func CheckAdd(s *setting.Setting, trs ...*tx.Transaction) error {
 			})
 		}
 	}
-	return put(s)
+	if err := put(s); err != nil {
+		return err
+	}
+	if f != nil {
+		return f()
+	}
+	return nil
 }
 
 func put(s *setting.Setting) error {
