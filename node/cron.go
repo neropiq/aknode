@@ -117,12 +117,14 @@ func goCron(ctx context.Context, s *setting.Setting) {
 	go func() {
 		ctx2, cancel2 := context.WithCancel(ctx)
 		defer cancel2()
-		select {
-		case <-ctx2.Done():
-			return
-		case <-ch:
-			if err := resolve(s); err != nil {
-				log.Println(err)
+		for {
+			select {
+			case <-ctx2.Done():
+				return
+			case <-ch:
+				if err := resolve(s); err != nil {
+					log.Println(err)
+				}
 			}
 		}
 	}()
@@ -130,29 +132,33 @@ func goCron(ctx context.Context, s *setting.Setting) {
 	go func() {
 		ctx2, cancel2 := context.WithCancel(ctx)
 		defer cancel2()
-		select {
-		case <-ctx2.Done():
-			return
-		case <-time.After(10 * time.Minute):
-			log.Println("querying latest leaves and node addressses..")
-			WriteAll(s, nil, msg.CmdGetLeaves)
-			WriteAll(s, nil, msg.CmdGetAddr)
-			peers.RLock()
-			log.Println("#node", len(peers.Peers))
-			peers.RUnlock()
-			log.Println("#leaves", leaves.Size())
-			log.Println("done")
+		for {
+			select {
+			case <-ctx2.Done():
+				return
+			case <-time.After(10 * time.Minute):
+				log.Println("querying latest leaves and node addressses..")
+				WriteAll(s, nil, msg.CmdGetLeaves)
+				WriteAll(s, nil, msg.CmdGetAddr)
+				peers.RLock()
+				log.Println("#node", len(peers.Peers))
+				peers.RUnlock()
+				log.Println("#leaves", leaves.Size())
+				log.Println("done")
+			}
 		}
 	}()
 	go func() {
 		for {
 			ctx2, cancel2 := context.WithCancel(ctx)
 			defer cancel2()
-			select {
-			case <-ctx2.Done():
-				return
-			case <-time.After(5 * time.Minute):
-				Resolve()
+			for {
+				select {
+				case <-ctx2.Done():
+					return
+				case <-time.After(5 * time.Minute):
+					Resolve()
+				}
 			}
 		}
 	}()

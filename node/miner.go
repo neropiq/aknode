@@ -101,13 +101,15 @@ func RunMiner(ctx context.Context, s *setting.Setting) {
 		go func() {
 			ctx2, cancel2 := context.WithCancel(ctx)
 			defer cancel2()
-			if err := issueTicket(s); err != nil {
-				log.Println(err)
-			}
-			select {
-			case <-ctx2.Done():
-				return
-			default:
+			for {
+				if err := issueTicket(s); err != nil {
+					log.Println(err)
+				}
+				select {
+				case <-ctx2.Done():
+					return
+				default:
+				}
 			}
 		}()
 	}
@@ -115,12 +117,14 @@ func RunMiner(ctx context.Context, s *setting.Setting) {
 	go func() {
 		ctx2, cancel2 := context.WithCancel(ctx)
 		defer cancel2()
-		select {
-		case <-ctx2.Done():
-			return
-		case h := <-mineCh:
-			if err := mine(s, h); err != nil {
-				log.Println(err)
+		for {
+			select {
+			case <-ctx2.Done():
+				return
+			case h := <-mineCh:
+				if err := mine(s, h); err != nil {
+					log.Println(err)
+				}
 			}
 		}
 	}()

@@ -82,12 +82,14 @@ func GoNotify(ctx context.Context, s *setting.Setting, nreg, creg func(chan []tx
 		go func() {
 			ctx2, cancel2 := context.WithCancel(ctx)
 			defer cancel2()
-			select {
-			case <-ctx2.Done():
-				return
-			case noti := <-cnotify:
-				if err := walletnotifyRunCommand(s, noti); err != nil {
-					log.Println(err)
+			for {
+				select {
+				case <-ctx2.Done():
+					return
+				case noti := <-cnotify:
+					if err := walletnotifyRunCommand(s, noti); err != nil {
+						log.Println(err)
+					}
 				}
 			}
 		}()
@@ -95,26 +97,28 @@ func GoNotify(ctx context.Context, s *setting.Setting, nreg, creg func(chan []tx
 	go func() {
 		ctx2, cancel2 := context.WithCancel(ctx)
 		defer cancel2()
-		select {
-		case <-ctx2.Done():
-			return
-		case noti := <-cnotify:
-			trs := make([]*imesh.TxInfo, 0, len(noti))
-			for _, h := range noti {
-				tr, err := imesh.GetTxInfo(s.DB, h)
-				if err != nil {
+		for {
+			select {
+			case <-ctx2.Done():
+				return
+			case noti := <-cnotify:
+				trs := make([]*imesh.TxInfo, 0, len(noti))
+				for _, h := range noti {
+					tr, err := imesh.GetTxInfo(s.DB, h)
+					if err != nil {
+						log.Println(err)
+					}
+					trs = append(trs, tr)
+				}
+				sort.Slice(trs, func(i, j int) bool {
+					return trs[i].Received.Before(trs[j].Received)
+				})
+				if err := walletnotifyUpdate(s, trs); err != nil {
 					log.Println(err)
 				}
-				trs = append(trs, tr)
-			}
-			sort.Slice(trs, func(i, j int) bool {
-				return trs[i].Received.Before(trs[j].Received)
-			})
-			if err := walletnotifyUpdate(s, trs); err != nil {
-				log.Println(err)
-			}
-			if s.WalletNotify != "" {
-				cnotify <- noti
+				if s.WalletNotify != "" {
+					cnotify <- noti
+				}
 			}
 		}
 	}()
