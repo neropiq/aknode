@@ -101,6 +101,7 @@ func confirmAll(t *testing.T, notify chan []tx.Hash, confirm bool) {
 	if notify != nil {
 		select {
 		case notify <- txs:
+			t.Log("notified")
 		case <-time.After(5 * time.Second):
 			t.Fatal("failed to notify")
 		}

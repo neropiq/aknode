@@ -96,6 +96,7 @@ func setup(ctx context.Context, t *testing.T) {
 }
 
 func teardown(t *testing.T) {
+	time.Sleep(3 * time.Second)
 	if err := os.RemoveAll("./test_db"); err != nil {
 		t.Error(err)
 	}
