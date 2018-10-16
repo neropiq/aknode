@@ -54,6 +54,7 @@ func setup(t *testing.T) {
 	if err2 != nil {
 		panic(err2)
 	}
+	s1.DB = s.DB
 
 	s.Config = aklib.DebugConfig
 	s.MaxConnections = 1

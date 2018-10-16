@@ -27,9 +27,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/AidosKuneen/aidosd/aidos"
@@ -70,8 +72,8 @@ func setup(t *testing.T) {
 	s.Config = aklib.DebugConfig
 	s.MaxConnections = 1
 	s.Bind = "127.0.0.1"
-	s.Port = 9624
-	s.MyHostPort = ":9624"
+	s.Port = uint16(rand.Int() % 65535)
+	s.MyHostPort = ":" + strconv.Itoa(int(s.Port))
 	seed := address.GenerateSeed32()
 	a, err2 = address.New(s.Config, seed)
 	if err2 != nil {
@@ -103,8 +105,8 @@ func setup(t *testing.T) {
 
 	s1.Config = aklib.DebugConfig
 	s1.MaxConnections = 1
-	s1.Port = 2345
-	s1.MyHostPort = ":2345"
+	s1.Port = uint16(rand.Int() % 65535)
+	s1.MyHostPort = ":" + strconv.Itoa(int(s1.Port))
 	var err error
 	l, err = node.Start(&s, true)
 	if err != nil {
