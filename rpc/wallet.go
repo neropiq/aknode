@@ -101,7 +101,7 @@ func GoNotify(ctx context.Context, s *setting.Setting, nreg, creg func(chan []tx
 			select {
 			case <-ctx2.Done():
 				return
-			case noti := <-cnotify:
+			case noti := <-nnotify:
 				trs := make([]*imesh.TxInfo, 0, len(noti))
 				for _, h := range noti {
 					tr, err := imesh.GetTxInfo(s.DB, h)
