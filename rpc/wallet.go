@@ -28,6 +28,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dgraph-io/badger"
+
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh"
 	"github.com/AidosKuneen/aknode/setting"
@@ -46,6 +48,9 @@ var wallet *walletImpl.Wallet
 func Init(s *setting.Setting) error {
 	var err error
 	wallet, err = walletImpl.Load(&s.DBConfig, nil, "")
+	if err == badger.ErrKeyNotFound {
+		return nil
+	}
 	return err
 }
 

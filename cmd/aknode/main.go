@@ -164,6 +164,7 @@ func main() {
 	}
 
 	<-setting.Stop
+	time.Sleep(3 * time.Second)
 	cancel()
 	time.Sleep(3 * time.Second)
 	if err := setting.DB.Close(); err != nil {

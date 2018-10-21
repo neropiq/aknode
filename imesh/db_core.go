@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/rand"
 	"github.com/AidosKuneen/aklib/tx"
@@ -85,6 +86,11 @@ func (ti *TxInfo) IsAccepted() bool {
 	return ti.StatNo != StatusPending && !ti.IsRejected
 }
 
+//IsConfirmed returns true if confirmed(rejected or accepted).
+func (ti *TxInfo) IsConfirmed() bool {
+	return ti.StatNo != StatusPending
+}
+
 func (ti *TxInfo) sigKey() []byte {
 	key := make([]byte, 8)
 	binary.LittleEndian.PutUint64(key, ti.TxNo)
@@ -138,7 +144,13 @@ func (ti *TxInfo) put(akdb *badger.DB) error {
 	return akdb.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, ti.Hash, ti, db.HeaderTxInfo)
 	})
+}
 
+//Put put the tx into db. It should be used only by akwallet.
+func (ti *TxInfo) Put(akdb *badger.DB) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+	return ti.put(akdb)
 }
 
 //GetTxInfo gets a transaction info.
@@ -188,14 +200,20 @@ func GetTx(akdb *badger.DB, hash []byte) (*tx.Transaction, error) {
 	}, nil
 }
 
-//PutTxDirect puts a transaction  into db without checking tx relation..
-func PutTxDirect(s *setting.DBConfig, tr *tx.Transaction) error {
+//PutRawTxDirect puts a transaction  into db without checking tx relation..
+//It should be used only from wallet
+func PutRawTxDirect(s *aklib.DBConfig, tr *tx.Transaction) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 	ti := TxInfo{
 		Hash:     tr.Hash(),
 		Body:     tr.Body,
 		Received: time.Now().Truncate(time.Second),
+	}
+	ti.OutputStatus[tx.TypeIn] = make([]OutputStatus, len(tr.Outputs))
+	ti.OutputStatus[tx.TypeMulin] = make([]OutputStatus, len(tr.MultiSigOuts))
+	if tr.TicketOutput != nil {
+		ti.OutputStatus[tx.TypeTicketin] = make([]OutputStatus, 1)
 	}
 	return s.DB.Update(func(txn *badger.Txn) error {
 		if err := ti.nextTxNo(txn); err != nil {
@@ -204,20 +222,9 @@ func PutTxDirect(s *setting.DBConfig, tr *tx.Transaction) error {
 		if err2 := db.Put(txn, tr.Hash(), &ti, db.HeaderTxInfo); err2 != nil {
 			return err2
 		}
-		if err := putAddressToTx(txn, tr); err != nil {
-			return err
-		}
 		if err := updateMulsigAddress(s.Config, txn, tr); err != nil {
 			return err
 		}
-		latestTxs.Lock()
-		if len(latestTxs.txs) >= 5 {
-			copy(latestTxs.txs, latestTxs.txs[1:])
-			latestTxs.txs[len(latestTxs.txs)-1] = nil
-			latestTxs.txs = latestTxs.txs[:len(latestTxs.txs)-1]
-		}
-		latestTxs.txs = append(latestTxs.txs, &ti)
-		latestTxs.Unlock()
 		return db.Put(txn, ti.sigKey(), tr.Signatures, db.HeaderTxSig)
 	})
 }
@@ -260,7 +267,7 @@ func putTxSub(s *setting.Setting, tr *tx.Transaction) error {
 				}
 			}
 		}
-		if err := putAddressToTx(txn, tr); err != nil {
+		if err := PutAddressToTx(txn, tr); err != nil {
 			return err
 		}
 		if err := updateMulsigAddress(s.Config, txn, tr); err != nil {

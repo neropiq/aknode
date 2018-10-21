@@ -252,11 +252,13 @@ func gettxsstatus(conf *setting.Setting, req *rpc.Request, res *rpc.Response) er
 		if err != nil {
 			return err
 		}
+		lid := hex.EncodeToString(tr.StatNo[:])
 		switch tr.StatNo {
 		case imesh.StatusPending:
 			r = append(r, &rpc.TxStatus{
-				Hash:   txid,
-				Exists: true,
+				Hash:     txid,
+				Exists:   true,
+				LedgerID: lid,
 			})
 		default:
 			if tr.IsRejected {
@@ -265,14 +267,14 @@ func gettxsstatus(conf *setting.Setting, req *rpc.Request, res *rpc.Response) er
 					Exists:      true,
 					IsRejected:  true,
 					IsConfirmed: true,
-					LedgerID:    hex.EncodeToString(tr.StatNo[:]),
+					LedgerID:    lid,
 				})
 			} else {
 				r = append(r, &rpc.TxStatus{
 					Hash:        txid,
 					Exists:      true,
 					IsConfirmed: true,
-					LedgerID:    hex.EncodeToString(tr.StatNo[:]),
+					LedgerID:    lid,
 				})
 			}
 		}

@@ -16,7 +16,6 @@ before_install:
 - go generate -x ./...
 
 script:
-- travis_wait 30 go test  ./node -run ^TestNode4$ -v  -timeout 100m -p 1
 - travis_wait 30 go test  -coverpkg ./...  ./... -tags travis -v  -timeout 100m -covermode=count -coverprofile=coverage.out -p 1
 
 after_success:
@@ -26,11 +25,13 @@ after_success:
 - go get -u github.com/gobuffalo/packr/...
 - packr
 - echo "Bootstrapping linux/amd64..."
-- go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_amd64 -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
+- env GOOS=linux GOARCH=amd64 go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_amd64 -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
 - echo "Bootstrapping linux/386..."
 - env GOOS=linux GOARCH=386 go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_386 -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
 - echo "Bootstrapping linux/arm..."
 - env GOOS=linux GOARCH=arm GOARM=6 go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_arm  -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
+- echo "Bootstrapping linux/arm64..."
+- env GOOS=linux GOARCH=arm GOARM=6 go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_arm64  -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
 - echo "Bootstrapping windows/amd64..."
 - env GOOS=windows GOARCH=amd64 go build -o ${REPO_NAME}_${TRAVIS_TAG}_win_amd64.exe  -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
 - echo "Bootstrapping windows/386..."
@@ -43,6 +44,7 @@ after_success:
 - gzip ${REPO_NAME}_${TRAVIS_TAG}_linux_386
 - gzip ${REPO_NAME}_${TRAVIS_TAG}_linux_amd64
 - gzip ${REPO_NAME}_${TRAVIS_TAG}_linux_arm
+- gzip ${REPO_NAME}_${TRAVIS_TAG}_linux_arm64
 - zip ${REPO_NAME}_${TRAVIS_TAG}_win_amd64.exe.zip  ${REPO_NAME}_${TRAVIS_TAG}_win_amd64.exe
 - zip ${REPO_NAME}_${TRAVIS_TAG}_win_386.exe.zip  ${REPO_NAME}_${TRAVIS_TAG}_win_386.exe
 - zip ${REPO_NAME}_${TRAVIS_TAG}_darwin_amd64.zip  ${REPO_NAME}_${TRAVIS_TAG}_darwin_amd64
@@ -59,6 +61,7 @@ deploy:
      -  "$GOPATH/src/$REPO_DIR/cmd/aknode/${REPO_NAME}_${TRAVIS_TAG}_linux_386.gz"
      -  "$GOPATH/src/$REPO_DIR/cmd/aknode/${REPO_NAME}_${TRAVIS_TAG}_linux_amd64.gz"
      -  "$GOPATH/src/$REPO_DIR/cmd/aknode/${REPO_NAME}_${TRAVIS_TAG}_linux_arm.gz"
+     -  "$GOPATH/src/$REPO_DIR/cmd/aknode/${REPO_NAME}_${TRAVIS_TAG}_linux_arm64.gz"
      -  "$GOPATH/src/$REPO_DIR/cmd/aknode/${REPO_NAME}_${TRAVIS_TAG}_win_386.exe.zip"
      -  "$GOPATH/src/$REPO_DIR/cmd/aknode/${REPO_NAME}_${TRAVIS_TAG}_win_amd64.exe.zip"
      -  "$GOPATH/src/$REPO_DIR/cmd/aknode/${REPO_NAME}_${TRAVIS_TAG}_darwin_386.zip"

@@ -73,7 +73,7 @@ func setup(ctx context.Context, t *testing.T) {
 	s.Config = aklib.DebugConfig
 	s.MaxConnections = 1
 	s.Bind = "127.0.0.1"
-	s.Port = uint16(rand.Int() % 65535)
+	s.Port = uint16(rand.Int31n(10000)) + 1025
 	s.MyHostPort = ":" + strconv.Itoa(int(s.Port))
 	seed := address.GenerateSeed32()
 	a, err2 = address.New(s.Config, seed)
@@ -106,7 +106,7 @@ func setup(ctx context.Context, t *testing.T) {
 
 	s1.Config = aklib.DebugConfig
 	s1.MaxConnections = 1
-	s1.Port = uint16(rand.Int() % 65535)
+	s1.Port = uint16(rand.Int31n(10000)) + 1025
 	s1.MyHostPort = ":" + strconv.Itoa(int(s1.Port))
 	var err error
 	l, err = node.Start(ctx, &s, true)

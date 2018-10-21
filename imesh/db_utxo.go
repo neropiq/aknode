@@ -27,6 +27,7 @@ import (
 	"log"
 	"sort"
 
+	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
@@ -56,7 +57,7 @@ func updateAddressToTx(txn *badger.Txn, adr []byte, addH, delH []byte) error {
 			for i := range hashes {
 				log.Println(hex.EncodeToString(hashes[i]), hex.EncodeToString(adr))
 			}
-			log.Println("not found", hex.EncodeToString(delH), "maybe double spend")
+			log.Println("not found", hex.EncodeToString(delH), "maybe the address ins not in the wallet or double spend")
 		}
 	}
 	return db.Put(txn, adr, hashes, db.HeaderAddressToTx)
@@ -134,8 +135,9 @@ func putMultisigOutAddressToTx(txn *badger.Txn, tr *tx.Transaction) error {
 	return nil
 }
 
-//should be called synchonously, but check for sure.
-func putAddressToTx(txn *badger.Txn, tr *tx.Transaction) error {
+//PutAddressToTx stores related addresses with tr.
+//should be called synchonously
+func PutAddressToTx(txn *badger.Txn, tr *tx.Transaction) error {
 	if err := putInputAddressToTx(txn, tr); err != nil {
 		return err
 	}
@@ -154,7 +156,7 @@ func GetHisoty(s *setting.Setting, adrstr string, utxoOnly bool) ([]*tx.InoutHas
 }
 
 //GetHisoty2 returns utxo (or all outputs) and input hashes associated with  address adr.
-func GetHisoty2(s *setting.DBConfig, adrstr string, utxoOnly bool) ([]*tx.InoutHash, error) {
+func GetHisoty2(s *aklib.DBConfig, adrstr string, utxoOnly bool) ([]*tx.InoutHash, error) {
 	adrbyte, _, err := address.ParseAddress58(s.Config, adrstr)
 	if err != nil {
 		return nil, err

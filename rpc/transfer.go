@@ -81,7 +81,7 @@ func Send(conf *setting.Setting, tag []byte, outputs ...*tx.RawOutput) (string, 
 	w := &trWallet{
 		conf: conf,
 	}
-	tr, err := tx.Build(conf.Config, w, tag, outputs)
+	tr, err := tx.Build(conf.Config, w, tag, outputs, nil)
 	if err != nil {
 		return "", err
 	}

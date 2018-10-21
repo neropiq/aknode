@@ -34,7 +34,6 @@ import (
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/consensus"
-	"github.com/dgraph-io/badger"
 )
 
 //DefaultMinimumFee is the minimum fee to receive minable tx.
@@ -47,12 +46,6 @@ const Version = "1.0.0"
 type Address struct {
 	Address string `json:"address"`
 	Port    uint16 `json:"port"`
-}
-
-//DBConfig is a set of config for db.
-type DBConfig struct {
-	DB     *badger.DB    `json:"-"`
-	Config *aklib.Config `json:"-"`
 }
 
 //Setting is  a aknode setting.
@@ -97,7 +90,7 @@ type Setting struct {
 	RunTicketIssuer bool    `json:"run_ticket_issuer"`
 	MinerAddress    string  `json:"miner_address"`
 
-	DBConfig
+	aklib.DBConfig
 	Stop chan struct{} `json:"-"`
 }
 

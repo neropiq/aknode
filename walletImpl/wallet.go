@@ -26,12 +26,12 @@ import (
 	"log"
 	"time"
 
+	"github.com/AidosKuneen/aklib"
 	"github.com/AidosKuneen/aklib/address"
 	"github.com/AidosKuneen/aklib/arypack"
 	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/tx"
 	"github.com/AidosKuneen/aknode/imesh"
-	"github.com/AidosKuneen/aknode/setting"
 
 	"github.com/dgraph-io/badger"
 )
@@ -61,7 +61,7 @@ type Wallet struct {
 const poolSize = 20 //FIXME
 
 //FillPool fills the pool.
-func (w *Wallet) FillPool(s *setting.DBConfig, pwdd []byte) error {
+func (w *Wallet) FillPool(s *aklib.DBConfig, pwdd []byte) error {
 	master, err := address.DecryptSeed(w.EncSeed, pwdd)
 	if err != nil {
 		return err
@@ -99,7 +99,7 @@ func (w *Wallet) AllAddress() []string {
 }
 
 //Load initialize wallet struct.
-func Load(s *setting.DBConfig, pwd []byte, priv string) (*Wallet, error) {
+func Load(s *aklib.DBConfig, pwd []byte, priv string) (*Wallet, error) {
 	var wallet = Wallet{
 		AddressChange: make(map[string]struct{}),
 		AddressPublic: make(map[string]struct{}),
@@ -107,19 +107,13 @@ func Load(s *setting.DBConfig, pwd []byte, priv string) (*Wallet, error) {
 
 	err := s.DB.View(func(txn *badger.Txn) error {
 		err := db.Get(txn, []byte(priv), &wallet, db.HeaderWallet)
-		if err != nil && err != badger.ErrKeyNotFound {
-			return err
-		}
-		return nil
+		return err
 	})
-	if err != nil {
-		return nil, err
-	}
 	return &wallet, err
 }
 
 //NewFromPriv creates a new wallet from private key.
-func NewFromPriv(s *setting.DBConfig, pwd []byte, priv string) (*Wallet, error) {
+func NewFromPriv(s *aklib.DBConfig, pwd []byte, priv string) (*Wallet, error) {
 	seed, isNode, err := address.HDFrom58(s.Config, priv, pwd)
 	if err != nil {
 		return nil, err
@@ -144,14 +138,14 @@ type History struct {
 }
 
 //PutHistory saves histroies.
-func PutHistory(s *setting.DBConfig, hist []*History) error {
+func PutHistory(s *aklib.DBConfig, hist []*History) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, nil, hist, db.HeaderWalletHistory)
 	})
 }
 
 //GetHistory gets histories of addresses  in wallet.
-func GetHistory(s *setting.DBConfig) ([]*History, error) {
+func GetHistory(s *aklib.DBConfig) ([]*History, error) {
 	var hist []*History
 	return hist, s.DB.View(func(txn *badger.Txn) error {
 		err := db.Get(txn, nil, &hist, db.HeaderWalletHistory)
@@ -163,7 +157,7 @@ func GetHistory(s *setting.DBConfig) ([]*History, error) {
 }
 
 //Put save the wallet.
-func (w *Wallet) put(s *setting.DBConfig) error {
+func (w *Wallet) put(s *aklib.DBConfig) error {
 	return s.DB.Update(func(txn *badger.Txn) error {
 		return db.Put(txn, []byte(w.AccountName), w, db.HeaderWallet)
 	})
@@ -175,7 +169,7 @@ func (w *Wallet) DecryptSeed(pwd []byte) ([]byte, error) {
 }
 
 //PutAddress saves adr.
-func (w *Wallet) PutAddress(s *setting.DBConfig, pwd []byte, adr *Address, doEnc bool) error {
+func (w *Wallet) PutAddress(s *aklib.DBConfig, pwd []byte, adr *Address, doEnc bool) error {
 	if doEnc {
 		adr.EncAddress = address.EncryptSeed(arypack.Marshal(adr.Address), pwd)
 	} else {
@@ -194,7 +188,7 @@ func (w *Wallet) PutAddress(s *setting.DBConfig, pwd []byte, adr *Address, doEnc
 }
 
 //GetAddress returns an address struct.
-func (w *Wallet) GetAddress(s *setting.DBConfig, name string, pwd []byte) (*Address, error) {
+func (w *Wallet) GetAddress(s *aklib.DBConfig, name string, pwd []byte) (*Address, error) {
 	var adr Address
 	return &adr, s.DB.View(func(txn *badger.Txn) error {
 		if err := db.Get(txn, []byte(name), &adr, db.HeaderWalletAddress); err != nil {
@@ -209,7 +203,7 @@ func (w *Wallet) GetAddress(s *setting.DBConfig, name string, pwd []byte) (*Addr
 }
 
 //InitSeed initialize the seed.
-func (w *Wallet) InitSeed(s *setting.DBConfig, pwd []byte) error {
+func (w *Wallet) InitSeed(s *aklib.DBConfig, pwd []byte) error {
 	seed := make([]byte, 32)
 	if _, err := rand.Read(seed); err != nil {
 		panic(err)
@@ -219,7 +213,7 @@ func (w *Wallet) InitSeed(s *setting.DBConfig, pwd []byte) error {
 }
 
 //GetAllAddress returns all used address in DB.
-func GetAllAddress(s *setting.DBConfig) (map[string]*Address, error) {
+func GetAllAddress(s *aklib.DBConfig) (map[string]*Address, error) {
 	adrs := make(map[string]*Address)
 	err := s.DB.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -243,7 +237,7 @@ func GetAllAddress(s *setting.DBConfig) (map[string]*Address, error) {
 }
 
 //GetAllUTXO returns all UTXOs with balance.
-func (w *Wallet) GetAllUTXO(s *setting.DBConfig, pwd []byte) ([]*tx.UTXO, uint64, error) {
+func (w *Wallet) GetAllUTXO(s *aklib.DBConfig, pwd []byte) ([]*tx.UTXO, uint64, error) {
 	log.Println(4)
 	u, bal, err := w.GetUTXO(s, pwd, true)
 	if err != nil {
@@ -258,7 +252,7 @@ func (w *Wallet) GetAllUTXO(s *setting.DBConfig, pwd []byte) ([]*tx.UTXO, uint64
 }
 
 //GetUTXO returns UTXOs with balance.
-func (w *Wallet) GetUTXO(s *setting.DBConfig, pwd []byte, isPublic bool) ([]*tx.UTXO, uint64, error) {
+func (w *Wallet) GetUTXO(s *aklib.DBConfig, pwd []byte, isPublic bool) ([]*tx.UTXO, uint64, error) {
 	var bal uint64
 	var utxos []*tx.UTXO
 	adrmap := w.AddressChange
@@ -322,7 +316,7 @@ func (adr *Address) Encrypt(pwd []byte) {
 }
 
 //NewAddress creates an address in wallet.
-func (w *Wallet) NewAddress(s *setting.DBConfig, pwd []byte, isPublic bool) (*address.Address, error) {
+func (w *Wallet) NewAddress(s *aklib.DBConfig, pwd []byte, isPublic bool) (*address.Address, error) {
 	adrmap := w.AddressChange
 	if isPublic {
 		adrmap = w.AddressPublic
@@ -349,7 +343,7 @@ func (w *Wallet) NewAddress(s *setting.DBConfig, pwd []byte, isPublic bool) (*ad
 }
 
 //NewPublicAddressFromPool get a public address from pool.
-func (w *Wallet) NewPublicAddressFromPool(s *setting.DBConfig) (string, error) {
+func (w *Wallet) NewPublicAddressFromPool(s *aklib.DBConfig) (string, error) {
 	if len(w.Pool.Address) == 0 {
 		return "", errors.New("pool is empty")
 	}
@@ -360,18 +354,33 @@ func (w *Wallet) NewPublicAddressFromPool(s *setting.DBConfig) (string, error) {
 }
 
 //FindAddress returns true if wallet has adrstr.
-func (w *Wallet) FindAddress(adrstr string) bool {
-	if _, isMine := w.AddressPublic[adrstr]; isMine {
-		return true
-	}
-	if _, isMine := w.AddressChange[adrstr]; isMine {
-		return true
+func (w *Wallet) FindAddress(adrstr ...string) bool {
+	for _, adr := range adrstr {
+		_, pub := w.AddressPublic[adr]
+		_, priv := w.AddressChange[adr]
+		if pub || priv {
+			return true
+		}
 	}
 	return false
 }
 
+//FindAddressByte returns true if wallet has adrstr.
+func (w *Wallet) FindAddressByte(cfg *aklib.DBConfig, adrstr ...address.Bytes) (bool, error) {
+	for _, adr := range adrstr {
+		a, err := address.Address58(cfg.Config, adr)
+		if err != nil {
+			return false, err
+		}
+		if w.FindAddress(a) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 //HasAddress returns true if wallet has an address in the multisg address.
-func (w *Wallet) HasAddress(s *setting.DBConfig, out *tx.MultiSigOut) (bool, error) {
+func (w *Wallet) HasAddress(s *aklib.DBConfig, out *tx.MultiSigOut) (bool, error) {
 	for _, mout := range out.Addresses {
 		for a := range w.AddressPublic {
 			adrstr, err := address.Address58(s.Config, mout)
