@@ -227,12 +227,12 @@ func checkResponse(t *testing.T, diff map[string]int64,
 		t.Error(err, txid, result)
 	}
 	for i, out := range tx.Outputs {
-		t.Log("out", i, out.Address, out.Value)
-		v, ok := sendto[out.Address.String()]
-		if !ok && i == len(tx.Outputs)-1 {
+		if i == 0 {
 			continue
 		}
-		if !ok && i != len(tx.Outputs)-1 {
+		t.Log("out", i, out.Address, out.Value)
+		v, ok := sendto[out.Address.String()]
+		if !ok {
 			t.Error("invalid output #", i)
 		}
 		if out.Value != v {

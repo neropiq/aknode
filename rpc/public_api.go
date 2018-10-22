@@ -228,7 +228,7 @@ func gettxsstatus(conf *setting.Setting, req *rpc.Request, res *rpc.Response) er
 	if len(data) == 0 {
 		return errors.New("need txids")
 	}
-	if len(data) > 50 {
+	if len(data) > 1000 {
 		return errors.New("array is too big")
 	}
 
@@ -256,9 +256,8 @@ func gettxsstatus(conf *setting.Setting, req *rpc.Request, res *rpc.Response) er
 		switch tr.StatNo {
 		case imesh.StatusPending:
 			r = append(r, &rpc.TxStatus{
-				Hash:     txid,
-				Exists:   true,
-				LedgerID: lid,
+				Hash:   txid,
+				Exists: true,
 			})
 		default:
 			if tr.IsRejected {

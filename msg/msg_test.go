@@ -30,7 +30,7 @@ import (
 
 func TestMsg(t *testing.T) {
 	s := &setting.Setting{
-		DBConfig: setting.DBConfig{
+		DBConfig: aklib.DBConfig{
 			Config: aklib.TestConfig,
 		},
 	}
@@ -60,7 +60,7 @@ func TestMsg(t *testing.T) {
 
 func TestMsgErr(t *testing.T) {
 	s := &setting.Setting{
-		DBConfig: setting.DBConfig{
+		DBConfig: aklib.DBConfig{
 			Config: aklib.TestConfig,
 		}}
 	var buf bytes.Buffer
