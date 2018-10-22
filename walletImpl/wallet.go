@@ -317,16 +317,17 @@ func (adr *Address) Encrypt(pwd []byte) {
 
 //NewAddress creates an address in wallet.
 func (w *Wallet) NewAddress(s *aklib.DBConfig, pwd []byte, isPublic bool) (*address.Address, error) {
-	adrmap := w.AddressChange
-	if isPublic {
-		adrmap = w.AddressPublic
+	adrmap := w.AddressPublic
+	var idx uint32
+	if !isPublic {
+		adrmap = w.AddressChange
+		idx = 1
 	}
 	master, err := address.DecryptSeed(w.EncSeed, pwd)
 	if err != nil {
 		return nil, err
 	}
-	seed := address.HDseed(master, 0,
-		uint32(len(w.AddressPublic)+len(w.AddressChange)))
+	seed := address.HDseed(master, idx, uint32(len(adrmap)))
 	a, err := address.New(s.Config, seed)
 	if err != nil {
 		return nil, err
