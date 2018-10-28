@@ -156,6 +156,20 @@ func GetHistory(s *aklib.DBConfig) ([]*History, error) {
 	})
 }
 
+//GetAllPrivateKeys returns privatekeys stored in the wallet.
+func GetAllPrivateKeys(s *aklib.DBConfig) ([]string, error) {
+	var pk []string
+	err := s.DB.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+		for it.Seek([]byte{byte(db.HeaderWallet)}); it.ValidForPrefix([]byte{byte(db.HeaderWallet)}); it.Next() {
+			pk = append(pk, string(it.Item().KeyCopy(nil)))
+		}
+		return nil
+	})
+	return pk, err
+}
+
 //Put save the wallet.
 func (w *Wallet) put(s *aklib.DBConfig) error {
 	return s.DB.Update(func(txn *badger.Txn) error {

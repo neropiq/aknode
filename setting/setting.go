@@ -40,7 +40,7 @@ import (
 const DefaultMinimumFee = 0.05
 
 //Version is the version of aknode
-const Version = "1.0.0"
+const Version = "unreleased"
 
 //Address represents an address.
 type Address struct {
