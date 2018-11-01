@@ -22,6 +22,7 @@ package imesh
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"log"
 	"os"
@@ -274,7 +275,7 @@ func TestImesh(t *testing.T) {
 		t.Error("invalid resolved tx", len(trs))
 	}
 
-	it, err2 := tx.IssueTicket(s.Config, genesis[0])
+	it, err2 := tx.IssueTicket(context.Background(), s.Config, genesis[0])
 	if err2 != nil {
 		t.Error(err2)
 	}

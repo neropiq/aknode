@@ -43,7 +43,7 @@ func TestMiner(t *testing.T) {
 	s.RunFeeMiner = true
 	s.RunTicketMiner = true
 
-	ti, err := tx.IssueTicket(s.Config, a.Address(s.Config), genesis)
+	ti, err := tx.IssueTicket(context.Background(), s.Config, a.Address(s.Config), genesis)
 	if err != nil {
 		t.Error(err)
 	}

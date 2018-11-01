@@ -77,22 +77,11 @@ func sendrawtx(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error
 }
 
 func getnodeinfo(conf *setting.Setting, req *rpc.Request, res *rpc.Response) error {
-	var bal *uint64
-	if conf.RPCUser != "" {
-		mutex.Lock()
-		defer mutex.Unlock()
-		_, total, err := wallet.GetAllUTXO(&conf.DBConfig, nil)
-		if err != nil {
-			return err
-		}
-		bal = &total
-	}
 	lid := akconsensus.LatestLedger().ID()
 	res.Result = &rpc.NodeInfo{
 		Version:         setting.Version,
 		ProtocolVersion: msg.MessageVersion,
 		WalletVersion:   walletVersion,
-		Balance:         bal,
 		Connections:     node.ConnSize(),
 		Proxy:           conf.Proxy,
 		Testnet:         conf.Testnet,
@@ -101,6 +90,7 @@ func getnodeinfo(conf *setting.Setting, req *rpc.Request, res *rpc.Response) err
 		Time:            time.Now().Unix(),
 		TxNo:            imesh.GetTxNo(),
 		LatestLedger:    hex.EncodeToString(lid[:]),
+		LatestLedgerNo:  int(akconsensus.LatestLedger().Seq),
 	}
 	return nil
 }

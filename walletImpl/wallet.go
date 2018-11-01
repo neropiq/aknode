@@ -41,6 +41,7 @@ type Address struct {
 	EncAddress []byte           `json:"encoded_address"`
 	Address    *address.Address `json:"-" msgpack:"-"`
 	Adrstr     string
+	No         int
 }
 
 //Pool is a pool for addresses.
@@ -349,6 +350,7 @@ func (w *Wallet) NewAddress(s *aklib.DBConfig, pwd []byte, isPublic bool) (*addr
 	adr := &Address{
 		Address: a,
 		Adrstr:  a.Address58(s.Config),
+		No:      len(adrmap),
 	}
 	if err := w.PutAddress(s, pwd, adr, true); err != nil {
 		return nil, err

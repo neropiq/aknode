@@ -130,9 +130,7 @@ func TestSendAPI(t *testing.T) {
 	testsendtoaddress(t, outadrs0[0], 0.2)
 
 	ni := testgetnodeinfo(t)
-	if *ni.Balance != total {
-		t.Error("invalid nodeinfo")
-	}
+
 	if ni.TxNo != 5 {
 		t.Error("invalid txno", ni.TxNo)
 	}

@@ -283,7 +283,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ti, err := imesh.GetTxInfo(s.DB, txid)
-	if !ok {
+	if err != nil {
 		renderError(w, err.Error())
 		return
 	}

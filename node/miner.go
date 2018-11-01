@@ -76,12 +76,12 @@ func mine(s *setting.Setting, mtx *tx.HashWithType) error {
 	return nil
 }
 
-func issueTicket(s *setting.Setting) error {
+func issueTicket(ctx context.Context, s *setting.Setting) error {
 	madr, _, err := address.ParseAddress58(s.Config, s.MinerAddress)
 	if err != nil {
 		log.Fatal(err)
 	}
-	tr, err := tx.IssueTicket(s.Config, madr, leaves.Get(0)...)
+	tr, err := tx.IssueTicket(ctx, s.Config, madr, leaves.Get(0)...)
 	if err != nil {
 		log.Println(err)
 	}
@@ -102,7 +102,7 @@ func RunMiner(ctx context.Context, s *setting.Setting) {
 			ctx2, cancel2 := context.WithCancel(ctx)
 			defer cancel2()
 			for {
-				if err := issueTicket(s); err != nil {
+				if err := issueTicket(ctx, s); err != nil {
 					log.Println(err)
 				}
 				select {
