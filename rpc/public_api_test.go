@@ -56,7 +56,7 @@ func TestPublicAPI(t *testing.T) {
 	testgetfeetx(t, float64(100)/aklib.ADK, nil)
 	testgetfeetx(t, float64(10)/aklib.ADK, tr.Hash())
 
-	ti, err := tx.IssueTicket(s.Config, a.Address(s.Config), genesis)
+	ti, err := tx.IssueTicket(context.Background(), s.Config, a.Address(s.Config), genesis)
 	if err != nil {
 		t.Error(err)
 	}
