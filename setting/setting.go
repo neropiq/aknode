@@ -79,7 +79,7 @@ type Setting struct {
 	ValidatorSecret string   `json:"validator_secret"`
 	TrustedNodes    []string `json:"trusted_nodes"`
 
-	RunExplorer            bool   `json:"run_explore"`
+	RunExplorer            bool   `json:"run_explorer"`
 	ExplorerBind           string `json:"explorer_bind"`
 	ExplorerPort           uint16 `json:"explorer_port"`
 	ExplorerMaxConnections uint16 `json:"explorer_max_connections"`
