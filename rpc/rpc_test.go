@@ -94,7 +94,9 @@ func setup(ctx context.Context, t *testing.T) {
 	s.RPCBind = "127.0.0.1"
 	s.RPCPort = s.Config.DefaultRPCPort
 	s.WalletNotify = "echo %s"
-	leaves.Init(&s)
+	if err := leaves.Init(&s); err != nil {
+		t.Error(err)
+	}
 	if err := imesh.Init(&s); err != nil {
 		t.Error(err)
 	}
@@ -114,7 +116,9 @@ func setup(ctx context.Context, t *testing.T) {
 		t.Error(err)
 	}
 	t.Log(imesh.GetTxNo())
-	Init(&s)
+	if err := Init(&s); err != nil {
+		t.Error(err)
+	}
 }
 
 func teardown(t *testing.T) {

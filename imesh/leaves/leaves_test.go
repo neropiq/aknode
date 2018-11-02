@@ -108,7 +108,9 @@ func TestLeaves(t *testing.T) {
 	}
 
 	leaves.leaves = leaves.leaves[:0]
-	Init(&s)
+	if err := Init(&s); err != nil {
+		t.Error(err)
+	}
 	if len(leaves.leaves) != 4 {
 		t.Error("invalid init")
 	}

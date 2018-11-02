@@ -203,7 +203,7 @@ func TestConsensus(t *testing.T) {
 	if cmd != msg.CmdProposal {
 		t.Error("cmd must be proposal", cmd)
 	}
-	prop, noexist, err2 := akconsensus.ReadProposal(&s1, peers.cons, buf)
+	_, noexist, err2 := akconsensus.ReadProposal(&s1, peers.cons, buf)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -312,7 +312,7 @@ func TestConsensus(t *testing.T) {
 	if cmd != msg.CmdProposal {
 		t.Error("cmd must be proposal", cmd)
 	}
-	prop, noexist, err2 = akconsensus.ReadProposal(&s1, peers.cons, buf)
+	prop, noexist, err2 := akconsensus.ReadProposal(&s1, peers.cons, buf)
 	if err2 != nil {
 		t.Error(err2)
 	}
@@ -376,7 +376,7 @@ func TestConsensus(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	//proposal echo
-	cmd, buf, err2 = msg.ReadHeader(&s1, conn)
+	_, buf, err2 = msg.ReadHeader(&s1, conn)
 	if err2 != nil {
 		t.Error(err2)
 	}

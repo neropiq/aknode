@@ -31,7 +31,7 @@ after_success:
 - echo "Bootstrapping linux/arm..."
 - env GOOS=linux GOARCH=arm GOARM=6 go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_arm  -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
 - echo "Bootstrapping linux/arm64..."
-- env GOOS=linux GOARCH=arm GOARM=6 go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_arm64  -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
+- env GOOS=linux GOARCH=arm64 go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_arm64  -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
 - echo "Bootstrapping windows/amd64..."
 - env GOOS=windows GOARCH=amd64 go build -o ${REPO_NAME}_${TRAVIS_TAG}_win_amd64.exe  -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
 - echo "Bootstrapping windows/386..."

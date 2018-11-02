@@ -46,8 +46,12 @@ func TestPublicAPI(t *testing.T) {
 
 	tr := tx.NewMinableFee(s.Config, genesis)
 	tr.AddInput(genesis, 0)
-	tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply-10)
-	tr.AddOutput(s.Config, "", 10)
+	if err := tr.AddOutput(s.Config, a.Address58(s.Config), aklib.ADKSupply-10); err != nil {
+		t.Error(err)
+	}
+	if err := tr.AddOutput(s.Config, "", 10); err != nil {
+		t.Error(err)
+	}
 	if err := tr.Sign(a); err != nil {
 		t.Error(err)
 	}

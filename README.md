@@ -2,6 +2,9 @@
 [![Build Status](https://travis-ci.org/AidosKuneen/aknode.svg?branch=master)](https://travis-ci.org/AidosKuneen/aknode)
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/AidosKuneen/aknode/LICENSE)
 [![Coverage Status](https://coveralls.io/repos/github/AidosKuneen/aknode/badge.svg?branch=master)](https://coveralls.io/github/AidosKuneen/aknode?branch=master)
+[![GolangCI](https://golangci.com/badges/github.com/AidosKuneen/aknode.svg)](https://golangci.com/r/github.com/AidosKuneen/aknode) 
+
+
 # aknode
 
 ## Overview

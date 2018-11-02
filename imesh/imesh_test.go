@@ -78,7 +78,9 @@ func setup(t *testing.T) {
 	if err2 != nil {
 		t.Error(err2)
 	}
-	leaves.Init(&s)
+	if err := leaves.Init(&s); err != nil {
+		t.Error(err)
+	}
 	if err := Init(&s); err != nil {
 		t.Error(err)
 	}

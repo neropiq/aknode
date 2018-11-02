@@ -75,7 +75,9 @@ func setup(t *testing.T) context.CancelFunc {
 	s.Config.Genesis = map[string]uint64{
 		a.Address58(s.Config): aklib.ADKSupply,
 	}
-	leaves.Init(&s)
+	if err := leaves.Init(&s); err != nil {
+		t.Error(err)
+	}
 	if err = imesh.Init(&s); err != nil {
 		t.Error(err)
 	}

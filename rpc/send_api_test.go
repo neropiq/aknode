@@ -112,7 +112,7 @@ func TestSendAPI(t *testing.T) {
 	if err.Error() != "not priviledged" {
 		t.Error("should be error", err)
 	}
-	if testwalletpassphrase1(string("aa"), 0); err == nil {
+	if err = testwalletpassphrase1(string("aa"), 0); err == nil {
 		t.Error("should be error")
 	}
 	testwalletpassphrase2(t, string(pwdd))
