@@ -376,7 +376,7 @@ func TestConsensus(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	//proposal echo
-	_, buf, err2 = msg.ReadHeader(&s1, conn)
+	_, _, err2 = msg.ReadHeader(&s1, conn)
 	if err2 != nil {
 		t.Error(err2)
 	}
