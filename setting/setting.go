@@ -50,7 +50,7 @@ type Address struct {
 
 //Setting is  a aknode setting.
 type Setting struct {
-	Version    string
+	Version    string   `json:"-"`
 	Debug      bool     `json:"debug"`
 	Testnet    byte     `json:"testnet"`
 	Blacklists []string `json:"blacklists"`
@@ -95,7 +95,7 @@ type Setting struct {
 }
 
 //Load parse a json file fname , open DB and returns Settings struct .
-func Load(s []byte) (*Setting, error) {
+func Load(s []byte, onlyTestnet bool) (*Setting, error) {
 	var se Setting
 	if err := json.Unmarshal(s, &se); err != nil {
 		return nil, err
@@ -104,6 +104,9 @@ func Load(s []byte) (*Setting, error) {
 		return nil, errors.New("testnet must be 0(mainnet) or 1")
 	}
 	se.Config = aklib.Configs[se.Testnet]
+	if onlyTestnet {
+		return &se, nil
+	}
 
 	for _, a := range se.Blacklists {
 		if err := se.CheckAddress(a, false, false); err != nil {

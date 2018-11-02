@@ -126,9 +126,28 @@ func main() {
 		fmt.Println(err2)
 		f = []byte("{}")
 	}
-	setting, err2 := setting.Load(f)
+	if genkey {
+		setting, err2 := setting.Load(f, true)
+		if err2 != nil {
+			fmt.Println(err2, "in setting file")
+			os.Exit(1)
+		}
+		seed := address.GenerateSeed32()
+		akseed := address.HDSeed58(setting.Config, seed, []byte(""), true)
+		pub, err := address.NewNode(setting.Config, seed)
+		if err != nil {
+			log.Println(err)
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("Your validator secret key is", akseed)
+		fmt.Println("Your validator pulibic key is", pub.Address58(setting.Config))
+		fmt.Println("Keep the secret key secret.")
+		return
+	}
+	setting, err2 := setting.Load(f, false)
 	if err2 != nil {
-		fmt.Println(err2)
+		fmt.Println(err2, "in setting file")
 		os.Exit(1)
 	}
 	if !verbose {
@@ -140,20 +159,6 @@ func main() {
 		}
 		log.SetOutput(l)
 	}
-	if genkey {
-		seed := address.GenerateSeed32()
-		akseed := address.HDSeed58(setting.Config, seed, []byte(""), true)
-		pub, err := address.NewNode(setting.Config, seed)
-		if err != nil {
-			log.Println(err)
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		fmt.Println("Your validator secret key is", akseed)
-		fmt.Println("Your validator pulibic key is", pub)
-		fmt.Println("Keep the secret key secret.")
-		return
-	}
 
 	onSigs(setting)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -164,6 +169,7 @@ func main() {
 	}
 
 	<-setting.Stop
+	fmt.Println("stopping aknode...")
 	time.Sleep(3 * time.Second)
 	cancel()
 	time.Sleep(3 * time.Second)

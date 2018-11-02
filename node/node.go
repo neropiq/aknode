@@ -198,7 +198,7 @@ func start(ctx context.Context, setting *setting.Setting) (*net.TCPListener, err
 			log.Println(err)
 		}
 	}()
-	fmt.Printf("Starting node Server on " + ipport + "\n")
+	log.Printf("Starting node Server on " + ipport + "\n")
 	go func() {
 		defer func() {
 			if err := l.Close(); err != nil {
