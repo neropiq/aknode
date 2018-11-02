@@ -185,5 +185,5 @@ func (a *Adaptor) ShareValidaton(v *consensus.Validation) {
 // ShouldAccept returns true if the result should be accepted
 func (a *Adaptor) ShouldAccept(result *consensus.Result) bool {
 	log.Println("#proposers", result.Proposers)
-	return len(a.s.TrustedNodes)/2+1 > int(result.Proposers)
+	return len(a.s.TrustedNodes)/2+1 <= int(result.Proposers)
 }
