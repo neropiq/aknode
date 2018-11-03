@@ -97,11 +97,12 @@ func main() {
 		os.Exit(1)
 	}
 	defaultpath := filepath.Join(usr.HomeDir, ".aknode", "aknode.json")
-	var verbose, update, genkey bool
+	var verbose, update, genkey, genaddress bool
 	var fname string
 	flag.BoolVar(&verbose, "verbose", false, "outputs logs to stdout.")
 	flag.BoolVar(&update, "update", false, "check for update")
 	flag.BoolVar(&genkey, "genkey", false, "generate a validator key")
+	flag.BoolVar(&genaddress, "genaddress", false, "generate a random address")
 	flag.StringVar(&fname, "config", defaultpath, "setting file path")
 	flag.Parse()
 
@@ -125,6 +126,25 @@ func main() {
 	if err2 != nil {
 		fmt.Println(err2)
 		f = []byte("{}")
+	}
+	if genaddress {
+		setting, err2 := setting.Load(f, true)
+		if err2 != nil {
+			fmt.Println(err2, "in setting file")
+			os.Exit(1)
+		}
+		seed := address.GenerateSeed32()
+		akseed := address.HDSeed58(setting.Config, seed, []byte(""), false)
+		seed2 := address.HDseed(seed, 0, 0)
+		pub, err := address.New(setting.Config, seed2)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("privatekey is", akseed)
+		fmt.Println("address is", pub.Address58(setting.Config))
+		fmt.Println("Keep the privatekey secret.")
+		return
 	}
 	if genkey {
 		setting, err2 := setting.Load(f, true)

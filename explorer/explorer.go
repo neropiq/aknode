@@ -223,7 +223,6 @@ func indexHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 	}
 	for i, l := 0, akconsensus.LatestLedger(); i < 5; i++ {
 		id := l.ID()
-		log.Println(hex.EncodeToString(id[:]))
 		var h consensus.TxID
 		for h = range l.Txs {
 		}

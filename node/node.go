@@ -127,7 +127,7 @@ func connect(ctx context.Context, s *setting.Setting) {
 						}
 					}
 					if !found {
-						log.Println("#", i, "no peers found, sleeping")
+						log.Println("no other peers found from peer", i, ", sleeping")
 						time.Sleep(time.Minute)
 						return nil
 					}

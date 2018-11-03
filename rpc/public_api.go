@@ -85,7 +85,6 @@ func getnodeinfo(conf *setting.Setting, req *rpc.Request, res *rpc.Response) err
 		Connections:     node.ConnSize(),
 		Proxy:           conf.Proxy,
 		Testnet:         conf.Testnet,
-		KeyPoolSize:     len(wallet.Pool.Address),
 		Leaves:          leaves.Size(),
 		Time:            time.Now().Unix(),
 		TxNo:            imesh.GetTxNo(),
