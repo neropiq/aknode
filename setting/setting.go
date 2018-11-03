@@ -162,7 +162,7 @@ func Load(s []byte, onlyTestnet bool) (*Setting, error) {
 		se.RPCBind = "127.0.0.1"
 	}
 	if se.ExplorerPort == 0 {
-		se.RPCPort = se.Config.DefaultExplorerPort
+		se.ExplorerPort = se.Config.DefaultExplorerPort
 	}
 	if se.ExplorerMaxConnections == 0 {
 		se.ExplorerMaxConnections = 1

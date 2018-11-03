@@ -222,7 +222,6 @@ func initialize(ctx context.Context, setting *setting.Setting) error {
 			}
 		}()
 	}
-
 	if err := rpc.Init(setting); err != nil {
 		return err
 	}
