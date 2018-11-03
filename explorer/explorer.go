@@ -98,7 +98,7 @@ func Run(ctx context.Context, setting *setting.Setting) {
 	tmpl.Funcs(funcMap)
 	box := packr.NewBox(filepath.Join(wwwPath, "templates"))
 	for _, t := range box.List() {
-		str, err := box.MustString(t)
+		str, err := box.FindString(t)
 		if err != nil {
 			log.Fatal(t, err)
 		}
