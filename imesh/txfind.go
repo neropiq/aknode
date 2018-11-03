@@ -66,6 +66,7 @@ func Init(s *setting.Setting) error {
 
 	var total uint64
 	tr := tx.New(s.Config)
+	tr.Time = time.Time{}
 	for adr, val := range s.Config.Genesis {
 		if err := tr.AddOutput(s.Config, adr, val); err != nil {
 			return err
