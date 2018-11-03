@@ -77,8 +77,8 @@ func writeVersion(s *setting.Setting, to msg.Addr, conn *net.TCPConn, nonce uint
 func lookup(s *setting.Setting) error {
 	if len(nodesDB.Addrs) < int(s.MaxConnections) {
 		log.Println("looking for DNS...")
-		i := 0
 		var adrs msg.Addrs
+		log.Println("found:")
 		for _, d := range s.Config.DNS {
 			_, addrs, err := net.LookupSRV(d.Service, "tcp", d.Name)
 			if err != nil {
@@ -86,15 +86,15 @@ func lookup(s *setting.Setting) error {
 			}
 			for _, n := range addrs {
 				adr := net.JoinHostPort(n.Target, strconv.Itoa(int(s.Config.DefaultPort)))
+				log.Println(adr)
 				adrs = append(adrs, *msg.NewAddr(adr, msg.ServiceFull))
-				i++
 			}
 		}
 		if err := putAddrs(s, adrs...); err != nil {
 			return err
 		}
-		log.Println("found", i, "nodes from DNS")
 	}
+	log.Println("from DNS")
 	return nil
 }
 
@@ -167,7 +167,7 @@ func connect(ctx context.Context, s *setting.Setting) {
 					if err := putAddrs(s, p); err != nil {
 						log.Println(err)
 					}
-					log.Println("#", i, "connected to", p.Address)
+					log.Println("connected to", p.Address)
 					pr.run(s)
 					return nil
 				}()
@@ -284,6 +284,9 @@ func Start(ctx context.Context, setting *setting.Setting, debug bool) (net.Liste
 }
 
 func startConsensus(ctx context.Context, setting *setting.Setting) error {
+	if err := akconsensus.Init(ctx, setting, &ConsensusPeer{}); err != nil {
+		return err
+	}
 	var id consensus.NodeID
 	if setting.RunValidator && setting.ValidatorSecret != "" {
 		adr, err := setting.ValidatorAddress()

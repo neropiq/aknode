@@ -202,9 +202,6 @@ func initialize(ctx context.Context, setting *setting.Setting) error {
 	if err := leaves.Init(setting); err != nil {
 		return err
 	}
-	if err := akconsensus.Init(ctx, setting, &node.ConsensusPeer{}); err != nil {
-		return err
-	}
 	if _, err := node.Start(ctx, setting, false); err != nil {
 		return err
 	}
