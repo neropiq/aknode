@@ -17,7 +17,7 @@ including:
 * Aidos Explorer (Testing)
 * RPC APIs with Wallet Service (Testing)
 * One time address (Not Yet)
-* One time ring signature (Not planned for Step2)
+* One time ring signature / Confidential transaction (Not planned for Step2)
 
 UNDER CONSTRUCTION. DON'T TOUCH ME.
 
