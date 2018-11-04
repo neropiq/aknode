@@ -222,6 +222,10 @@ func writeGetData(s *setting.Setting, invs msg.Inventories) {
 		j := akrand.R.Intn(i + 1)
 		invs[i], invs[j] = invs[j], invs[i]
 	}
+	if len(peers.Peers) == 0 {
+		log.Println("no peers to writegetdata")
+		return
+	}
 	n := 2 * len(invs) / len(peers.Peers)
 	if n*len(peers.Peers) != 2*len(invs) {
 		n++
