@@ -27,7 +27,6 @@ import (
 	"log"
 	"net"
 	"strconv"
-	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -98,6 +97,61 @@ func lookup(s *setting.Setting) error {
 	return nil
 }
 
+func connectSub(ctx context.Context, s *setting.Setting, dialer func(string, string) (net.Conn, error)) error {
+	var p msg.Addr
+	found := false
+	for _, p = range get(0) {
+		if !isConnected(p.Address) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		log.Println("no other peers found from peer, sleeping")
+		time.Sleep(time.Minute)
+		return nil
+	}
+	if err := remove(s, p); err != nil {
+		log.Println(err)
+	}
+
+	conn, err3 := dialer("tcp", p.Address)
+	if err3 != nil {
+		return err3
+	}
+	tcpconn, ok := conn.(*net.TCPConn)
+	if !ok {
+		log.Fatal("invalid connection")
+	}
+	ctx2, cancel2 := context.WithCancel(ctx)
+	defer cancel2()
+	go func() {
+		<-ctx2.Done()
+		if err := tcpconn.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
+	if err := tcpconn.SetDeadline(time.Now().Add(rwTimeout)); err != nil {
+		return err
+	}
+	if err := writeVersion(s, p, tcpconn, verNonce); err != nil {
+		return err
+	}
+	pr, err3 := readVersion(s, tcpconn, verNonce)
+	if err3 != nil {
+		return err3
+	}
+	if err := pr.add(s); err != nil {
+		return err
+	}
+	if err := putAddrs(s, p); err != nil {
+		log.Println(err)
+	}
+	log.Println("connected to", p.Address)
+	pr.run(s)
+	return nil
+}
+
 func connect(ctx context.Context, s *setting.Setting) {
 	dialer := net.Dial
 	if s.Proxy != "" {
@@ -107,72 +161,18 @@ func connect(ctx context.Context, s *setting.Setting) {
 		}
 		dialer = p.Dial
 	}
-	var stop uint32
-	go func() {
-		ctx2, cancel2 := context.WithCancel(ctx)
-		defer cancel2()
-		<-ctx2.Done()
-		atomic.StoreUint32(&stop, 1)
-	}()
 	for i := 0; i < int(s.MaxConnections); i++ {
 		go func(i int) {
-			for atomic.LoadUint32(&stop) == 0 {
-				errr := func() error {
-					var p msg.Addr
-					found := false
-					for _, p = range get(0) {
-						if !isConnected(p.Address) {
-							found = true
-							break
-						}
-					}
-					if !found {
-						log.Println("no other peers found from peer", i, ", sleeping")
-						time.Sleep(time.Minute)
-						return nil
-					}
-					if err := remove(s, p); err != nil {
+			ctx2, cancel2 := context.WithCancel(ctx)
+			defer cancel2()
+			for {
+				select {
+				case <-ctx2.Done():
+					return
+				default:
+					if err := connectSub(ctx, s, dialer); err != nil {
 						log.Println(err)
 					}
-
-					conn, err3 := dialer("tcp", p.Address)
-					if err3 != nil {
-						return err3
-					}
-					tcpconn, ok := conn.(*net.TCPConn)
-					if !ok {
-						log.Fatal("invalid connection")
-					}
-					ctx2, cancel2 := context.WithCancel(ctx)
-					defer cancel2()
-					go func() {
-						<-ctx2.Done()
-						if err := tcpconn.Close(); err != nil {
-							log.Println(err)
-						}
-					}()
-					if err := tcpconn.SetDeadline(time.Now().Add(rwTimeout)); err != nil {
-						return err
-					}
-					if err := writeVersion(s, p, tcpconn, verNonce); err != nil {
-						return err
-					}
-					pr, err3 := readVersion(s, tcpconn, verNonce)
-					if err3 != nil {
-						return err3
-					}
-					if err := pr.add(s); err != nil {
-						return err
-					}
-					if err := putAddrs(s, p); err != nil {
-						log.Println(err)
-					}
-					log.Println("connected to", p.Address)
-					pr.run(s)
-					return nil
-				}()
-				if errr != nil {
-					log.Println(errr)
 				}
 			}
 		}(i)
@@ -180,7 +180,6 @@ func connect(ctx context.Context, s *setting.Setting) {
 }
 
 func start(ctx context.Context, setting *setting.Setting) (*net.TCPListener, error) {
-
 	ipport := fmt.Sprintf("%s:%d", setting.Bind, setting.Port)
 	tcpAddr, err2 := net.ResolveTCPAddr("tcp", ipport)
 	if err2 != nil {

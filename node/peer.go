@@ -247,6 +247,8 @@ func writeGetData(s *setting.Setting, invs msg.Inventories) {
 
 //Write writes a packet to peer p.
 func (p *peer) write(s *setting.Setting, m interface{}, cmd byte) error {
+	log.Println("writing packet cmd", cmd)
+
 	p.Lock()
 	defer p.Unlock()
 	w := wdata{

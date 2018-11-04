@@ -62,6 +62,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 			}
 			return err2
 		}
+		log.Println("read packet cmd", cmd)
 		switch cmd {
 		case msg.CmdPing:
 			v, err := msg.ReadNonce(buf)
