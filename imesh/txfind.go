@@ -76,6 +76,7 @@ func Init(s *setting.Setting) error {
 	if total != aklib.ADKSupply {
 		return errors.New("invalid total supply")
 	}
+	log.Println("genesis hash", tr.Hash())
 	has, err2 := Has(s, tr.Hash())
 	if err2 != nil {
 		return err2
