@@ -130,6 +130,7 @@ func goCron(ctx context.Context, s *setting.Setting) {
 	}()
 
 	go func() {
+		var lfrom msg.LeavesFrom
 		ctx2, cancel2 := context.WithCancel(ctx)
 		defer cancel2()
 		for {
@@ -138,7 +139,7 @@ func goCron(ctx context.Context, s *setting.Setting) {
 				return
 			case <-time.After(10 * time.Minute):
 				log.Println("querying latest leaves and node addressses..")
-				WriteAll(s, nil, msg.CmdGetLeaves)
+				WriteAll(s, &lfrom, msg.CmdGetLeaves)
 				WriteAll(s, nil, msg.CmdGetAddr)
 				peers.RLock()
 				log.Println("#node", len(peers.Peers))

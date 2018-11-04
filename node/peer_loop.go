@@ -190,6 +190,7 @@ func (p *peer) runLoop(s *setting.Setting) error {
 		case msg.CmdGetLeaves:
 			v, err := msg.ReadLeavesFrom(buf)
 			if err != nil {
+				log.Println(err)
 				return err
 			}
 			ls := leaves.GetAll()

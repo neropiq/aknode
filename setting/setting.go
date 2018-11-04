@@ -155,11 +155,11 @@ func Load(s []byte, onlyTestnet bool) (*Setting, error) {
 		return nil, errors.New("You must specify rpc_user and rpc_password")
 	}
 	if se.RPCMaxConnections == 0 {
-		se.MaxConnections = 1
+		se.RPCMaxConnections = 1
 	}
 
 	if se.ExplorerBind == "" {
-		se.RPCBind = "127.0.0.1"
+		se.ExplorerBind = "127.0.0.1"
 	}
 	if se.ExplorerPort == 0 {
 		se.ExplorerPort = se.Config.DefaultExplorerPort
