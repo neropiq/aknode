@@ -19,10 +19,9 @@ including:
 * One time address (Not Yet)
 * One time ring signature (Not planned for Step2)
 
-
 UNDER CONSTRUCTION. DON'T TOUCH ME.
 
-![Plan](https://i.imgur.com/NuATxJN.png)
+![Plan](https://i.imgur.com/g3mKfOl.png)
 
 
 ## Requirements
