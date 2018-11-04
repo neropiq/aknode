@@ -36,10 +36,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/AidosKuneen/aklib/db"
-
 	"github.com/AidosKuneen/aklib/address"
-
+	"github.com/AidosKuneen/aklib/db"
 	"github.com/AidosKuneen/aklib/updater"
 	"github.com/AidosKuneen/aknode/akconsensus"
 	"github.com/AidosKuneen/aknode/explorer"

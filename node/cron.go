@@ -130,22 +130,15 @@ func goCron(ctx context.Context, s *setting.Setting) {
 	}()
 
 	go func() {
-		var lfrom msg.LeavesFrom
 		ctx2, cancel2 := context.WithCancel(ctx)
 		defer cancel2()
+		cronSub(s)
 		for {
 			select {
 			case <-ctx2.Done():
 				return
 			case <-time.After(10 * time.Minute):
-				log.Println("querying latest leaves and node addressses..")
-				WriteAll(s, &lfrom, msg.CmdGetLeaves)
-				WriteAll(s, nil, msg.CmdGetAddr)
-				peers.RLock()
-				log.Println("#node", len(peers.Peers))
-				peers.RUnlock()
-				log.Println("#leaves", leaves.Size())
-				log.Println("done")
+				cronSub(s)
 			}
 		}
 	}()
@@ -163,4 +156,17 @@ func goCron(ctx context.Context, s *setting.Setting) {
 			}
 		}
 	}()
+}
+
+func cronSub(s *setting.Setting) {
+	var lfrom msg.LeavesFrom
+
+	log.Println("querying latest leaves and node addressses..")
+	WriteAll(s, &lfrom, msg.CmdGetLeaves)
+	WriteAll(s, nil, msg.CmdGetAddr)
+	peers.RLock()
+	log.Println("#node", len(peers.Peers))
+	peers.RUnlock()
+	log.Println("#leaves", leaves.Size())
+	log.Println("done")
 }
