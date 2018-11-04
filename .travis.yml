@@ -12,6 +12,7 @@ before_install:
 - go get -u github.com/alecthomas/gometalinter
 - go get -u github.com/mattn/goveralls
 - export PATH=$PATH:$GOPATH/bin
+- go get -u github.com/gobuffalo/packr/...
 - gometalinter --install --update
 - go generate -x ./...
 
@@ -22,8 +23,6 @@ after_success:
 - gometalinter -e bindata --deadline=1000s ./...
 - goveralls -coverprofile=coverage.out -service=travis-ci
 - cd cmd/aknode
-- go get -u github.com/gobuffalo/packr/...
-- packr
 - echo "Bootstrapping linux/amd64..."
 - env GOOS=linux GOARCH=amd64 go build -o ${REPO_NAME}_${TRAVIS_TAG}_linux_amd64 -ldflags "-X ${REPO_DIR}/setting.Version=\"${TRAVIS_TAG}\""
 - echo "Bootstrapping linux/386..."

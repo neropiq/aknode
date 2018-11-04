@@ -28,8 +28,6 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -50,6 +48,8 @@ import (
 	qrcode "github.com/skip2/go-qrcode"
 )
 
+//go:generate packr
+
 const (
 	notFound = "we couldn't find what you are looking for."
 )
@@ -58,14 +58,6 @@ var tmpl = template.New("")
 
 //Run runs explorer server.
 func Run(ctx context.Context, setting *setting.Setting) {
-	p, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	wwwPath := filepath.Join(p, "static")
-	if _, err := os.Stat(wwwPath); err != nil {
-		wwwPath = filepath.Join(p, "../cmd/aknode/static")
-	}
 	funcMap := template.FuncMap{
 		"toADK": func(amount uint64) string {
 			p := message.NewPrinter(language.English)
@@ -96,7 +88,7 @@ func Run(ctx context.Context, setting *setting.Setting) {
 		},
 	}
 	tmpl.Funcs(funcMap)
-	box := packr.NewBox(filepath.Join(wwwPath, "templates"))
+	box := packr.NewBox("../cmd/aknode/static/templates")
 	for _, t := range box.List() {
 		str, err := box.FindString(t)
 		if err != nil {
@@ -110,34 +102,7 @@ func Run(ctx context.Context, setting *setting.Setting) {
 
 	ipport := fmt.Sprintf("%s:%d", setting.ExplorerBind, setting.ExplorerPort)
 	mux := http.NewServeMux()
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		indexHandle(setting, w, r)
-	})
-	mux.HandleFunc("/search/", func(w http.ResponseWriter, r *http.Request) {
-		searchHandle(setting, w, r)
-	})
-	mux.HandleFunc("/tx/", func(w http.ResponseWriter, r *http.Request) {
-		txHandle(setting, w, r)
-	})
-	mux.HandleFunc("/address/", func(w http.ResponseWriter, r *http.Request) {
-		addressHandle(setting, w, r)
-	})
-	mux.HandleFunc("/maddress/", func(w http.ResponseWriter, r *http.Request) {
-		maddressHandle(setting, w, r)
-	})
-	mux.HandleFunc("/statement/", func(w http.ResponseWriter, r *http.Request) {
-		statementHandle(setting, w, r)
-	})
-	mux.HandleFunc("/qrcode/", func(w http.ResponseWriter, r *http.Request) {
-		qrHandle(setting, w, r)
-	})
-	for _, stat := range []string{"images", "css", "js", "icofont"} {
-		box := packr.NewBox(filepath.Join(wwwPath, stat))
-		mux.Handle("/"+stat+"/", http.StripPrefix("/"+stat+"/", http.FileServer(box)))
-	}
-	ibox := packr.NewBox(filepath.Join(wwwPath, "images"))
-	mux.Handle("/favicon.ico", http.StripPrefix("/", http.FileServer(ibox)))
+	setupHandler(setting, ipport, mux)
 
 	s := &http.Server{
 		Addr:              ipport,
@@ -159,6 +124,40 @@ func Run(ctx context.Context, setting *setting.Setting) {
 			log.Print(err)
 		}
 	}()
+}
+
+func setupHandler(setting *setting.Setting, ipport string, mux *http.ServeMux) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		indexHandle(setting, w, r)
+	})
+	mux.HandleFunc("/search/", func(w http.ResponseWriter, r *http.Request) {
+		searchHandle(setting, w, r)
+	})
+	mux.HandleFunc("/tx/", func(w http.ResponseWriter, r *http.Request) {
+		txHandle(setting, w, r)
+	})
+	mux.HandleFunc("/address/", func(w http.ResponseWriter, r *http.Request) {
+		addressHandle(setting, w, r)
+	})
+	mux.HandleFunc("/maddress/", func(w http.ResponseWriter, r *http.Request) {
+		maddressHandle(setting, w, r)
+	})
+	mux.HandleFunc("/statement/", func(w http.ResponseWriter, r *http.Request) {
+		statementHandle(setting, w, r)
+	})
+	mux.HandleFunc("/qrcode/", func(w http.ResponseWriter, r *http.Request) {
+		qrHandle(setting, w, r)
+	})
+	//cannot use variables for packr
+	ibox := packr.NewBox("../cmd/aknode/static/images")
+	mux.Handle("/favicon.ico", http.StripPrefix("/", http.FileServer(ibox)))
+	mux.Handle("/images/", http.StripPrefix("/images/", http.FileServer(ibox)))
+	ibox = packr.NewBox("../cmd/aknode/static/css")
+	mux.Handle("/css/", http.StripPrefix("/css/", http.FileServer(ibox)))
+	ibox = packr.NewBox("../cmd/aknode/static/js")
+	mux.Handle("/js/", http.StripPrefix("/js/", http.FileServer(ibox)))
+	ibox = packr.NewBox("../cmd/aknode/static/icofont")
+	mux.Handle("/icofont/", http.StripPrefix("/icofont/", http.FileServer(ibox)))
 }
 
 func qrHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
