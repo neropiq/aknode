@@ -271,7 +271,7 @@ func txHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		renderError(w, err.Error())
 		return
 	}
-	ok, err := imesh.Has(s, txid)
+	ok, err := imesh.Has(s.DB, txid)
 	if err != nil {
 		renderError(w, err.Error())
 		return
@@ -590,7 +590,7 @@ func searchHandle(s *setting.Setting, w http.ResponseWriter, r *http.Request) {
 		if err2 == nil {
 			isStatement = true
 		}
-		isTx, err2 = imesh.Has(s, bid)
+		isTx, err2 = imesh.Has(s.DB, bid)
 		if err2 != nil {
 			renderError(w, err2.Error())
 			return

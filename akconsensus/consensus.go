@@ -364,7 +364,7 @@ func Confirm(s *setting.Setting, l *consensus.Ledger) error {
 			for h := range ll.Txs {
 				t = tx.Hash(h[:])
 			}
-			has, err := imesh.Has(s, t)
+			has, err := imesh.Has(s.DB, t)
 			if err != nil {
 				return err
 			}

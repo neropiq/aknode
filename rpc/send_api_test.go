@@ -169,9 +169,6 @@ func testgetnodeinfo(t *testing.T) *rpc.NodeInfo {
 	if result.Testnet != s.Testnet {
 		t.Error("invalid testnet")
 	}
-	if result.KeyPoolSize != len(wallet.Pool.Address) {
-		t.Error("invalid pool size")
-	}
 	if result.Leaves != leaves.Size() {
 		t.Error("invalid leave size")
 	}

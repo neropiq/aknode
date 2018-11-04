@@ -227,7 +227,7 @@ func gettxsstatus(conf *setting.Setting, req *rpc.Request, res *rpc.Response) er
 		if err != nil {
 			return err
 		}
-		ok, err := imesh.Has(conf, tid)
+		ok, err := imesh.Has(conf.DB, tid)
 		if err != nil {
 			return err
 		}

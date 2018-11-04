@@ -124,8 +124,8 @@ func PreviousMultisigOutput(s *setting.Setting, in *tx.MultiSigIn) (*tx.MultiSig
 }
 
 // Has returns true if hash exists in db.
-func Has(s *setting.Setting, hash []byte) (bool, error) {
-	err := s.DB.View(func(txn *badger.Txn) error {
+func Has(bdb *badger.DB, hash []byte) (bool, error) {
+	err := bdb.View(func(txn *badger.Txn) error {
 		_, err2 := txn.Get(append([]byte{byte(db.HeaderTxInfo)}, hash...))
 		return err2
 	})

@@ -77,7 +77,7 @@ func Init(s *setting.Setting) error {
 		return errors.New("invalid total supply")
 	}
 	log.Println("genesis hash", tr.Hash())
-	has, err2 := Has(s, tr.Hash())
+	has, err2 := Has(s.DB, tr.Hash())
 	if err2 != nil {
 		return err2
 	}
@@ -134,7 +134,7 @@ func put(s *setting.Setting) error {
 func AddNoexistTxHash(s *setting.Setting, h tx.Hash, typ tx.Type) error {
 	mutex.Lock()
 	defer mutex.Unlock()
-	has, err := Has(s, h)
+	has, err := Has(s.DB, h)
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func CheckAddTx(s *setting.Setting, tr *tx.Transaction, typ tx.Type) error {
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
-	has, err := Has(s, tr.Hash())
+	has, err := Has(s.DB, tr.Hash())
 	if err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func (tr *unresolvedTx) dfs(s *setting.Setting, h [32]byte) error {
 	}
 	tr.visited = true
 	for _, prev := range tr.prevs {
-		has, err := Has(s, prev)
+		has, err := Has(s.DB, prev)
 		if err != nil {
 			return err
 		}

@@ -274,15 +274,16 @@ func Start(ctx context.Context, setting *setting.Setting, debug bool) (net.Liste
 			return nil, err
 		}
 		connect(ctx, setting)
-		// if err := startConsensus(ctx, setting); err != nil {
-		// 	return nil, err
-		// }
+		if err := startConsensus(ctx, setting); err != nil {
+			return nil, err
+		}
 	}
 	l, err := start(ctx, setting)
 	return l, err
 }
 
 func startConsensus(ctx context.Context, setting *setting.Setting) error {
+	consensus.LedgerGranularity = 30 * time.Second
 	if err := akconsensus.Init(ctx, setting, &ConsensusPeer{}); err != nil {
 		return err
 	}
