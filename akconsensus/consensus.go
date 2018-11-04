@@ -110,6 +110,8 @@ func LatestLedger() *consensus.Ledger {
 
 //Init initialize consensus.
 func Init(ctx context.Context, s *setting.Setting, p network) error {
+	consensus.LedgerGranularity = 15 * time.Second
+
 	notify = nil
 	proposals = make(map[consensus.ProposalID]time.Time)
 	validations = make(map[consensus.ValidationID]time.Time)
@@ -258,10 +260,14 @@ func ReadGetLeadger(buf []byte) (consensus.LedgerID, error) {
 
 //ReadLeadger parse a Ledger command.
 func ReadLeadger(s *setting.Setting, peer *consensus.Peer, buf []byte) (*consensus.Ledger, error) {
-	var v consensus.Ledger
-	err := arypack.Unmarshal(buf, &v)
-	v.IndexOf = consensus.IndexOfFunc(&v, peer.AcquireLedger)
-	return &v, err
+	var l ledger
+	err := arypack.Unmarshal(buf, &l)
+	v, err := fromLedger(s, &l)
+	if err != nil {
+		return nil, err
+	}
+	v.IndexOf = consensus.IndexOfFunc(v, peer.AcquireLedger)
+	return v, err
 }
 
 //ReadValidation parse a Validation command.
