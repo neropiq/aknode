@@ -20,6 +20,8 @@ including:
 
 UNDER CONSTRUCTION. DON'T TOUCH ME.
 
+![Plan](https://i.imgur.com/ES9PJlA.png)
+
 
 ## Requirements
 
