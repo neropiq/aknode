@@ -262,6 +262,9 @@ func ReadGetLeadger(buf []byte) (consensus.LedgerID, error) {
 func ReadLeadger(s *setting.Setting, peer *consensus.Peer, buf []byte) (*consensus.Ledger, error) {
 	var l ledger
 	err := arypack.Unmarshal(buf, &l)
+	if err != nil {
+		return nil, err
+	}
 	v, err := fromLedger(s, &l)
 	if err != nil {
 		return nil, err
