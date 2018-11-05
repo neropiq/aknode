@@ -110,7 +110,7 @@ func LatestLedger() *consensus.Ledger {
 
 //Init initialize consensus.
 func Init(ctx context.Context, s *setting.Setting, p network) error {
-	consensus.LedgerGranularity = 15 * time.Second
+	consensus.LedgerGranularity = 5 * time.Second
 
 	notify = nil
 	proposals = make(map[consensus.ProposalID]time.Time)
