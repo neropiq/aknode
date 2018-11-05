@@ -65,6 +65,7 @@ func TestPublicAPI(t *testing.T) {
 		t.Error(err)
 	}
 	testsendrawtx(t, ti, tx.TypeNormal)
+	time.Sleep(6 * time.Second)
 
 	tr = tx.NewMinableTicket(s.Config, ti.Hash(), genesis)
 	tr.AddInput(genesis, 0)
